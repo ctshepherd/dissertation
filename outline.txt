@@ -1,0 +1,36 @@
+Phase 1 Project Selection Status Report
+
+Name: Charlie Shepherd
+
+College: Churchill
+
+User Identifier: cs648
+
+Director of Studies: John Fawcett
+
+
+1. Please write 100 words on your current project ideas.
+
+   My current project idea is to develop a distributed peer to peer filesystem
+   using the Paxos protocol invented by Leslie Lamport, which is a
+   generalisation of the Two Phase Commit protocol and has been used by Google
+   and Microsoft in various projects.
+   It will use fuse and be written in python using fusepy, a single python
+   file that is a wrapper for the fuse shared library. I will use git as a
+   VCS.
+   Possibilities for extensions involve profiling the hotspots and
+   optimising them, either the python code or writing a C extension that
+   implements the functionality that needs to be the fastest.
+
+2. Please list names of potential project supervisors.
+
+   Stephen Cross (CC'ed) has agreed to supervise my project.
+
+3.
+   your own machine, machines in College, special peripherals,
+   imported software packages, special hardware, network access,
+   substantial extra disc space on the PWF.
+   If so indicate below what, and what it is needed for.
+   My own laptop - development
+   Oracle VirtualBox - development environment
+   CL computers with fuse installed- test/data gathering environment

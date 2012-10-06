@@ -33,4 +33,5 @@ Director of Studies: John Fawcett
    If so indicate below what, and what it is needed for.
    My own laptop - development
    Oracle VirtualBox - development environment
+   Fuse shared library/fusepy - kernel interface
    CL computers with fuse installed- test/data gathering environment

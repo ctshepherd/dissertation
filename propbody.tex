@@ -1,0 +1,214 @@
+\vfil
+
+\centerline{\Large Computer Science Project Proposal}
+\vspace{0.4in}
+\centerline{\Large PFS: A Distributed Peer-to-Peer Filesystem based on the Paxos protocol}
+\vspace{0.4in}
+\centerline{\large Charlie Shepherd, Churchill College}
+\vspace{0.3in}
+\centerline{\large Originator: Charlie Shepherd}
+\vspace{0.3in}
+\centerline{\large 5$^{th}$ October 2012}
+
+\vfil
+
+
+\noindent
+{\bf Project Supervisor:} Stephen Cross
+\vspace{0.2in}
+
+\noindent
+{\bf Director of Studies:} Dr John Fawcett
+\vspace{0.2in}
+\noindent
+
+\noindent
+{\bf Project Overseers:} Dr~A.~Madhavapeddy \& Dr~M.~Kuhn
+
+
+% Main document
+
+\section*{Introduction, The Problem To Be Addressed}
+
+Talk about filesystems, bitorrent, dropbox, etc
+modernisation, smart phones, tablets, laptops
+
+There has been an explosion of connectivity in the recent past, with each consumer owning multiple
+laptops, a tablet, smartphone and a desktop computer. The demand for services that provide the
+ability to synchronise a users data across their multiple devices has grown accordingly, the rise
+to prominence of Dropbox being the most pertinent recent example (quote valuation of dropbox).
+
+Some others include...
+
+Lots of synchronisation applications are now moving to the cloud, eg Dropbox. However, there are
+several drawbacks to this approach:
+
+- Lack of control of data
+The recent spate of acquihires (too topical?).
+If a users data resides on their synchronisation provider's system, then if that provider goes
+bust, suffers a natural or manmade disaster or their equipment breaks, the user may be deprived of
+their ability to use the service, and may in fact lose all their data completely. Network outages
+to the region where the data is stored (Uganda, AWS outage in US), may also deny the user access
+to their data, or to their service, even if they are in a different region or even country.
+
+Clearly distributed networks are far more resilient to failure, both hardware and network. 
+
+- Lack of privacy of data
+All the users data, along with connection and login information, can be collected by the central
+repository and retained indefinitely. In fact many regulations require the retention of this
+information by service providers. In the past this information has been subpoenaed by governments,
+including the United States government, in order to trace an individuals identity, often without
+a warrant. Clearly this could be a significant concern to anyone wanting to synchronise sensitive
+files, which may include bank details, passwords/PINS, photos etc.
+
+Also, a service provider is free to, and in some cases required by legislation to, inspect the
+contents of users data. Although some services like Amazon's S3 enforce encryption so that it is
+not possible to snoop on a users data, there have been various recent controversies that show that
+this is not a theoretical problem. Although customer level encryption can mitigate this problem,
+it is often bulky, complex, not integrated with the synchronisation solution and easy to get
+wrong, completely bypassing its benefits.
+
+- reliance on other backup solutions
+As there is a master central server, this contains all revision history, data etc and is a
+centralised backup source. The advantage of this is that it does provide a centralised location to
+backup from, however as this is in the cloud a user has far less control over the ability to
+backup. This could be mitigated by hosting the service on the users own service but a distributed
+approach is another solution to the problem, which has the advantage of placing the backup
+controller as merely another peer in the network, allowing separation of duties between servers
+and clearer failover characteristics.
+
+From this it is clear that using the cloud as a synchronisation backend has advantages but also
+some clear limitations. For this reason I am proposing to implement a filesystem for file
+synchronisation, that uses a peer to peer protocol.
+
+
+\section*{Starting Point}
+
+{\em Describe existing state of the art, previous work in this area, libraries and databases to be used.
+Describe the state of any existing codebase that is to be built on.  }
+
+
+Google uses the Paxos algorithm in their Chubby distributed lock service in order to keep
+replicas consistent in case of failure. Chubby is used by BigTable which is now in production
+in Google Analytics and other products.
+Google Spanner uses the Paxos algorithm internally
+The OpenReplica replication service uses Paxos to maintain replicas for an open access
+system that enables users to create fault-tolerant objects. It provides high
+performance through concurrent rounds and flexibility through dynamic membership
+changes.
+Microsoft uses Paxos in the Autopilot cluster management service from Bing.
+WANDisco have implemented Paxos within their DConE active-active
+replication technology.
+
+
+\section*{Resources Required}
+
+{\em A note of the resources required and confirmation of access.}
+
+I will mainly do my project on a virtual machine which is running on my own personal computer.
+Although the source code will
+For this project I shall mainly use my own quad-core computer that runs Fedora Linux. Backup
+will be to github and/or to an SVN repository on an external hard disk that is dumped to writable CD/DVD media.
+I have another similar computer to hand should my main machine suddenly fail.
+I require no other special resources.
+
+\section*{Work to be done}
+
+{\em Describe the technical work.}
+
+The project breaks down into the following sub-projects:
+
+\begin{enumerate}
+
+\item A study of network filesystems etc
+
+\item A study of FUSE? (Really?)
+
+\item Developing a prototype fuse plugin in python that implements my protocol
+
+\item Analysing several different performance metrics of the protocol
+
+\item Looking at way to optimise the plugin and perhaps the protocol? To make it more efficient
+(solely in terms of performance)
+
+\end{enumerate}
+
+\section*{Success Criterion for the Main Result}
+
+
+In order for the project to be a success, the project must be:
+\begin{enumerate}
+
+\item Preserving consistency etc
+
+\end{enumerate}
+
+
+
+
+\section*{Possible Extensions}
+
+{\em Potential further envisaged evaluation metrics or extensions.}
+
+As for evaluation, in terms of performance you'll probably want to assess
+things like latency (how long it takes for a single request to be fulfilled)
+and throughput (how many requests you can fulfil per unit time). There's also
+failure tolerance (how many nodes can fail before the system breaks), and
+performance under failure (how are latency/throughput affected if a certain
+number of nodes fail).
+
+Perhaps the system can reconfigure itself to handle node failure; how long does
+this take? Also, how does the system scale? What's the performance with ten
+nodes vs a hundred? How many requests (from different nodes) can the system
+handle before performance degrades?
+
+Are there any cases where the system performs badly? And where it performs
+well? How often do the worst case situations occur?
+
+Finally, how resistant is the system to malicious nodes? (This may not be
+relevant.)
+
+Security? Encryption?
+
+\section*{Timetable: Workplan and Milestones to be achieved.}
+
+
+{\em Perhaps list ten or so  two-week work-packages.}
+
+Planned starting date is 16/10/2011.
+
+\begin{enumerate}
+
+\item {\bf Michaelmas weeks 2-3} Write initial Paxos functions, functions for debugging etc,
+achieve consistency on a decision
+
+\item {\bf Michaelmas weeks 4-5} Build commandline shim, transfer files between nodes, node
+discovery etc
+
+\item {\bf Michaelmas weeks 6-7} Enhance protocol support enough for directories and link FUSE
+operations class
+
+\item {\bf Michaelmas weeks 8} Enhance protocol support enough for directories and link FUSE
+operations class
+
+\item {\bf Michaelmas vacation} Finish coding: test debug etc etc
+
+\item {\bf Lent weeks 0-1} Write progress report. Start analysis of individual nodes/local nodes,
+protocol performance/limitations etc
+
+\item {\bf Lent weeks 2-3} Run main experiments, including large scale network across CL, analyse
+performance, create graphs in Matlab etc etc
+
+\item {\bf Lent weeks 4-5} Protocol improvement
+
+\item {\bf Lent weeks 6-7} C extension.
+
+\item {\bf Lent weeks 8} Finish evaluation, overarching themes
+
+\item {\bf Easter vacation:} Analyse performance increases etc
+
+\item {\bf Easter term 0-2:}  Further evaluation and complete dissertation.
+
+\item {\bf Easter term 3:} Proof reading and then an early submission so as to concentrate on examination revision.
+
+\end{enumerate}

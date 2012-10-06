@@ -40,6 +40,13 @@ diss.ps:	$(DISS)
 diss.pdf:	diss.ps
 	ps2pdf diss.ps
 
+proposal.ps:	$(PROP)
+	latex proposal
+	dvips -Ppdf -G0 -t a4 -pp 0-200 -o proposal.ps proposal.dvi
+
+proposal.pdf:	proposal.ps
+	ps2pdf proposal.ps
+
 makefile.txt:	Makefile
 	expand Makefile >makefile.txt
 count:

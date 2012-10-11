@@ -25,7 +25,8 @@ help:
 	@echo "make pr       print the dissertation"
 	@echo
 
-prop:	proposal.dvi
+prop:	proposal.dvi proposal.pdf
+	cp proposal.pdf ~/public_html/
 	#xdvi proposal.dvi
 
 diss.ps:	$(DISS)

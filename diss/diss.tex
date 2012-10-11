@@ -38,16 +38,16 @@
 
 \pagestyle{empty}
 
-\hfill{\LARGE \bf Martin Richards}
+\hfill{\LARGE \bf Charlie Shepherd}
 
 \vspace*{60mm}
 \begin{center}
 \Huge
-{\bf How to write a dissertation in \LaTeX} \\
+{\bf PFS: A Distributed Peer-to-Peer Filesystem based on the Paxos protocol} \\
 \vspace*{5mm}
 Diploma in Computer Science \\
 \vspace*{5mm}
-St John's College \\
+Churchill College \\
 \vspace*{5mm}
 \today  % today's date
 \end{center}
@@ -65,14 +65,14 @@ St John's College \\
 
 {\large
 \begin{tabular}{ll}
-Name:               & \bf Martin Richards                       \\
-College:            & \bf St John's College                     \\
-Project Title:      & \bf How to write a dissertation in \LaTeX \\
-Examination:        & \bf Diploma in Computer Science, July 2001        \\
+Name:               & \bf Charlie Shepherd                        \\
+College:            & \bf Churchill College                     \\
+Project Title:      & \bf PFS: A Distributed Peer-to-Peer Filesystem based on the Paxos protocol  \\
+Examination:        & \bf Diploma in Computer Science, July 2013        \\
 Word Count:         & \bf 1587\footnotemark[1]
 (well less than the 12000 limit) \\
-Project Originator: & Dr M.~Richards                    \\
-Supervisor:         & Dr M.~Richards                    \\ 
+Project Originator: & Charlie Shepherd                    \\
+Supervisor:         & Stephen Cross                    \\
 \end{tabular}
 }
 \footnotetext[1]{This word count was computed
@@ -104,7 +104,7 @@ All that has been completed appears in this dissertation.
 
 Learning how to incorporate encapulated postscript into a \LaTeX\
 document on both CUS and Thor.
- 
+
 \newpage
 \section*{Declaration}
 
@@ -131,7 +131,7 @@ extent for a comparable purpose.
 \section*{Acknowledgements}
 
 This document owes much to an earlier version written by Simon Moore
-\cite{moore95}.  His help, encouragement and advice was greatly 
+\cite{moore95}.  His help, encouragement and advice was greatly
 appreciated.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -153,8 +153,8 @@ This document consists of the following files:
 \begin{itemize}
 \item {\tt Makefile} --- The Makefile for the dissertation and Project Proposal
 \item {\tt diss.tex} --- The dissertation
-\item {\tt propbody.tex} --- Appendix~C  -- the project proposal 
-\item {\tt proposal.tex}  --- A \LaTeX\ main file for the proposal 
+\item {\tt propbody.tex} --- Appendix~C  -- the project proposal
+\item {\tt proposal.tex}  --- A \LaTeX\ main file for the proposal
 \item{\tt figs} -- A directory containing diagrams and pictures
 \item{\tt refs.bib} --- The bibliography database
 \end{itemize}
@@ -180,8 +180,8 @@ usually takes 2 more runs.
 
 \subsection{The makefile}
 
-To simplify the calls to {\tt latex} and {\tt bibtex}, 
-a makefile has been provided, see Appendix~\ref{makefile}. 
+To simplify the calls to {\tt latex} and {\tt bibtex},
+a makefile has been provided, see Appendix~\ref{makefile}.
 It provides the following facilities:
 
 \begin{itemize}
@@ -196,11 +196,11 @@ It provides the following facilities:
  Make the file {\tt diss.ps}.
 
 \item{\tt make gv} \\
- View the dissertation using ghostview after performing 
+ View the dissertation using ghostview after performing
 {\tt make diss.ps}, if necessary.
 
 \item{\tt make gs} \\
- View the dissertation using ghostscript after performing 
+ View the dissertation using ghostscript after performing
 {\tt make diss.ps}, if necessary.
 
 \item{\tt make count} \\
@@ -257,9 +257,9 @@ often squeeze the lines a little closer together, as in:
 
 {\renewcommand{\baselinestretch}{0.8}\small\begin{verbatim}
 GET "libhdr"
- 
+
 GLOBAL { count:200; all  }
- 
+
 LET try(ld, row, rd) BE TEST row=all
                         THEN count := count + 1
                         ELSE { LET poss = all & ~(ld | row | rd)

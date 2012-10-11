@@ -30,24 +30,49 @@
 
 \section*{Introduction, The Problem To Be Addressed}
 
-Paxos is a protocol for achieving distributed consensus. 
+Paxos is a protocol for achieving distributed consensus, developed by Leslie Lamport at
+Microsoft Research.
+The motivation for Paxos as a protocol is that it is capable of handling failures that other
+consensus protocols cannot. Two Phase Commit (2PC) and Three Phase Commit (3PC) are two common
+protocols that can be used to ensure atomic commits in a distributed system.
+
+2PC works by having a co-ordinator node contact every node and send a proposal message. Each node
+must then either respond with a commit or abort message. However, 2PC suffers from a problem, in
+that if the co-ordinator node crashes after any proposal messages have been sent out, the protocol
+will block. This can be resolved by establishing a timeout and, on timeout, establishing a
+"recovery node" that recovers the state of the proposal and completes transaction (either by
+committing or aborting). The main limitation of this protocol is that, even with this fix in
+place, a fundamental limitation of the protocol is that if, while the network is in "recovery
+mode", another node crashes, the entire network is blocked, and the state is unrecoverable. This
+is a fairly fundamental flaw in a protocol if it is to be used over the Internet, where computer
+crashes and network failures (which can be represented as a crash) are common.
+
+3PC is an extension to 2PC which endeavours to fix this limitation, at the expense of greater
+latency, by adding a third roundtrip to confirm the commit to all nodes. This means that the
+protocol is asynchronous, and that node failures cannot block the protocol or cause it to fail.
+However, it still has its own limitations, in particular, in the event of a network partition. If
+the network is partitioned so that in one partition all nodes vote "commit" and in the other all
+nodes vote "abort", both partitions will initiate recovery, and when the network merges again the
+system will be in an inconsistent state. This is the limitation that Paxos was intended to solve.
 
 \section*{Starting Point}
 
 {\em Describe existing state of the art, previous work in this area, libraries and databases to be used.
 Describe the state of any existing codebase that is to be built on.  }
 
-My starting point will be to study the Paxos protocol
+My starting point will be to study the Paxos protocol. From there I will design a library
+implementation of Paxos and then implement it, along with unit tests. The challenge will be
+developing a complex distributed protocol, as this is something I have minimal experience of.
 
 \section*{Resources Required}
 
 {\em A note of the resources required and confirmation of access.}
 
-I will mainly do my project on a virtual machine which is running on my own personal computer.
-Although the source code will
-For this project I shall mainly use my own quad-core computer that runs Fedora Linux. Backup
-will be to github and/or to an SVN repository on an external hard disk that is dumped to writable CD/DVD media.
-I have another similar computer to hand should my main machine suddenly fail.
+I will mainly do my project on a virtual machine which is running on my own personal laptop.
+The source code will be committed to a Git repository, which will be pushed to Bitbucket and my
+own personal host. The virtual machine contents will be backed up on an external HDD for quick
+recovery, although the git repository will be adequate for restoring my project if the system I am
+developing it on fails.
 I require no other special resources.
 
 \section*{Work to be done}
@@ -58,77 +83,113 @@ The project breaks down into the following sub-projects:
 
 \begin{enumerate}
 
-\item A study of network filesystems etc
+\item A study of distributed algorithms and the Paxos protocol
 
-\item A study of FUSE? (Really?)
+\item Implementing the Paxos protocol
 
-\item Developing a prototype fuse plugin in python that implements my protocol
+\item Analysing several different performance metrics of the protocol implementation
 
-\item Analysing several different performance metrics of the protocol
-
-\item Looking at way to optimise the plugin and perhaps the protocol? To make it more efficient
-(solely in terms of performance)
+\item Evaluating potential improvements to the protocol
 
 \end{enumerate}
 
 \section*{Success Criterion for the Main Result}
 
-
-In order for the project to be a success, the project must be:
-\begin{enumerate}
-
-\item Preserving consistency etc
-
-\end{enumerate}
-
-
+In order for the project to be a success, the project must correctly implement the Paxos protocol.
+The main deliverable is a python script and library implementing Paxos. The library must be
+capable of forming a running network, in particular dynamic leader election, as well as achieving
+consensus on a key/value store across the network. A node must be capable of joining the network
+given only the address and port of all other nodes in the network.
 
 
 \section*{Possible Extensions}
 
 {\em Potential further envisaged evaluation metrics or extensions.}
 
+There are several potential evaluation metrics for the project.
 
+One major metric is latency - the time for one key/value pair to be committed to the system. This
+can be evaluated in a number of difference circumstances, including simulated node failure, leader
+failure and network partition, and the results analysed to see how the system handles performance
+under failure compared to normal conditions.
+
+Another key metric is throughput - the maximum number of key/value pairs to be committed to the
+network over a specified period of time. Again there are a number of different situations
+throughput can be measured in, including load from one source, load from multiple sources and
+load under failure.
+
+A potential extension topic is dynamic node bootstrap - given the address/port pair of another
+node, can a node successfully bootstrap itself into the network? Another potential topic is that
+of a FUSE filesystem - as a filesystem is essentially added semantics on top of a key/value store,
+it would be possible to build a distributed filesystem on top of a Paxos network, using FUSE.
 
 \section*{Timetable: Workplan and Milestones to be achieved.}
 
-
 {\em Perhaps list ten or so two-week work-packages.}
 
-Planned starting date is 16/10/2011.
+Planned starting date is 19/10/2011.
 
+{\bf Michaelmas Term}
 \begin{enumerate}
 
-\item {\bf Michaelmas weeks 2-3} Write initial Paxos functions, functions for debugging etc,
-achieve consistency on a decision
+\item {\bf 19/10/2012-01/11/2012} Research distributed algorithms and the Paxos protocol.
 
-\item {\bf Michaelmas weeks 4-5} Build commandline shim, transfer files between nodes, node
-discovery etc
+Milestone: Be ready to start designing the system
 
-\item {\bf Michaelmas weeks 6-7} Enhance protocol support enough for directories and link FUSE
-operations class
+\item {\bf 02/11/2012-15/11/2012} Design the protocol implementation and library layout.
 
-\item {\bf Michaelmas weeks 8} Enhance protocol support enough for directories and link FUSE
-operations class
+Milestone: Be reading to start the implementation
 
-\item {\bf Michaelmas vacation} Finish coding: test debug etc etc
+\item {\bf 16/11/2012-29/11/2012} Begin implementation of protocol library
 
-\item {\bf Lent weeks 0-1} Write progress report. Start analysis of individual nodes/local nodes,
-protocol performance/limitations etc
+Milestone: Basic Paxos implementation
 
-\item {\bf Lent weeks 2-3} Run main experiments, including large scale network across CL, analyse
-performance, create graphs in Matlab etc etc
+\noindent {\bf Christmas Vacation}
 
-\item {\bf Lent weeks 4-5} Protocol improvement
+\item {\bf 30/11/2012-13/12/2012} Finish implementation of library
 
-\item {\bf Lent weeks 6-7} C extension.
+Milestone: Paxos implementation that can coordinate distributed leader election and achieve
+consensus, including unit tests.
 
-\item {\bf Lent weeks 8} Finish evaluation, overarching themes
+\item {\bf 14/12/2012-27/12/2012} Slack time/Revision/Holiday break
 
-\item {\bf Easter vacation:} Analyse performance increases etc
+\item {\bf 28/12/2012-10/01/2013} Prepare for progress report, start latency analysis.
 
-\item {\bf Easter term 0-2:}  Further evaluation and complete dissertation.
+Milestone: Draft progress report, latency analysis data.
 
-\item {\bf Easter term 3:} Proof reading and then an early submission so as to concentrate on examination revision.
+{\bf Lent Term}
+\item {\bf 11/01/2013-24/01/2013} Write progress report, perform throughput analysis.
+
+Milestone: Finished Progress report, throughput analysis data.
+Deadlines: Progress report deadline
+
+\item {\bf 25/01/2013-07/02/2013} Investigate improvements to the protocol/implementation and their effect on
+performance metrics.
+
+Milestone: Improvements to protocol/implementation and revised performance data.
+
+\item {\bf 08/02/2013-21/02/2013} Start dissertation
+
+Milestone: Draft Introduction and Preparation sections complete
+
+\item {\bf 22/02/2013-07/03/2013} Finish writing up dissertation
+
+Milestone: Draft Implementation, Evaluation and Conclusion sections complete
+
+\item {\bf 08/03/2013-21/03/2013} Proof reading and then an early submission so as to concentrate on examination revision
+
+Milestone: Finished dissertation
+
+Easter Vacation
+\item {\bf 22/03/2013-04/04/2013} Slack time/Revision/Holiday break
+
+\item {\bf 05/04/2013-18/04/2013} Slack time/Revision/Holiday break
+
+Easter Term
+\item {\bf 19/04/2013-02/05/2013} Slack time/Revision/Holiday break
+
+\item {\bf 03/05/2013-16/05/2013} Slack time/Revision/Holiday break
+
+Deadlines: Official dissertation submission deadline
 
 \end{enumerate}

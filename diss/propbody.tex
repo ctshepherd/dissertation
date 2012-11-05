@@ -2,13 +2,13 @@
 
 \centerline{\Large Computer Science Project Proposal}
 \vspace{0.4in}
-\centerline{\Large Paxos: A Distributed Consensus Protocol}
+\centerline{\Large PDB: A Distributed Database Based on Paxos}
 \vspace{0.4in}
 \centerline{\large Charlie Shepherd, Churchill College}
 \vspace{0.3in}
 \centerline{\large Originator: Charlie Shepherd}
 \vspace{0.3in}
-\centerline{\large 5$^{th}$ October 2012}
+\centerline{\large 18$^{th}$ October 2012}
 
 \vfil
 
@@ -30,43 +30,38 @@
 
 \section*{Introduction, The Problem To Be Addressed}
 
-Paxos is a protocol for achieving distributed consensus, developed by Leslie Lamport at
-Microsoft Research.
+{\em Paxos} is a protocol for achieving distributed consensus, developed by Leslie Lamport in 1991.
+
 The motivation for Paxos as a protocol is that it is capable of handling failures that other
-consensus protocols cannot. Two Phase Commit (2PC) and Three Phase Commit (3PC) are two common
+consensus protocols cannot. {\em Two Phase Commit} (2PC) and {\em Three Phase Commit} (3PC) are two common
 protocols that can be used to ensure atomic commits in a distributed system.
 
 2PC works by having a co-ordinator node contact every node and send a proposal message. Each node
-must then either respond with a commit or abort message. However, 2PC suffers from a problem, in
-that if the co-ordinator node crashes after any proposal messages have been sent out, the protocol
-will block. This can be resolved by establishing a timeout and, on timeout, establishing a
-"recovery node" that recovers the state of the proposal and completes transaction (either by
-committing or aborting). The main limitation of this protocol is that, even with this fix in
-place, a fundamental limitation of the protocol is that if, while the network is in "recovery
-mode", another node crashes, the entire network is blocked, and the state is unrecoverable. This
-is a fairly fundamental flaw in a protocol if it is to be used over the Internet, where computer
-crashes and network failures (which can be represented as a crash) are common.
+must then either respond with a commit or abort message. However, 2PC suffers from several
+problems, mainly that it is a blocking protocol. This means that if the co-ordinator fails, and
+then a node subsequently fails, the network will deadlock, as 2PC is not able to recover from that
+failure situation.
 
 3PC is an extension to 2PC which endeavours to fix this limitation, at the expense of greater
 latency, by adding a third roundtrip to confirm the commit to all nodes. This means that the
 protocol is asynchronous, and that node failures cannot block the protocol or cause it to fail.
 However, it still has its own limitations, in particular, in the event of a network partition. If
-the network is partitioned so that in one partition all nodes vote "commit" and in the other all
-nodes vote "abort", both partitions will initiate recovery, and when the network merges again the
+the network is partitioned so that in one partition all nodes vote ``commit'' and in the other all
+nodes vote ``abort'' both partitions will initiate recovery, and when the network merges again the
 system will be in an inconsistent state. This is the limitation that Paxos was intended to solve.
+
+My project will be to design and implement a distributed database, built on the Paxos protocol.
+
 
 \section*{Starting Point}
 
-{\em Describe existing state of the art, previous work in this area, libraries and databases to be used.
-Describe the state of any existing codebase that is to be built on.  }
-
-My starting point will be to study the Paxos protocol. From there I will design a library
-implementation of Paxos and then implement it, along with unit tests. The challenge will be
-developing a complex distributed protocol, as this is something I have minimal experience of.
+My starting point will be to study the Paxos protocol, as well as research distributed databases.
+From there I will develop a library implementing Paxos, along with unit tests. I will then design
+and implement a distributed database on the Paxos library. The challenge will be to implement a
+complex distributed protocol and then utilise it for a database, as these are both areas I have
+little experience of.
 
 \section*{Resources Required}
-
-{\em A note of the resources required and confirmation of access.}
 
 I will mainly do my project on a virtual machine which is running on my own personal laptop.
 The source code will be committed to a Git repository, which will be pushed to Bitbucket and my
@@ -77,121 +72,159 @@ I require no other special resources.
 
 \section*{Work to be done}
 
-{\em Describe the technical work.}
-
 The project breaks down into the following sub-projects:
 
 \begin{enumerate}
 
 \item A study of distributed algorithms and the Paxos protocol
 
+\item A study of distributed databases
+
 \item Implementing the Paxos protocol
 
-\item Analysing several different performance metrics of the protocol implementation
+\item Designing the distributed database
 
-\item Evaluating potential improvements to the protocol
+\item Implementing the distributed database
+
+\item Evaluating the performance of the database
 
 \end{enumerate}
 
-\section*{Success Criterion for the Main Result}
+\section*{Success Criteria for the Main Result}
 
-In order for the project to be a success, the project must correctly implement the Paxos protocol.
-The main deliverable is a python script and library implementing Paxos. The library must be
-capable of forming a running network, in particular dynamic leader election, as well as achieving
-consensus on a key/value store across the network. A node must be capable of joining the network
-given only the address and port of all other nodes in the network.
+In order for the project to be a success, the following must be true:
 
+\begin{enumerate}
 
-\section*{Possible Extensions}
+\item The project must correctly implement the Paxos protocol.
+	The library must be capable of forming a running network,
+	in particular dynamic leader election,
+	as well as achieving consensus on a key/value store across the network.
 
-{\em Potential further envisaged evaluation metrics or extensions.}
+\item The database must implement a subset of SQL, specifically:
+\begin{enumerate}
+\item A single table with a static name
+\item SELECT/INSERT
+\item WHERE
+\item GROUP BY
+\item ORDER BY
+\item Aggregation
+\end{enumerate}
+
+\item The database must have all ACID properties, that is:
+\begin{enumerate}
+\item Atomic
+\item Consistent
+\item Isolated
+\item Durable
+\end{enumerate}
+
+\end{enumerate}
+
+\section*{Evaluation Topics}
 
 There are several potential evaluation metrics for the project.
 
-One major metric is latency - the time for one key/value pair to be committed to the system. This
+One major metric is transaction latency - the time for a transaction to be committed to the system. This
 can be evaluated in a number of difference circumstances, including simulated node failure, leader
 failure and network partition, and the results analysed to see how the system handles performance
 under failure compared to normal conditions.
 
-Another key metric is throughput - the maximum number of key/value pairs to be committed to the
+Another key metric is transaction throughput - the maximum number of transactions committed to the
 network over a specified period of time. Again there are a number of different situations
 throughput can be measured in, including load from one source, load from multiple sources and
 load under failure.
 
-A potential extension topic is dynamic node bootstrap - given the address/port pair of another
-node, can a node successfully bootstrap itself into the network? Another potential topic is that
-of a FUSE filesystem - as a filesystem is essentially added semantics on top of a key/value store,
-it would be possible to build a distributed filesystem on top of a Paxos network, using FUSE.
+I will also investigate the advantages of a distributed database over a normal single-server
+database, particularly in terms of scalability. I will also consider how performance is affected
+by the ratio of writing clients to reading clients.
+
+\section*{Possible Extensions}
+
+A clear possible extension is to investigate various different modifications to Paxos in order
+to try to optimise the database for certain performance characteristics
+(e.g. fast reads, but slow writes),
+and to assess the usefulness and efficiency of these modifications.
+
+Another possible extension is to investigate how the database performs when various ACID
+properties are relaxed, and to measure and analyse how the performance gains compare with the
+tradeoffs made.
+
 
 \section*{Timetable: Workplan and Milestones to be achieved.}
 
-{\em Perhaps list ten or so two-week work-packages.}
+\setlength\parindent{0pt}
+\parskip = \baselineskip
 
 Planned starting date is 19/10/2011.
 
-{\bf Michaelmas Term}
-\begin{enumerate}
+\subsection*{Michaelmas Term}
 
-\item {\bf 19/10/2012-01/11/2012} Research distributed algorithms and the Paxos protocol, in order
-to be ready to start designing the system.
+{\bf 19/10/2012-01/11/2012} Research distributed algorithms and the Paxos protocol; design the
+protocol implementation and library layout.
 
-Milestone: A write up of the Paxos algorithm.
+Milestone: A write up of the Paxos algorithm and a design document of the implementation.
 
-\item {\bf 02/11/2012-15/11/2012} Design the protocol implementation and library layout, in order
-to be reading to start the implementation.
+{\bf 02/11/2012-15/11/2012} Begin the protocol implementation.
 
-Milestone: A design document of the implementation.
+Milestone: Basic Paxos implementation.
 
-\item {\bf 16/11/2012-29/11/2012} Begin implementation of protocol library
-
-Milestone: Basic Paxos implementation
-
-\noindent {\bf Christmas Vacation}
-
-\item {\bf 30/11/2012-13/12/2012} Finish implementation of library
+{\bf 16/11/2012-29/11/2012} Finish implementation of Paxos library.
 
 Milestone: Paxos implementation that can coordinate distributed leader election and achieve
 consensus, including unit tests.
 
-\item {\bf 14/12/2012-27/12/2012} Slack time/Revision/Holiday break
+\subsection*{Christmas Vacation}
 
-\item {\bf 28/12/2012-10/01/2013} Prepare for progress report, start latency analysis.
+{\bf 30/11/2012-13/12/2012} Research distributed databases and design the database implementation.
 
-Milestone: Draft progress report, latency analysis data.
+Milestone: A write up of research on distributed databases and a design document for the database.
 
-{\bf Lent Term}
-\item {\bf 11/01/2013-24/01/2013} Write progress report, perform throughput analysis.
+{\bf 14/12/2012-27/12/2012} Slack time/Revision/Holiday break.
 
-Milestone: Finished Progress report, throughput analysis data.
-Deadlines: Progress report deadline
+{\bf 28/12/2012-10/01/2013} Prepare for progress report, start database implementation.
 
-\item {\bf 25/01/2013-07/02/2013} Investigate improvements to the protocol/implementation and their effect on
+Milestone: Draft progress report, initial database implementation.
+
+\subsection*{Lent Term}
+{\bf 11/01/2013-24/01/2013} Write progress report, finish database implementation.
+
+Milestone: Finished Progress report, fully functional database implementation.
+Deadlines: Progress report deadline - 01/02/2013.
+
+{\bf 25/01/2013-07/02/2013} Perform initial performance analysis on transaction, including
+transaction latency and transaction throughput.
+
+Milestone: Initial analysis data.
+
+{\bf 08/02/2013-21/02/2013} Perform detailed performance analysis comparing distributed and
+centralised servers, and on failing and partitioned networks.
+
+Milestone: Analysis data on server models and on performance during failure.
+
+{\bf 22/02/2013-07/03/2013} Investigate improvements to the protocol/implementation and their effect on
 performance metrics.
 
 Milestone: Improvements to protocol/implementation and revised performance data.
 
-\item {\bf 08/02/2013-21/02/2013} Start dissertation
+{\bf 08/03/2013-21/03/2013} Start dissertation.
 
-Milestone: Draft Introduction and Preparation sections complete
+Milestone: Draft Introduction and Preparation sections complete.
 
-\item {\bf 22/02/2013-07/03/2013} Finish writing up dissertation
+\subsection*{Easter Vacation}
 
-Milestone: Draft Implementation, Evaluation and Conclusion sections complete
+{\bf 22/03/2013-04/04/2013} Finish writing up dissertation.
 
-\item {\bf 08/03/2013-21/03/2013} Proof reading and then an early submission so as to concentrate on examination revision
+Milestone: Draft Implementation, Evaluation and Conclusion sections complete.
 
-Milestone: Finished dissertation
+{\bf 05/04/2013-18/04/2013} Proof reading and then an early submission so as to concentrate on
+examination revision.
 
-Easter Vacation
-\item {\bf 22/03/2013-04/04/2013} Slack time/Revision/Holiday break
+Milestone: Finished dissertation.
 
-\item {\bf 05/04/2013-18/04/2013} Slack time/Revision/Holiday break
+\subsection*{Easter Term}
+{\bf 19/04/2013-02/05/2013} Slack time/Revision/Holiday break.
 
-Easter Term
-\item {\bf 19/04/2013-02/05/2013} Slack time/Revision/Holiday break
+{\bf 03/05/2013-16/05/2013} Slack time/Revision/Holiday break.
 
-\item {\bf 03/05/2013-16/05/2013} Slack time/Revision/Holiday break
-
-Deadlines: Official dissertation submission deadline
-
-\end{enumerate}
+Deadlines: Official dissertation submission deadline - 17/05/2013.

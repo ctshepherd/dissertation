@@ -98,7 +98,8 @@ class Proposer(Agent):
         # (a) A proposer selects a proposal number n, greater than any proposal number it
         # has selected before, and sends a request containing n to a majority of
         # acceptors. This message is known as a prepare request.
-        n = self.num + 1
+        self.num += 1
+        n = self.num
         for a in network['acceptor']:
             send(self, a, Prepare(Proposal(n)))
 

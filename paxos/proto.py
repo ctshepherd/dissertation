@@ -1,4 +1,10 @@
 network = {}
+network_num = {}
+
+
+def title(s):
+    """capitalizes only first character of a string"""
+    return s[0].capitalize() + s[1:]
 
 
 def send(sender, receiver, message):
@@ -14,9 +20,17 @@ class Proposal(object):
         self.prop_num = prop_num
         self.value = value
 
+    def __str__(self):
+        return "Proposal(%s: %s)" % (self.prop_num, self.value)
+
+    def __repr__(self):
+        return "<%s @ %#lx>" % (self, id(self))
+
 
 class Message(object):
     """Message superclass"""
+    msg_type = "message"
+
     def __init__(self, proposal):
         super(Message, self).__init__()
         self.proposal = proposal
@@ -26,6 +40,17 @@ class Message(object):
     def transmit(self, sender, receiver):
         self.sender = sender
         self.receiver = receiver
+
+    def __str__(self):
+        if self.sender is None:
+            assert(self.receiver is None)
+            addr = ""
+        else:
+            addr = "from %s to %s " % (self.sender, self.receiver)
+        return "%s(%s (%s))" % (title(self.msg_type), addr, self.proposal)
+
+    def __repr__(self):
+        return "<%s @ %#lx>" % (self, id(self))
 
 
 class Prepare(Message):
@@ -44,13 +69,23 @@ class Accept(Message):
 
 
 class Agent(object):
+    agent_type = "agent"
+
     def __init__(self):
         self._msgs = []
-        network.set_default(self.agent_type, []).append(self)
+        network.setdefault(self.agent_type, []).append(self)
+        self._num = network_num.setdefault(self.agent_type, 0)
+        network_num[self.agent_type] += 1
 
     def send(self, msg):
         self._msgs.append(msg)
         self._send()
+
+    def __str__(self):
+        return "%s(%s)" % (title(self.agent_type), self._num)
+
+    def __repr__(self):
+        return "<%s @ %#lx>" % (self, id(self))
 
 
 class Acceptor(Agent):
@@ -112,3 +147,12 @@ class Proposer(Agent):
         # acceptors for a proposal numbered n with a value v, where v is the value of
         # the highest-numbered proposal among the responses, or if the responses reported
         # no proposals, a value of its own choosing.
+        acceptor_num = len(network['acceptor'])
+        # if acceptor_num > :
+        #     pass
+        print self.received
+
+
+p1 = Proposer()
+a1 = Acceptor()
+l1 = Learner()

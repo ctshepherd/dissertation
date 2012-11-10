@@ -79,7 +79,7 @@ class Agent(object):
 
     def send(self, msg):
         self._msgs.append(msg)
-        self._send()
+        self._send(msg)
 
     def __str__(self):
         return "%s(%s)" % (title(self.agent_type), self._num)

@@ -94,10 +94,14 @@ class Proposer(Agent):
         super(Proposer, self).__init__()
         self.num = 0
 
+    def _send(self, msg):
+        self.received.setdefault(msg.proposal.prop_num, []).append(msg)
+
     def run(self, value):
         # (a) A proposer selects a proposal number n, greater than any proposal number it
         # has selected before, and sends a request containing n to a majority of
         # acceptors. This message is known as a prepare request.
+        self.received = {}
         self.num += 1
         n = self.num
         for a in network['acceptor']:

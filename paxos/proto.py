@@ -69,7 +69,7 @@ class Acceptor(Agent):
             # the request with a promise not to accept any more proposals numbered less than
             # n and with the highest-numbered proposal (if any) that it has accepted.
             if msg.proposal.prop_num > self._cur_prop_num:
-                send(msg.sender, self, Promise(Proposal(msg.proposal.prop_num, self._cur_prop.value)))
+                send(self, msg.sender, Promise(Proposal(msg.proposal.prop_num, self._cur_prop.value)))
                 self._cur_prop_num = msg.proposal.prop_num
             else:
                 pass  # Can NACK here

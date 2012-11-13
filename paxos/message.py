@@ -18,7 +18,6 @@ def send(sender, receiver, message):
     else:
         host = receiver.proto.transport.getHost()
         addr = (host.host, host.port)
-    message.transmit(sender, receiver)
     sender.proto.sendDatagram(message.serialize(), addr)
 
 
@@ -29,12 +28,6 @@ class Message(object):
     def __init__(self, proposal):
         super(Message, self).__init__()
         self.proposal = proposal
-        self.sender = None
-        self.receiver = None
-
-    def transmit(self, sender, receiver):
-        self.sender = sender
-        self.receiver = receiver
 
     def __str__(self):
         if self.sender is None:

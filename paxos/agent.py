@@ -1,7 +1,8 @@
 from network import network, network_num
 from util import title
-from message import Promise, Prepare, send
+from message import Promise, Prepare, send, parse_message
 from proposal import Proposal
+from protocol import EchoClientDatagramProtocol, reactor
 
 
 class Agent(object):
@@ -11,11 +12,19 @@ class Agent(object):
         self._msgs = []
         network.setdefault(self.agent_type, []).append(self)
         self._num = network_num.setdefault(self.agent_type, 0)
+        self.proto = EchoClientDatagramProtocol()
+        self.proto.parent = self
+        t = reactor.listenUDP(0, self.proto)
         network_num[self.agent_type] += 1
 
-    def send(self, msg):
-        self._msgs.append(msg)
-        self._send(msg)
+    def receive(self, msg, host):
+        print "%s got message %s from %s" % (self, msg, host)
+        self._msgs.append((msg, host))
+        m = parse_message(msg)
+        self._receive(m, host)
+
+    def _receive(self, msg, host):
+        raise NotImplementedError()
 
     def __str__(self):
         return "%s(%s)" % (title(self.agent_type), self._num)
@@ -33,14 +42,14 @@ class Acceptor(Agent):
         self._cur_prop_num = 0
         self._cur_prop = Proposal(0)
 
-    def _send(self, msg):
+    def _receive(self, msg, host):
         if msg.msg_type == "prepare":
             # (b) If an acceptor receives a prepare request with number n greater than that
             # of any prepare request to which it has already responded, then it responds to
             # the request with a promise not to accept any more proposals numbered less than
             # n and with the highest-numbered proposal (if any) that it has accepted.
             if msg.proposal.prop_num > self._cur_prop_num:
-                send(self, msg.sender, Promise(Proposal(msg.proposal.prop_num, self._cur_prop.value)))
+                send(self, host, Promise(Proposal(msg.proposal.prop_num, self._cur_prop.value)))
                 self._cur_prop_num = msg.proposal.prop_num
             else:
                 pass  # Can NACK here
@@ -65,8 +74,18 @@ class Proposer(Agent):
         super(Proposer, self).__init__()
         self.num = 0
 
-    def _send(self, msg):
+    def _receive(self, msg, host):
         self.received.setdefault(msg.proposal.prop_num, []).append(msg)
+
+        # (a) If the proposer receives a response to its prepare requests (numbered n)
+        # from a majority of acceptors, then it sends an accept request to each of those
+        # acceptors for a proposal numbered n with a value v, where v is the value of
+        # the highest-numbered proposal among the responses, or if the responses reported
+        # no proposals, a value of its own choosing.
+        acceptor_num = len(network['acceptor'])
+        if len(self.received.get(self.num, ())) > acceptor_num/2:
+            print "Accept!"
+        print self.received
 
     def run(self, value):
         # (a) A proposer selects a proposal number n, greater than any proposal number it
@@ -77,13 +96,3 @@ class Proposer(Agent):
         n = self.num
         for a in network['acceptor']:
             send(self, a, Prepare(Proposal(n)))
-
-        # (a) If the proposer receives a response to its prepare requests (numbered n)
-        # from a majority of acceptors, then it sends an accept request to each of those
-        # acceptors for a proposal numbered n with a value v, where v is the value of
-        # the highest-numbered proposal among the responses, or if the responses reported
-        # no proposals, a value of its own choosing.
-        acceptor_num = len(network['acceptor'])
-        if len(self.received[n]) > acceptor_num/2:
-            print "Accept!"
-        print self.received

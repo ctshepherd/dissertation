@@ -10,3 +10,6 @@ class Proposal(object):
 
     def __repr__(self):
         return "<%s @ %#lx>" % (self, id(self))
+
+    def serialize(self):
+        return "%s,%s" % (self.prop_num, self.value)

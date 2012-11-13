@@ -1,4 +1,4 @@
-from util import title
+from util import title, dbprint
 from proposal import Proposal
 from ast import literal_eval
 
@@ -7,7 +7,7 @@ def parse_message(msg):
     mtype, p = msg.split(':')
     pt = p.split(',')
     m = message_types[mtype](Proposal(literal_eval(pt[0]), literal_eval(pt[1])))
-    print "converting '%s' to '%s'" % (msg, m)
+    dbprint("converting '%s' to '%s'" % (msg, m))
     return m
 
 

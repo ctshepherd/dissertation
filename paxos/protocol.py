@@ -1,3 +1,4 @@
+from util import dbprint
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet import reactor
 
@@ -16,7 +17,7 @@ class EchoClientDatagramProtocol(DatagramProtocol):
         self.transport.write(msg, addr)
 
     def datagramReceived(self, datagram, host):
-        print 'Datagram received: %s (%s)' % (repr(datagram), host)
+        dbprint('Datagram received: %s (%s)' % (repr(datagram), host))
         self.parent.receive(datagram, host)
 
 

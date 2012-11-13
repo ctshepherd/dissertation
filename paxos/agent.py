@@ -1,5 +1,5 @@
 from network import network, network_num
-from util import title
+from util import title, dbprint
 from message import Promise, Prepare, send, parse_message
 from proposal import Proposal
 from protocol import EchoClientDatagramProtocol, reactor
@@ -18,7 +18,7 @@ class Agent(object):
         network_num[self.agent_type] += 1
 
     def receive(self, msg, host):
-        print "%s got message %s from %s" % (self, msg, host)
+        dbprint("%s got message %s from %s" % (self, msg, host))
         self._msgs.append((msg, host))
         m = parse_message(msg)
         self._receive(m, host)

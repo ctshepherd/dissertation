@@ -18,3 +18,6 @@ p1.run(3)
 
 def run():
     reactor.run()
+
+if __name__ == '__main__':
+    run()

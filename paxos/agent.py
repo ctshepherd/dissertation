@@ -18,6 +18,9 @@ class Agent(object):
         network_num[self.agent_type] += 1
 
     def receive(self, msg, host):
+        """Called when a message is received by a specific agent.
+
+        """
         dbprint("%s got message %s from %s" % (self, msg, host))
         self._msgs.append((msg, host))
         m = parse_message(msg)

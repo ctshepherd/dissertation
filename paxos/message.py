@@ -4,9 +4,16 @@ from ast import literal_eval
 
 
 def parse_message(msg):
+    """Convert a message from string format to a Python object
+
+    This takes a string (probably received off the network) and returns the
+    corresponding Message object.
+    """
     mtype, p = msg.split(':')
-    pt = p.split(',')
-    m = message_types[mtype](Proposal(literal_eval(pt[0]), literal_eval(pt[1])))
+    pt = p.split(',')  # proposal value tuple
+    m = message_types[mtype](
+        Proposal(literal_eval(pt[0]),   # literal_eval is a safe version of eval,
+                 literal_eval(pt[1])))  # that only works for literal values
     dbprint("converting '%s' to '%s'" % (msg, m))
     return m
 
@@ -30,18 +37,18 @@ class Message(object):
         self.proposal = proposal
 
     def __str__(self):
-        if self.sender is None:
-            assert(self.receiver is None)
-            addr = ""
-        else:
-            addr = "from %s to %s " % (self.sender, self.receiver)
-        return "%s(%s (%s))" % (title(self.msg_type), addr, self.proposal)
-
-    def serialize(self):
-        return "%s:%s" % (self.msg_type, self.proposal.serialize())
+        return "%s(%s)" % (title(self.msg_type), self.proposal)
 
     def __repr__(self):
         return "<%s @ %#lx>" % (self, id(self))
+
+    def serialize(self):
+        """Serialize into a format for on the wire transfer
+
+        This returns a string which can be sent over the network and
+        reconstructed by parse_message
+        """
+        return "%s:%s" % (self.msg_type, self.proposal.serialize())
 
 
 class Prepare(Message):
@@ -58,6 +65,11 @@ class Accept(Message):
     """Accept message"""
     msg_type = "accept"
 
+
+# This is a mapping from message types to the actual classes.
+# I guess we could handle this with a metaclass or something but it seems less
+# magic to just hardcode it, especially as there isn't going to be an explosion
+# of message types.
 message_types = {
     Prepare.msg_type: Prepare,
     Promise.msg_type: Promise,

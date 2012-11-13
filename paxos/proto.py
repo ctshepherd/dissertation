@@ -150,8 +150,8 @@ class Proposer(Agent):
         # the highest-numbered proposal among the responses, or if the responses reported
         # no proposals, a value of its own choosing.
         acceptor_num = len(network['acceptor'])
-        # if acceptor_num > :
-        #     pass
+        if len(self.received[n]) > acceptor_num/2:
+            print "Accept!"
         print self.received
 
 

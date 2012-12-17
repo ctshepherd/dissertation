@@ -17,7 +17,7 @@ class StringTransport(TStringTransport):
         TStringTransport.write(self, data)
 
 
-class EchoClientTest(TestCase):
+class TestEchoClient(TestCase):
     def setUp(self):
         self.proto = EchoClientDatagramProtocol()
         self.tr = StringTransport()

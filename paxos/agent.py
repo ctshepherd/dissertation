@@ -23,7 +23,7 @@ class Agent(object):
 
         """
         host = hosts[host[1]]
-        dbprint("%s got message %s from %s" % (self, msg, host))
+        dbprint("%s got message %s from %s" % (self, msg, host), level=2)
         self._msgs.append((msg, host))
         m = parse_message(msg)
         self._receive(m, host)

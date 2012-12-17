@@ -12,5 +12,5 @@ class EchoClientDatagramProtocol(DatagramProtocol):
         self.transport.write(msg, addr)
 
     def datagramReceived(self, datagram, host):
-        dbprint('Datagram received: %s (%s)' % (repr(datagram), host))
+        dbprint('Datagram received: %s (%s)' % (repr(datagram), host), level=1)
         self.parent.receive(datagram, host)

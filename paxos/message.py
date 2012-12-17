@@ -14,7 +14,7 @@ def parse_message(msg):
     m = message_types[mtype](
         Proposal(literal_eval(pt[0]),   # literal_eval is a safe version of eval,
                  literal_eval(pt[1])))  # that only works for literal values
-    dbprint("converting '%s' to '%s'" % (msg, m))
+    dbprint("converting '%s' to '%s'" % (msg, m), level=1)
     return m
 
 

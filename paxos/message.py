@@ -42,6 +42,15 @@ class Message(object):
     def __repr__(self):
         return "<%s @ %#lx>" % (self, id(self))
 
+    def __eq__(self, other):
+        if not isinstance(other, Message):
+            return NotImplemented
+        return (self.msg_type == other.msg_type and
+                self.proposal == other.proposal)
+
+    def __ne__(self, other):
+        return not self == other
+
     def serialize(self):
         """Serialize into a format for on the wire transfer
 

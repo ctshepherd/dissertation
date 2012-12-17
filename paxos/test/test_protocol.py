@@ -1,6 +1,6 @@
-from twisted.trial import unittest
 from twisted.test.proto_helpers import StringTransport as TStringTransport
 from paxos.protocol import EchoClientDatagramProtocol
+from paxos.test import TestCase
 
 
 class MockAgent(object):
@@ -17,7 +17,7 @@ class StringTransport(TStringTransport):
         TStringTransport.write(self, data)
 
 
-class EchoClientTest(unittest.TestCase):
+class EchoClientTest(TestCase):
     def setUp(self):
         self.proto = EchoClientDatagramProtocol()
         self.tr = StringTransport()

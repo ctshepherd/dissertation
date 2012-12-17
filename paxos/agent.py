@@ -1,4 +1,4 @@
-from paxos.network import network, network_num
+from paxos.network import network, network_num, hosts
 from paxos.util import title, dbprint
 from paxos.message import Promise, Prepare, send, parse_message
 from paxos.proposal import Proposal
@@ -15,12 +15,14 @@ class Agent(object):
         self.proto = EchoClientDatagramProtocol()
         self.proto.parent = self
         t = reactor.listenUDP(0, self.proto)
+        hosts[self.proto.transport.getHost().port] = self
         network_num[self.agent_type] += 1
 
     def receive(self, msg, host):
         """Called when a message is received by a specific agent.
 
         """
+        host = hosts[host[1]]
         dbprint("%s got message %s from %s" % (self, msg, host))
         self._msgs.append((msg, host))
         m = parse_message(msg)

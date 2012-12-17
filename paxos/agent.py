@@ -1,8 +1,8 @@
-from network import network, network_num
-from util import title, dbprint
-from message import Promise, Prepare, send, parse_message
-from proposal import Proposal
-from protocol import EchoClientDatagramProtocol, reactor
+from paxos.network import network, network_num
+from paxos.util import title, dbprint
+from paxos.message import Promise, Prepare, send, parse_message
+from paxos.proposal import Proposal
+from paxos.protocol import EchoClientDatagramProtocol, reactor
 
 
 class Agent(object):

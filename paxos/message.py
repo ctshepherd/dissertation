@@ -1,5 +1,5 @@
-from util import title, dbprint
-from proposal import Proposal
+from paxos.util import title, dbprint
+from paxos.proposal import Proposal
 from ast import literal_eval
 
 

@@ -1,4 +1,4 @@
-from util import dbprint
+from paxos.util import dbprint
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet import reactor
 

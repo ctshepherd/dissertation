@@ -99,6 +99,7 @@ class Proposer(Agent):
         self.accepted = False
         self.replies = []
         self.cur_value = None
+        self.received = {}
 
     def _receive(self, msg, host):
         self.received.setdefault(msg.proposal.prop_num, []).append((msg, host))

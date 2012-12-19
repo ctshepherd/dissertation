@@ -50,7 +50,7 @@ class TestAcceptor(AgentTestMixin, TestCase):
         """Test that we ignore lower numbered proposals than one we've already accepted"""
         a = self.agent
         a.receive("prepare:2,None", (None, None))
-        self.msgs = []
+        self.msgs.pop()
         a.receive("prepare:1,None", (None, None))
         self.assertEqual([], self.msgs)
 

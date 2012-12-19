@@ -56,7 +56,7 @@ class TestAcceptor(AgentTestMixin, TestCase):
     def test_accept(self):
         a = self.agent
         a.receive("accept:1,2", (None, None))
-        self.assertEqual(Promise(Proposal(1, 2)), a._cur_prop)
+        self.assertEqual(Proposal(1, 2), a._cur_prop)
 
 
 class TestProposer(AgentTestMixin, TestCase):

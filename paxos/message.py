@@ -38,7 +38,6 @@ class Message(object):
     msg_type = "message"
 
     def __init__(self, proposal):
-        super(Message, self).__init__()
         self.proposal = proposal
 
     def __str__(self):

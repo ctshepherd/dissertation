@@ -67,6 +67,14 @@ class Message(object):
 
 class Prepare(Message):
     """Prepare message"""
+    def __init__(self, proposal):
+        super(Prepare, self).__init__(proposal)
+        # Add a sanity check that we're not sending a value with our prepare
+        # message
+        if proposal.value is not None:
+            raise InvalidMessageException(
+                "Prepare messages cannot contain a value, %s has a non-None value"
+                % (proposal))
     msg_type = "prepare"
 
 

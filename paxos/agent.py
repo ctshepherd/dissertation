@@ -1,6 +1,6 @@
 from paxos.network import network, network_num, hosts
 from paxos.util import title, dbprint
-from paxos.message import Accept, Promise, Prepare, send, parse_message
+from paxos.message import Accept, Promise, Prepare, send, parse_message, InvalidMessageException
 from paxos.proposal import Proposal
 from paxos.protocol import EchoClientDatagramProtocol, reactor
 
@@ -25,7 +25,11 @@ class Agent(object):
         host = hosts[host[1]]
         dbprint("%s got message %s from %s" % (self, msg, host), level=2)
         self._msgs.append((msg, host))
-        m = parse_message(msg)
+        try:
+            m = parse_message(msg)
+        except InvalidMessageException, e:
+            dbprint("%s received invalid message %s (%s)" % (self, msg, e))
+            return
         self._receive(m, host)
 
     def _receive(self, msg, host):
@@ -53,6 +57,11 @@ class Acceptor(Agent):
             # of any prepare request to which it has already responded, then it responds to
             # the request with a promise not to accept any more proposals numbered less than
             # n and with the highest-numbered proposal (if any) that it has accepted.
+            if msg.proposal.value is not None:
+                # Sanity check - prepare messages should not have a value
+                dbprint("Warning: %s received a Prepare message %s with an unexpected value"
+                        % (self, msg), level=5)
+                return
             if msg.proposal.prop_num > self._cur_prop_num:
                 send(self, host, Promise(Proposal(msg.proposal.prop_num, self._cur_prop.value)))
                 self._cur_prop_num = msg.proposal.prop_num

@@ -50,3 +50,11 @@ class TestMessageTypes(TestCase):
                 fm_orig = msg_class(Proposal(*args))
                 fm_new = parse_message(fm_orig.serialize())
                 self.assertEqual(fm_orig, fm_new)
+
+
+class TestMessage(TestCase):
+    def test_ne(self):
+        self.assertNotEqual(FakeMessage(Proposal(1)), Prepare(Proposal(1)))
+        self.assertNotEqual(Prepare(Proposal(1)), FakeMessage(Proposal(1)))
+        self.assertNotEqual(FakeMessage(Proposal(1)), object())
+        self.assertNotEqual(object(), FakeMessage(Proposal(1)))

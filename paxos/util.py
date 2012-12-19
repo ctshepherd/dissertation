@@ -16,3 +16,7 @@ def title(s):
 def dbprint(s, level=5):
     if DEBUG and level >= DEBUG:
         print s
+
+class PaxosException(Exception):
+    """Superclass for all exceptions raised by the Paxos module."""
+    pass

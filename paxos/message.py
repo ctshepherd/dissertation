@@ -1,6 +1,11 @@
-from paxos.util import title, dbprint
+from paxos.util import title, dbprint, PaxosException
 from paxos.proposal import Proposal
 from ast import literal_eval
+
+
+class InvalidMessageException(PaxosException):
+    """Exception raised if there is an error in the message code"""
+    pass
 
 
 def parse_message(msg):

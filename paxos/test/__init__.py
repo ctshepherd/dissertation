@@ -2,6 +2,16 @@ from twisted.trial import unittest
 from paxos import util
 
 
+def enable_debug(func, level=1):
+    """Decorator to enable debug for a specific test method"""
+    def f(*args):
+        saved_dbg = util.DEBUG
+        util.DEBUG = level
+        func(*args)
+        util.DEBUG = saved_dbg
+    return f
+
+
 class TestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         self.debug = kwargs.get('debug', False)

@@ -1,8 +1,14 @@
 from paxos import agent
-from paxos.agent import Acceptor, Learner, Proposer
-from paxos.message import Promise
+from paxos.agent import Acceptor, Learner, Proposer, Agent
+from paxos.message import Promise, Accept
 from paxos.proposal import Proposal
 from paxos.test import TestCase
+
+
+class FakeAgent(Agent):
+    """FakeAgent class to record messages passed"""
+    def _receive(self, m, host):
+        pass
 
 
 class AgentTestMixin(object):
@@ -10,8 +16,10 @@ class AgentTestMixin(object):
     def setUp(self):
         # Put any messages sent into self.msgs
         self.msgs = []
+        self.hmsgs = {}
         def s(r, h, m):
             self.msgs.append(m)
+            self.hmsgs[h] = m
         # Save agent.send
         self.s = agent.send
         agent.send = s
@@ -71,9 +79,18 @@ class TestAcceptor(AgentTestMixin, TestCase):
         self.assertEqual([], self.msgs)
 
     def test_accept(self):
+        n = agent.network
+        flearner1 = FakeAgent()
+        flearner2 = FakeAgent()
+        self.addCleanup(flearner1.proto.transport.stopListening)
+        self.addCleanup(flearner2.proto.transport.stopListening)
+        agent.network = {'learner': [flearner1, flearner2]}
         a = self.agent
         a.receive("accept:1,2", (None, None))
         self.assertEqual(Proposal(1, 2), a._cur_prop)
+        self.assertEqual(self.hmsgs[flearner1], Accept(Proposal(1, 2)))
+        self.assertEqual(self.hmsgs[flearner2], Accept(Proposal(1, 2)))
+        agent.network = n
 
 
 class TestProposer(AgentTestMixin, TestCase):

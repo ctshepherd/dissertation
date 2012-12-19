@@ -102,22 +102,23 @@ class Proposer(Agent):
         self.received = {}
 
     def _receive(self, msg, host):
-        self.received.setdefault(msg.proposal.prop_num, []).append((msg, host))
+        if msg.msg_type == "promise":
+            self.received.setdefault(msg.proposal.prop_num, []).append((msg, host))
 
-        # (a) If the proposer receives a response to its prepare requests (numbered n)
-        # from a majority of acceptors, then it sends an accept request to each of those
-        # acceptors for a proposal numbered n with a value v, where v is the value of
-        # the highest-numbered proposal among the responses, or if the responses reported
-        # no proposals, a value of its own choosing.
-        acceptor_num = len(network['acceptor'])
-        if not self.accepted and len(self.received.get(self.cur_prop_num, ())) > acceptor_num/2:
-            self.accepted = True
-            competing = max(self.received[self.cur_prop_num])
-            dbprint("Proposal %s accepted", self.cur_prop_num)
-            for (m, acceptor) in self.received.get(self.cur_prop_num, ()):
-                send(self, acceptor, Accept(msg.proposal))
-        elif self.accepted:
-            send(self, host, Accept(msg.proposal))
+            # (a) If the proposer receives a response to its prepare requests (numbered n)
+            # from a majority of acceptors, then it sends an accept request to each of those
+            # acceptors for a proposal numbered n with a value v, where v is the value of
+            # the highest-numbered proposal among the responses, or if the responses reported
+            # no proposals, a value of its own choosing.
+            acceptor_num = len(network['acceptor'])
+            if not self.accepted and len(self.received.get(self.cur_prop_num, ())) > acceptor_num/2:
+                self.accepted = True
+                competing = max(self.received[self.cur_prop_num])
+                dbprint("Proposal %s accepted", self.cur_prop_num)
+                for (m, acceptor) in self.received.get(self.cur_prop_num, ()):
+                    send(self, acceptor, Accept(msg.proposal))
+            elif self.accepted:
+                send(self, host, Accept(msg.proposal))
 
     def run(self, value):
         # (a) A proposer selects a proposal number n, greater than any proposal number it

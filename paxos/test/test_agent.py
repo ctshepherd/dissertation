@@ -47,10 +47,27 @@ class TestAcceptor(AgentTestMixin, TestCase):
         self.assertEqual(Promise(Proposal(1, None)), self.msgs.pop())
 
     def test_promise2(self):
+        """Test that we ignore lower numbered proposals than one we've already accepted"""
         a = self.agent
         a.receive("prepare:2,None", (None, None))
         self.msgs = []
         a.receive("prepare:1,None", (None, None))
+        self.assertEqual([], self.msgs)
+
+    def test_promise3(self):
+        """Test that we accept new, higher numbered proposals than ones we've already accepted"""
+        a = self.agent
+        a.receive("prepare:1,None", (None, None))
+        self.assertEqual(Promise(Proposal(1, None)), self.msgs.pop())
+        a.receive("prepare:2,None", (None, None))
+        self.assertEqual(Promise(Proposal(2, None)), self.msgs.pop())
+
+    def test_promise4(self):
+        """Test that we ignore a message setting the value on an already accepted proposal"""
+        a = self.agent
+        a.receive("prepare:2,None", (None, None))
+        self.assertEqual(Promise(Proposal(2, None)), self.msgs.pop())
+        a.receive("prepare:2,3", (None, None))
         self.assertEqual([], self.msgs)
 
     def test_accept(self):

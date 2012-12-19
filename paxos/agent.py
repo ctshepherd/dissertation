@@ -86,7 +86,7 @@ class Learner(Agent):
             self.received.setdefault(msg.proposal.prop_num, []).append((msg, host))
             if len(self.received[msg.proposal.prop_num]) > acceptor_num/2:
                 self.accepted_proposals.add(msg.proposal)
-                dbprint("Proposal %s accepted" % msg.proposal)
+                dbprint("Proposal %s accepted" % msg.proposal, level=3)
                 print self.accepted_proposals
 
 

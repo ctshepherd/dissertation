@@ -35,6 +35,15 @@ class DBP(object):
         self._process_txs.append(tx)
 
     def get_next_tx_id(self):
+        """Return the next (potentially) viable TX across the whole network.
+
+        This returns a TX id which we are guessing is a valid TX to use for our
+        operation. If we pick one too far on we will have to wait for previous
+        transactions to be issued before we can execute, if we pick one too
+        close we will be beaten to issueing that TX by another node. The code
+        doesn't go into those complexities at this point but it will do soon,
+        for now we use a global counter.
+        """
         global cur_tx
         cur_tx += 1
         return cur_tx
@@ -63,7 +72,7 @@ class DBP(object):
         self.distribute((k, v))
 
     def wait_on_next_tx(self):
-        """Wait for the next TX and return the id"""
+        """Wait for the next TX received and return it."""
         # We have a fake TX list for the moment
         return fake_tx_list.pop(0)
 

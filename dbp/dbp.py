@@ -21,7 +21,7 @@ class DB(object):
         return self._db[key]
 
 
-class PDB(object):
+class DBP(object):
     def __init__(self):
         self._min_tx = 0
         self._received_txs = {}

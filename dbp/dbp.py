@@ -83,14 +83,10 @@ class DBP(object):
             next_tx = self.wait_on_next_tx()
             next_tx_id, next_tx_op = next_tx
             dbprint("next tx is %d (%d)" % (next_tx_id, self._min_tx), level=2)
-            if next_tx_id == self._min_tx+1:
+            self._received_txs[next_tx_id] = next_tx_op
+            while (self._min_tx+1) in self._received_txs:
+                self.queue(self._received_txs.pop(self._min_tx+1))
                 self._min_tx += 1
-                while (self._min_tx+1) in self._received_txs:
-                    self._process_txs.append(self._received_txs.pop(self._min_tx+1))
-                    self._min_tx += 1
-                self._process_txs.append(next_tx_op)
-            else:
-                self._received_txs[next_tx_id] = next_tx_op
         assert(not self._received_txs)
 
     def execute(self, s):

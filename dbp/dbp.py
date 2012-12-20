@@ -1,8 +1,8 @@
 from paxos.util import dbprint
 
-fake_tx_list = [(1, "a = b"), (2, "b = c"), (3, "a = c")]
+fake_tx_list = []
 distributed_txs = []
-cur_tx = 3
+cur_tx = 0
 
 
 class DB(object):

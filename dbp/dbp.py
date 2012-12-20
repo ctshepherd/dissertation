@@ -30,6 +30,10 @@ class DBP(object):
         self._process_txs = []
         self.db = DB()
 
+    def queue(self, tx):
+        """Queue a TX for processing."""
+        self._process_txs.append(tx)
+
     def get_next_tx_id(self):
         global cur_tx
         cur_tx += 1

@@ -30,19 +30,50 @@ class Distributor(object):
         distributed_txs.append(tx)
 
 
-class DBP(object):
+class TXWindower(object):
+    """Maintains a moving "window" of received transactions.
+
+    In order to ensure we process received transactions in order, we maintain a
+    window and fill in "holes" when we eventually receive those transactions.
+    """
     def __init__(self):
-        self._min_tx = 0
-        self._received_txs = {}
-        self._max_tx = 0
-        self._txs = {}
+        self.received_txs = {}
+        self.min_tx = 0
+        self.max_tx = 0
+
+    def insert_tx(self, tx_id, tx_op):
+        """Insert a transaction.
+
+        Insert a transaction into the datastructure and potentially update max_tx.
+        """
+        self.received_txs[tx_id] = tx_op
+        if tx_id > self.max_tx:
+            self.max_tx = tx_id
+
+    def pop_valid_txs(self):
+        """Return the largest number of contiguous TXs, starting from min_tx."""
+        ret = []
+        while (self.min_tx+1) in self.received_txs:
+            ret.append(self.received_txs.pop(self.min_tx+1))
+            self.min_tx += 1
+        return ret
+
+
+class DBP(object):
+    """Main DBP object - coordinates the database."""
+    def __init__(self):
         self._process_txs = []
         self.db = DB()
         self.distributor = Distributor()
+        self.windower = TXWindower()
 
     def queue(self, tx):
         """Queue a TX for processing."""
         self._process_txs.append(tx)
+
+    def queue_multiple(self, txs):
+        """Queue a list of TXs for processing."""
+        self._process_txs.extend(txs)
 
     def get_next_tx_id(self):
         """Return the next (potentially) viable TX across the whole network.
@@ -94,19 +125,17 @@ class DBP(object):
         process it. When self._received_txs is empty then we can return.
         """
         wait_tx = tx_id - 1
-        dbprint("waiting on tx %d (mix tx is %d)" % (tx_id, self._min_tx), level=3)
+        dbprint("waiting on tx %d (mix tx is %d)" % (tx_id, self.windower.min_tx), level=3)
         # This loop doesn't take into account missing/timedout txs yet
-        while self._min_tx < wait_tx:
+        while self.windower.min_tx < wait_tx:
             next_tx = self.wait_on_next_tx()
             next_tx_id, next_tx_op = next_tx
-            dbprint("next tx is %d (%d)" % (next_tx_id, self._min_tx), level=2)
-            self._received_txs[next_tx_id] = next_tx_op
-            while (self._min_tx+1) in self._received_txs:
-                self.queue(self._received_txs.pop(self._min_tx+1))
-                self._min_tx += 1
-        assert(not self._received_txs)
+            dbprint("next tx is %d (%d)" % (next_tx_id, self.windower.min_tx), level=2)
+            self.windower.insert_tx(next_tx_id, next_tx_op)
+            self.queue_multiple(self.windower.pop_valid_txs())
 
     def execute(self, s):
+        """Execute a statement."""
         tx_id = self.get_next_tx_id()
         self.wait_on_txs(tx_id)
         self.sync_db()

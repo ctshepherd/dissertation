@@ -1,5 +1,5 @@
 from dbp import dbp
-from dbp.dbp import DB, DBP
+from dbp.dbp import DB, DBP, Distributor
 from paxos.test import TestCase
 
 
@@ -9,6 +9,24 @@ class TestDB(TestCase):
         db.set("foo", "bar")
         self.assertEqual(db.get("foo"), "bar")
         self.assertRaises(KeyError, db.get, "foobar")
+
+
+class TestDistributor(TestCase):
+    def test_distribute(self):
+        d = dbp.distributed_txs
+
+        dbp.distributed_txs = []
+        p = Distributor()
+        p.distribute(("a", "b"))
+        self.assertEqual(dbp.distributed_txs, [("a", "b")])
+
+        dbp.distributed_txs = []
+        p = Distributor()
+        o = object()
+        p.distribute(o)
+        self.assertEqual(dbp.distributed_txs, [o])
+
+        dbp.distributed_txs = d
 
 
 class TestDBP(TestCase):
@@ -23,14 +41,15 @@ class TestDBP(TestCase):
         dbp.cur_tx = c
 
     def test_distribute(self):
-        d = dbp.distributed_txs
-        dbp.distributed_txs = []
-
+        l = []
+        class FakeD(object):
+            def distribute(self, tx):
+                l.append(tx)
+        o = object()
         p = DBP()
-        p.distribute(("a", "b"))
-        self.assertEqual(dbp.distributed_txs, [("a", "b")])
-
-        dbp.distributed_txs = d
+        p.distributor = FakeD()
+        p.distribute(o)
+        self.assertEqual(l, [o])
 
     def test_sync_db(self):
         p = DBP()

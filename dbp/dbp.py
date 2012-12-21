@@ -21,6 +21,15 @@ class DB(object):
         return self._db[key]
 
 
+class Distributor(object):
+    """Distributes TXs across the network"""
+    def __init__(self):
+        pass
+
+    def distribute(self, tx):
+        distributed_txs.append(tx)
+
+
 class DBP(object):
     def __init__(self):
         self._min_tx = 0
@@ -29,6 +38,7 @@ class DBP(object):
         self._txs = {}
         self._process_txs = []
         self.db = DB()
+        self.distributor = Distributor()
 
     def queue(self, tx):
         """Queue a TX for processing."""
@@ -48,11 +58,9 @@ class DBP(object):
         cur_tx += 1
         return cur_tx
 
-    def distribute(self, (k, v)):
+    def distribute(self, tx):
         """Distribute transaction to other nodes."""
-        # This is just a stub at the moment, eventually will hand off
-        # transaction to a network object that will do the dirty.
-        distributed_txs.append((k, v))
+        self.distributor.distribute(tx)
 
     def sync_db(self):
         """Process all unprocessed TXs"""

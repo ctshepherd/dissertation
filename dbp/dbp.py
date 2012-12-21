@@ -27,6 +27,7 @@ class Distributor(object):
         pass
 
     def distribute(self, tx):
+        # XXX: this writes to the network
         distributed_txs.append(tx)
 
 
@@ -85,6 +86,7 @@ class DBP(object):
         doesn't go into those complexities at this point but it will do soon,
         for now we use a global counter.
         """
+        # XXX: this writes to the network
         global cur_tx
         cur_tx += 1
         return cur_tx
@@ -113,6 +115,7 @@ class DBP(object):
     def wait_on_next_tx(self):
         """Wait for the next TX received and return it."""
         # We have a fake TX list for the moment
+        # XXX: this reads from the network
         return fake_tx_list.pop(0)
 
     def wait_on_txs(self, tx_id):

@@ -1,7 +1,5 @@
 from paxos.util import dbprint
 
-distributed_txs = []
-
 
 class DB(object):
     """Database backing store class"""
@@ -22,11 +20,11 @@ class DB(object):
 class Distributor(object):
     """Distributes TXs across the network"""
     def __init__(self):
-        pass
+        self.distributed_txs = []
 
     def distribute(self, tx):
         # XXX: this writes to the network
-        distributed_txs.append(tx)
+        self.distributed_txs.append(tx)
 
 
 class TXWindower(object):
@@ -67,6 +65,7 @@ class TXInput(object):
     def pop(self):
         """Return a TX from the network."""
         return self.tx_list.pop(0)
+
 
 class DBP(object):
     """Main DBP object - coordinates the database."""

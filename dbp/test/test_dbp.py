@@ -13,20 +13,14 @@ class TestDB(TestCase):
 
 class TestDistributor(TestCase):
     def test_distribute(self):
-        d = dbp.distributed_txs
+        d = Distributor()
+        d.distribute(("a", "b"))
+        self.assertEqual(d.distributed_txs, [("a", "b")])
 
-        dbp.distributed_txs = []
-        p = Distributor()
-        p.distribute(("a", "b"))
-        self.assertEqual(dbp.distributed_txs, [("a", "b")])
-
-        dbp.distributed_txs = []
-        p = Distributor()
+        d = Distributor()
         o = object()
-        p.distribute(o)
-        self.assertEqual(dbp.distributed_txs, [o])
-
-        dbp.distributed_txs = d
+        d.distribute(o)
+        self.assertEqual(d.distributed_txs, [o])
 
 
 class TestDBP(TestCase):

@@ -1,4 +1,5 @@
 from paxos.util import dbprint
+from twisted.internet import defer, reactor
 
 
 class DB(object):
@@ -120,8 +121,12 @@ class DBP(object):
     def wait_on_next_tx(self):
         """Wait for the next TX received and return it."""
         # XXX: this reads from the network
-        return self.txn.pop()
+        tx = self.txn.pop()
+        d = defer.Deferred()
+        reactor.callLater(1, d.callback, tx)
+        return d
 
+    @defer.deferredGenerator
     def wait_on_txs(self, tx_id):
         """Wait until we have received all txs < tx_id.
 
@@ -135,8 +140,11 @@ class DBP(object):
         dbprint("waiting on tx %d (mix tx is %d)" % (tx_id, self.windower.min_tx), level=3)
         # This loop doesn't take into account missing/timedout txs yet
         while self.windower.min_tx < wait_tx:
+            print "waiting on tx %d" % self.windower.min_tx
             next_tx = self.wait_on_next_tx()
-            next_tx_id, next_tx_op = next_tx
+            d = defer.waitForDeferred(next_tx)
+            yield d
+            next_tx_id, next_tx_op = d.getResult()
             dbprint("next tx is %d (%d)" % (next_tx_id, self.windower.min_tx), level=2)
             self.windower.insert_tx(next_tx_id, next_tx_op)
             self.queue_multiple(self.windower.pop_valid_txs())
@@ -144,6 +152,7 @@ class DBP(object):
     def execute(self, s):
         """Execute a statement."""
         tx_id = self.get_next_tx_id()
-        self.wait_on_txs(tx_id)
-        self.sync_db()
-        self.process(tx_id, s)
+        d = self.wait_on_txs(tx_id)
+        d.addCallback(lambda r: self.sync_db())
+        d.addCallback(lambda r: self.process(tx_id, s))
+        d.addBoth(lambda r: reactor.stop())

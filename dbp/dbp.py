@@ -155,4 +155,4 @@ class DBP(object):
         d = self.wait_on_txs(tx_id)
         d.addCallback(cb(self.sync_db))
         d.addCallback(cb(self.process, (tx_id, s)))
-        d.addBoth(cb(reactor.stop))
+        return d

@@ -2,6 +2,12 @@ from paxos.util import dbprint
 from twisted.internet import defer, reactor
 
 
+def cb(f, args=()):
+    def g(r):
+        f(*args)
+    return g
+
+
 class DB(object):
     """Database backing store class"""
     def __init__(self):
@@ -153,6 +159,6 @@ class DBP(object):
         """Execute a statement."""
         tx_id = self.get_next_tx_id()
         d = self.wait_on_txs(tx_id)
-        d.addCallback(lambda r: self.sync_db())
-        d.addCallback(lambda r: self.process(tx_id, s))
-        d.addBoth(lambda r: reactor.stop())
+        d.addCallback(cb(self.sync_db))
+        d.addCallback(cb(self.process, (tx_id, s)))
+        d.addBoth(cb(reactor.stop))

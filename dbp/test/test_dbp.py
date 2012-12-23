@@ -14,13 +14,13 @@ class TestDB(TestCase):
 class TestTXNetwork(TestCase):
     def test_distribute(self):
         d = TXNetwork()
-        d.distribute(("a", "b"))
-        self.assertEqual(d.distributed_txs, [("a", "b")])
+        d.distribute(0, ("a", "b"))
+        self.assertEqual(d.distributed_txs, [(0, ("a", "b"))])
 
         d = TXNetwork()
         o = object()
-        d.distribute(o)
-        self.assertEqual(d.distributed_txs, [o])
+        d.distribute(0, o)
+        self.assertEqual(d.distributed_txs, [(0, o)])
 
 
 class TestDBP(TestCase):
@@ -36,28 +36,28 @@ class TestDBP(TestCase):
         l = []
         o = object()
         p = DBP()
-        p.distribute(o)
-        self.assertEqual(p.txn.distributed_txs, [o])
+        p.distribute(0, o)
+        self.assertEqual(p.txn.distributed_txs, [(0, o)])
 
     def test_sync_db(self):
         p = DBP()
 
-        p.queue("a = b")
+        p.queue((1, "a = b"))
         self.assertEqual(p.db._db, {})
         p.sync_db()
         self.assertEqual(p.db._db, {'a': 'b'})
 
-        p.queue("b = a")
-        p.queue("a = a")
+        p.queue((2, "b = a"))
+        p.queue((3, "a = a"))
         self.assertEqual(p.db._db, {'a': 'b'})
         p.sync_db()
         self.assertEqual(p.db._db, {'a': 'a', 'b': 'a'})
 
     def test_process(self):
         p = DBP()
-        p.process("a = b")
+        p.process(0, "a = b")
         self.assertEqual(p.db._db, {'a': 'b'})
-        self.assertRaises(ValueError, p.process, "foobar")
+        self.assertRaises(ValueError, p.process, 0, "foobar")
 
     def test_wait_on_next_tx(self):
         l = [(1, "a = b"), (2, "b = c"), (3, "a = c")]

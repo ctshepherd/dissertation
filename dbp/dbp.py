@@ -41,7 +41,7 @@ class TXWindower(object):
         """Return the largest number of contiguous TXs, starting from min_tx."""
         ret = []
         while (self.min_tx+1) in self.received_txs:
-            ret.append(self.received_txs.pop(self.min_tx+1))
+            ret.append((self.min_tx+1, self.received_txs.pop(self.min_tx+1)))
             self.min_tx += 1
         return ret
 
@@ -56,9 +56,9 @@ class TXNetwork(object):
         self.cur_tx = len(txs)
         self.distributed_txs = []
 
-    def distribute(self, tx):
+    def distribute(self, tx_id, op):
         # XXX: this writes to the network
-        self.distributed_txs.append(tx)
+        self.distributed_txs.append((tx_id, op))
 
     def pop(self):
         """Return a TX from the network."""
@@ -95,26 +95,27 @@ class DBP(object):
         self.txn.cur_tx += 1
         return self.txn.cur_tx
 
-    def distribute(self, tx):
+    def distribute(self, tx_id, op):
         """Distribute transaction to other nodes."""
-        self.txn.distribute(tx)
+        self.txn.distribute(tx_id, op)
 
     def sync_db(self):
         """Process all unprocessed TXs"""
-        for t in self._process_txs:
-            self.process(t)
+        for tx in self._process_txs:
+            tx_id, tx_op = tx
+            self.process(tx_id, tx_op)
         self._process_txs = []
 
-    def process(self, s):
-        """Actually process the transaction"""
-        dbprint("processing tx %r" % s, level=2)
+    def process(self, tx_id, s):
+        """Perform the operation s with transaction id tx_id."""
+        dbprint("processing op %r, tx id %d" % (s, tx_id), level=2)
         k, v = s.split('=')
         k = k.strip(' ')
         v = v.strip(' ')
         self.db.set(k, v)
         # This will change in the future, eg, if we allowed reads then they
         # wouldn't need to be distributed
-        self.distribute((k, v))
+        self.distribute(tx_id, (k, v))
 
     def wait_on_next_tx(self):
         """Wait for the next TX received and return it."""
@@ -145,4 +146,4 @@ class DBP(object):
         tx_id = self.get_next_tx_id()
         self.wait_on_txs(tx_id)
         self.sync_db()
-        self.process(s)
+        self.process(tx_id, s)

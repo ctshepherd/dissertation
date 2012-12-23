@@ -123,7 +123,7 @@ class DBP(object):
         # XXX: this reads from the network
         tx = self.txn.pop()
         d = defer.Deferred()
-        reactor.callLater(1, d.callback, tx)
+        reactor.callLater(0.1, d.callback, tx)
         return d
 
     @defer.deferredGenerator

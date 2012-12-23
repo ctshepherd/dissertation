@@ -7,8 +7,9 @@ def enable_debug(func, level=1):
     def f(*args):
         saved_dbg = util.DEBUG
         util.DEBUG = level
-        func(*args)
+        ret = func(*args)
         util.DEBUG = saved_dbg
+        return ret
     return f
 
 

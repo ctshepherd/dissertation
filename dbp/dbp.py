@@ -17,16 +17,6 @@ class DB(object):
         return self._db[key]
 
 
-class Distributor(object):
-    """Distributes TXs across the network"""
-    def __init__(self):
-        self.distributed_txs = []
-
-    def distribute(self, tx):
-        # XXX: this writes to the network
-        self.distributed_txs.append(tx)
-
-
 class TXWindower(object):
     """Maintains a moving "window" of received transactions.
 
@@ -56,11 +46,19 @@ class TXWindower(object):
         return ret
 
 
-class TXInput(object):
-    """Fake network object to return TX objects. Will be replaced by something cleverer later."""
+class TXNetwork(object):
+    """Fake network object. Will be replaced by something cleverer later.
+
+    Distributes TXs across the network and returns a prepopulated list of TXs when asked.
+    """
     def __init__(self, txs=()):
         self.tx_list = list(txs)
         self.cur_tx = len(txs)
+        self.distributed_txs = []
+
+    def distribute(self, tx):
+        # XXX: this writes to the network
+        self.distributed_txs.append(tx)
 
     def pop(self):
         """Return a TX from the network."""
@@ -72,9 +70,8 @@ class DBP(object):
     def __init__(self):
         self._process_txs = []
         self.db = DB()
-        self.distributor = Distributor()
         self.windower = TXWindower()
-        self.tx_input = TXInput()
+        self.txn = TXNetwork()
 
     def queue(self, tx):
         """Queue a TX for processing."""
@@ -95,12 +92,12 @@ class DBP(object):
         for now we use a global counter.
         """
         # XXX: this reads from/writes to the network
-        self.tx_input.cur_tx += 1
-        return self.tx_input.cur_tx
+        self.txn.cur_tx += 1
+        return self.txn.cur_tx
 
     def distribute(self, tx):
         """Distribute transaction to other nodes."""
-        self.distributor.distribute(tx)
+        self.txn.distribute(tx)
 
     def sync_db(self):
         """Process all unprocessed TXs"""
@@ -122,7 +119,7 @@ class DBP(object):
     def wait_on_next_tx(self):
         """Wait for the next TX received and return it."""
         # XXX: this reads from the network
-        return self.tx_input.pop()
+        return self.txn.pop()
 
     def wait_on_txs(self, tx_id):
         """Wait until we have received all txs < tx_id.

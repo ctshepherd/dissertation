@@ -1,5 +1,5 @@
 from dbp import dbp
-from dbp.dbp import DB, DBP, Distributor, TXInput
+from dbp.dbp import DB, DBP, TXNetwork
 from paxos.test import TestCase
 
 
@@ -11,13 +11,13 @@ class TestDB(TestCase):
         self.assertRaises(KeyError, db.get, "foobar")
 
 
-class TestDistributor(TestCase):
+class TestTXNetwork(TestCase):
     def test_distribute(self):
-        d = Distributor()
+        d = TXNetwork()
         d.distribute(("a", "b"))
         self.assertEqual(d.distributed_txs, [("a", "b")])
 
-        d = Distributor()
+        d = TXNetwork()
         o = object()
         d.distribute(o)
         self.assertEqual(d.distributed_txs, [o])
@@ -28,20 +28,16 @@ class TestDBP(TestCase):
     def test_get_next_tx_id(self):
         v = 3
         p = DBP()
-        p.tx_input.cur_tx = v
+        p.txn.cur_tx = v
         self.assertEqual(p.get_next_tx_id(), v+1)
-        self.assertEqual(p.tx_input.cur_tx, v+1)
+        self.assertEqual(p.txn.cur_tx, v+1)
 
     def test_distribute(self):
         l = []
-        class FakeD(object):
-            def distribute(self, tx):
-                l.append(tx)
         o = object()
         p = DBP()
-        p.distributor = FakeD()
         p.distribute(o)
-        self.assertEqual(l, [o])
+        self.assertEqual(p.txn.distributed_txs, [o])
 
     def test_sync_db(self):
         p = DBP()
@@ -66,7 +62,7 @@ class TestDBP(TestCase):
     def test_wait_on_next_tx(self):
         l = [(1, "a = b"), (2, "b = c"), (3, "a = c")]
         p = DBP()
-        p.tx_input = TXInput(list(l))
+        p.txn = TXNetwork(list(l))
         self.assertEqual(p.wait_on_next_tx(), l.pop(0))
         self.assertEqual(p.wait_on_next_tx(), l.pop(0))
         self.assertEqual(p.wait_on_next_tx(), l.pop(0))
@@ -75,7 +71,7 @@ class TestDBP(TestCase):
         l = [(1, "a = b"), (2, "b = c"), (3, "a = c")]
 
         p = DBP()
-        p.tx_input = TXInput(list(l))
+        p.txn = TXNetwork(list(l))
         p.wait_on_txs(2)
         p.sync_db()
         self.assertEqual(p.db._db, {"a": "b"})
@@ -89,7 +85,7 @@ class TestDBP(TestCase):
         # check the same thing happens even if TXs arrive out of order
         l = [(1, "a = b"), (3, "a = c"), (2, "b = c")]
         p = DBP()
-        p.tx_input = TXInput(list(l))
+        p.txn = TXNetwork(list(l))
         p.wait_on_txs(2)
         p.sync_db()
         self.assertEqual(p.db._db, {"a": "b"})
@@ -103,7 +99,7 @@ class TestDBP(TestCase):
 
         l = [(1, "a = b"), (3, "a = e"), (2, "a = d")]
         p = DBP()
-        p.tx_input = TXInput(list(l))
+        p.txn = TXNetwork(list(l))
         p.wait_on_txs(2)
         p.sync_db()
         self.assertEqual(p.db._db, {"a": "b"})
@@ -116,6 +112,6 @@ class TestDBP(TestCase):
 
     def test_execute(self):
         p = DBP()
-        p.tx_input = TXInput([(1, "a = b"), (2, "b = c"), (3, "a = c")])
+        p.txn = TXNetwork([(1, "a = b"), (2, "b = c"), (3, "a = c")])
         p.execute("b = a")
         self.assertEqual(p.db._db, {"a": "c", "b": "a"})

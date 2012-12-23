@@ -140,7 +140,6 @@ class DBP(object):
         dbprint("waiting on tx %d (mix tx is %d)" % (tx_id, self.windower.min_tx), level=3)
         # This loop doesn't take into account missing/timedout txs yet
         while self.windower.min_tx < wait_tx:
-            print "waiting on tx %d" % self.windower.min_tx
             next_tx = self.wait_on_next_tx()
             d = defer.waitForDeferred(next_tx)
             yield d

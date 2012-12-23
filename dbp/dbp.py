@@ -1,8 +1,6 @@
 from paxos.util import dbprint
 
-fake_tx_list = []
 distributed_txs = []
-cur_tx = 0
 
 
 class DB(object):
@@ -60,6 +58,16 @@ class TXWindower(object):
         return ret
 
 
+class TXInput(object):
+    """Fake network object to return TX objects. Will be replaced by something cleverer later."""
+    def __init__(self, txs=()):
+        self.tx_list = list(txs)
+        self.cur_tx = len(txs)
+
+    def pop(self):
+        """Return a TX from the network."""
+        return self.tx_list.pop(0)
+
 class DBP(object):
     """Main DBP object - coordinates the database."""
     def __init__(self):
@@ -67,6 +75,7 @@ class DBP(object):
         self.db = DB()
         self.distributor = Distributor()
         self.windower = TXWindower()
+        self.tx_input = TXInput()
 
     def queue(self, tx):
         """Queue a TX for processing."""
@@ -86,10 +95,9 @@ class DBP(object):
         doesn't go into those complexities at this point but it will do soon,
         for now we use a global counter.
         """
-        # XXX: this writes to the network
-        global cur_tx
-        cur_tx += 1
-        return cur_tx
+        # XXX: this reads from/writes to the network
+        self.tx_input.cur_tx += 1
+        return self.tx_input.cur_tx
 
     def distribute(self, tx):
         """Distribute transaction to other nodes."""
@@ -114,9 +122,8 @@ class DBP(object):
 
     def wait_on_next_tx(self):
         """Wait for the next TX received and return it."""
-        # We have a fake TX list for the moment
         # XXX: this reads from the network
-        return fake_tx_list.pop(0)
+        return self.tx_input.pop()
 
     def wait_on_txs(self, tx_id):
         """Wait until we have received all txs < tx_id.

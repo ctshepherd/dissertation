@@ -1,5 +1,5 @@
 from dbp import dbp
-from dbp.dbp import DB, DBP, Distributor
+from dbp.dbp import DB, DBP, Distributor, TXInput
 from paxos.test import TestCase
 
 
@@ -33,12 +33,10 @@ class TestDBP(TestCase):
 
     def test_get_next_tx_id(self):
         v = 3
-        c = dbp.cur_tx
-        dbp.cur_tx = v
         p = DBP()
+        p.tx_input.cur_tx = v
         self.assertEqual(p.get_next_tx_id(), v+1)
-        self.assertEqual(dbp.cur_tx, v+1)
-        dbp.cur_tx = c
+        self.assertEqual(p.tx_input.cur_tx, v+1)
 
     def test_distribute(self):
         l = []
@@ -72,24 +70,18 @@ class TestDBP(TestCase):
         self.assertRaises(ValueError, p.process, "foobar")
 
     def test_wait_on_next_tx(self):
-        f = dbp.fake_tx_list
         l = [(1, "a = b"), (2, "b = c"), (3, "a = c")]
-        dbp.fake_tx_list = list(l)  # copy l into fake_tx_list
-
         p = DBP()
+        p.tx_input = TXInput(list(l))
         self.assertEqual(p.wait_on_next_tx(), l.pop(0))
         self.assertEqual(p.wait_on_next_tx(), l.pop(0))
         self.assertEqual(p.wait_on_next_tx(), l.pop(0))
-
-        dbp.fake_tx_list = f
 
     def test_wait_on_txs(self):
-        f = dbp.fake_tx_list
-
         l = [(1, "a = b"), (2, "b = c"), (3, "a = c")]
-        dbp.fake_tx_list = list(l)  # copy l into fake_tx_list
 
         p = DBP()
+        p.tx_input = TXInput(list(l))
         p.wait_on_txs(2)
         p.sync_db()
         self.assertEqual(p.db._db, {"a": "b"})
@@ -102,8 +94,8 @@ class TestDBP(TestCase):
 
         # check the same thing happens even if TXs arrive out of order
         l = [(1, "a = b"), (3, "a = c"), (2, "b = c")]
-        dbp.fake_tx_list = list(l)  # copy l into fake_tx_list
         p = DBP()
+        p.tx_input = TXInput(list(l))
         p.wait_on_txs(2)
         p.sync_db()
         self.assertEqual(p.db._db, {"a": "b"})
@@ -116,8 +108,8 @@ class TestDBP(TestCase):
         self.assertEqual(p.db._db, {"a": "c", "b": "c"})
 
         l = [(1, "a = b"), (3, "a = e"), (2, "a = d")]
-        dbp.fake_tx_list = list(l)  # copy l into fake_tx_list
         p = DBP()
+        p.tx_input = TXInput(list(l))
         p.wait_on_txs(2)
         p.sync_db()
         self.assertEqual(p.db._db, {"a": "b"})
@@ -128,17 +120,8 @@ class TestDBP(TestCase):
         p.sync_db()
         self.assertEqual(p.db._db, {"a": "e"})
 
-        dbp.fake_tx_list = f
-
     def test_execute(self):
-        f = dbp.fake_tx_list
-        c = dbp.cur_tx
-        dbp.fake_tx_list = [(1, "a = b"), (2, "b = c"), (3, "a = c")]
-        dbp.cur_tx = len(dbp.fake_tx_list)
-
         p = DBP()
+        p.tx_input = TXInput([(1, "a = b"), (2, "b = c"), (3, "a = c")])
         p.execute("b = a")
         self.assertEqual(p.db._db, {"a": "c", "b": "a"})
-
-        dbp.fake_tx_list = f
-        dbp.cur_tx = c

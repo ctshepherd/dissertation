@@ -1,11 +1,5 @@
-from paxos.util import dbprint
+from paxos.util import cb, dbprint
 from twisted.internet import defer, reactor
-
-
-def cb(f, args=()):
-    def g(r):
-        f(*args)
-    return g
 
 
 class DB(object):

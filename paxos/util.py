@@ -13,9 +13,16 @@ def title(s):
     return s[0].capitalize() + s[1:]
 
 
+def cb(f, args=()):
+    def g(r):
+        f(*args)
+    return g
+
+
 def dbprint(s, level=5):
     if DEBUG and level >= DEBUG:
         print s
+
 
 class PaxosException(Exception):
     """Superclass for all exceptions raised by the Paxos module."""

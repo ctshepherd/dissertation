@@ -142,13 +142,13 @@ class DBP(object):
             return d
 
     def _get_tx(self, attempts=-1):
-        """Get a TX id that this node owns.
+        """Get a TX id that this node has reserved.
 
-        Return a Deferred that calls back with an asserted tx or gives up after trying attempts times, errback'ing with TXFailed.
+        Return a Deferred that calls back with a reserved tx or gives up after trying attempts times, errback'ing with TXFailed.
         """
         ret = defer.Deferred()
         tx_id = self.get_next_tx_id()
-        d = self.txn.assert_tx(tx_id)
+        d = self.txn.reserve_tx(tx_id)
         def retry(err):
             if err.check(TXTaken):
                 # If we ran out of attempts, fail

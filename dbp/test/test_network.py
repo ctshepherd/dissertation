@@ -32,26 +32,26 @@ class TestTXNetwork(TestCase):
             self.assertEqual(result, x)
         return f
 
-    def test_assert_tx_succeeds(self):
+    def test_reserve_tx_succeeds(self):
         l = [(0, "a = b"), (1, "b = c")]
         n = TXNetwork(l)
-        d = n.assert_tx(2)
+        d = n.reserve_tx(2)
         d.addCallback(self.gen_cb(2))
         return d
 
-    def test_assert_tx_recieved(self):
-        # assert we fail if we've already recieved the TX we try to assert
+    def test_reserve_tx_recieved(self):
+        # assert we fail if we've already recieved the TX we try to reserve
         l = [(0, "a = b"), (1, "b = c")]
         n = TXNetwork(l)
-        d = n.assert_tx(1)
+        d = n.reserve_tx(1)
         d.addBoth(self.gen_cbs())
         return d
 
-    def test_assert_tx_distributed(self):
-        # assert we fail if we've already distributed the TX we try to assert
+    def test_reserve_tx_distributed(self):
+        # assert we fail if we've already distributed the TX we try to reserve
         l = [(0, "a = b"), (1, "b = c")]
         n = TXNetwork(l)
         n.distribute(2, "a = c")
-        d = n.assert_tx(2)
+        d = n.reserve_tx(2)
         d.addBoth(self.gen_cbs())
         return d

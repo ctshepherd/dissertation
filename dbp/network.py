@@ -8,11 +8,11 @@ from twisted.python import failure
 
 
 class TXTaken(Exception):
-    """Raised when we try to own a TX but it was taken by someone else."""
+    """Raised when we try to reserve a TX but it was taken by someone else."""
 
 
 class TXFailed(Exception):
-    """Raised when we have exceeded number of attempts to try to own a TX."""
+    """Raised when we have exceeded number of attempts to try to reserve a TX."""
 
 
 class TXNetwork(object):
@@ -35,10 +35,11 @@ class TXNetwork(object):
         """Return a TX from the network."""
         return self.tx_list.pop(0)
 
-    def assert_tx(self, tx_id):
-        """Attempt to assert that this node "owns" TX tx_id.
+    def reserve_tx(self, tx_id):
+        """Attempt to reserve TX with id tx_id for this node.
 
-        Returns a Deferred that calls back with tx_id if we can assert that we own tx_id, or errback with TXTaken otherwise."""
+        Returns a Deferred that calls back with tx_id if we can reserve tx_id, or errback with TXTaken otherwise."""
+        # This will call down to Paxos eventually
         d = defer.Deferred()
         if tx_id not in self.taken_txs:
             reactor.callLater(0.1, d.callback, tx_id)

@@ -14,6 +14,7 @@ short:
 - investigate odd crash in dbp.test
 - fix up comments
 - do we want assert_tx to insert no-op txs?
+- hook ops into dbp.core
 medium:
 - other types of ops
 long:

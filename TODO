@@ -7,8 +7,15 @@ Paxos:
 - Develop client separation logic
 
 DBP:
+short:
 - reserve TX, repeat if failed
 - actually hook into network
 - hook into paxos
 - investigate odd crash in dbp.test
 - fix up comments
+medium:
+- other types of ops
+long:
+- simple SQL parsing
+- transactions
+- command line client

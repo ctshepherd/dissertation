@@ -151,18 +151,15 @@ class TestDBP(TestCase):
         p = DBP()
         p.txn = TXNetwork([(1, "a = b"), (3, "a = e"), (2, "a = d")])
 
-        def f(r): print p.db._db
         d = p.wait_on_txs(2)
         d.addCallback(cb(p.sync_db))
         #d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "b"})))
-        d.addCallback(f)
         ret.append(d)
 
         d = p.wait_on_txs(3)
         d.addCallback(cb(p.sync_db))
         # Because we've already received TX 3 it will be processed here
         # d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "e"})))
-        d.addCallback(f)
         ret.append(d)
 
         d = p.wait_on_txs(4)

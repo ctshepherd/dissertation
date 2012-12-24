@@ -139,3 +139,27 @@ class TestLearner(AgentTestMixin, TestCase):
         self.assertEqual(a.accepted_proposals, {1: 2})
 
         agent.network = n
+
+    def test_regr2(self):
+        # test that if we send a Learner a bunch of accept messages from the same
+        # acceptor, it only accepts a majority vote
+        n = agent.network
+        l = []
+        h = {}
+        for x in xrange(5):
+            fa = FakeAgent()
+            h[x] = fa
+            l.append(fa)
+            self.addCleanup(fa.proto.transport.stopListening)
+        agent.network = {'acceptor': l}
+        agent.hosts = h
+        a = self.agent
+
+        a.receive("accept:1,2", (None, 0))
+        a.receive("accept:1,2", (None, 0))
+        a.receive("accept:1,2", (None, 0))
+        self.assertEqual(a.accepted_proposals, {})
+        a.receive("accept:1,2", (None, 0))
+        self.assertEqual(a.accepted_proposals, {})
+
+        agent.network = n

@@ -13,6 +13,7 @@ short:
 - hook into paxos
 - investigate odd crash in dbp.test
 - fix up comments
+- do we want assert_tx to insert no-op txs?
 medium:
 - other types of ops
 long:

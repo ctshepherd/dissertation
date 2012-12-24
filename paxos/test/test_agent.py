@@ -121,18 +121,21 @@ class TestLearner(AgentTestMixin, TestCase):
         # proposal, it only accepts a majority vote
         n = agent.network
         l = []
+        h = {}
         for x in xrange(5):
             fa = FakeAgent()
             l.append(fa)
+            h[x] = fa
             self.addCleanup(fa.proto.transport.stopListening)
         agent.network = {'acceptor': l}
+        agent.hosts = h
         a = self.agent
 
-        a.receive("accept:1,2", (l[0], None))
-        a.receive("accept:1,2", (l[1], None))
-        a.receive("accept:1,3", (l[2], None))
-        self.assertEqual(a.accepted_proposals, set())
-        a.receive("accept:1,2", (l[3], None))
-        self.assertEqual(a.accepted_proposals, set([Proposal(1, 2)]))
+        a.receive("accept:1,2", (None, 0))
+        a.receive("accept:1,2", (None, 1))
+        a.receive("accept:1,3", (None, 2))
+        self.assertEqual(a.accepted_proposals, {})
+        a.receive("accept:1,2", (None, 3))
+        self.assertEqual(a.accepted_proposals, {1: 2})
 
         agent.network = n

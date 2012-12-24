@@ -86,17 +86,22 @@ class Learner(Agent):
 
     def __init__(self):
         super(Learner, self).__init__()
-        self.received = {}
-        self.accepted_proposals = set()
+        self.received_proposals = {}
+        self.accepted_proposals = {}
 
     def _receive(self, msg, host):
         acceptor_num = len(network['acceptor'])
         if msg.msg_type == "accept":
-            self.received.setdefault(msg.proposal.prop_num, []).append((msg, host))
-            if len(self.received[msg.proposal.prop_num]) > acceptor_num/2:
-                self.accepted_proposals.add(msg.proposal)
+            # if we've already learnt it's been accepted, there's no need to
+            # deal with it any more
+            if msg.proposal.prop_num in self.accepted_proposals:
+                return
+            p = self.received_proposals.setdefault(msg.proposal.prop_num, {})
+            s = p.setdefault(msg.proposal.value, set())
+            s.add(host)
+            if len(s) > acceptor_num/2:
+                self.accepted_proposals[msg.proposal.prop_num] = msg.proposal.value
                 dbprint("Proposal %s accepted" % msg.proposal, level=3)
-                print self.accepted_proposals
 
 
 class Proposer(Agent):

@@ -4,6 +4,7 @@ Network module, mainly contains the TXNetwork class, which handles all network t
 """
 
 from twisted.internet import defer, reactor
+from twisted.python import failure
 
 
 class TXTaken(Exception):
@@ -23,10 +24,12 @@ class TXNetwork(object):
         self.tx_list = list(txs)
         self.cur_tx = len(txs)
         self.distributed_txs = []
+        self.taken_txs = set(txi for (txi, txo) in txs)
 
     def distribute(self, tx_id, op):
-        # XXX: this writes to the network
         self.distributed_txs.append((tx_id, op))
+        self.taken_txs.add(tx_id)
+        self.cur_tx += 1
 
     def pop(self):
         """Return a TX from the network."""
@@ -37,6 +40,8 @@ class TXNetwork(object):
 
         Returns a Deferred that calls back with tx_id if we can assert that we own tx_id, or errback with TXTaken otherwise."""
         d = defer.Deferred()
-        # XXX: actually make this work
-        reactor.callLater(1, d.callback, tx_id)
+        if tx_id not in self.taken_txs:
+            reactor.callLater(0.1, d.callback, tx_id)
+        else:
+            reactor.callLater(0.1, d.errback, failure.Failure(TXTaken(tx_id)))
         return d

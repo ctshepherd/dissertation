@@ -1,4 +1,4 @@
-from dbp.dbp import DB, DBP, TXNetwork
+from dbp.core import DB, DBP, TXNetwork
 from paxos.util import cb
 from paxos.test import TestCase
 from twisted.internet import defer

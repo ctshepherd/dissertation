@@ -1,6 +1,12 @@
+Paxos:
 - Implement NACKs
 - Move agents over to their own protocols
 - split Accept into AcceptRequest and AcceptNotify
 - Add acceptor info to acceptnotify
 - Move network logic into factory class
 - Develop client separation logic
+
+DBP:
+- reserve TX, repeat if failed
+- actually hook into network
+- hook into paxos

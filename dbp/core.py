@@ -46,6 +46,11 @@ class TXWindower(object):
             self.min_tx += 1
         return ret
 
+class TXTaken(Exception):
+    pass
+
+class TXFailed(Exception):
+    pass
 
 class TXNetwork(object):
     """Fake network object. Will be replaced by something cleverer later.
@@ -64,6 +69,15 @@ class TXNetwork(object):
     def pop(self):
         """Return a TX from the network."""
         return self.tx_list.pop(0)
+
+    def assert_tx(self, tx_id):
+        """Attempt to assert that this node "owns" TX tx_id.
+
+        Returns a Deferred that calls back with tx_id if we can assert that we own tx_id, or errback with TXTaken otherwise."""
+        d = defer.Deferred()
+        # XXX: actually make this work
+        reactor.callLater(1, d.callback, tx_id)
+        return d
 
 
 class DBP(object):
@@ -168,10 +182,45 @@ class DBP(object):
             d = defer.succeed(None)
             return d
 
-    def execute(self, s):
-        """Execute a statement."""
+    def _get_tx(self, attempts=-1):
+        """Get a TX id that this node owns.
+
+        Return a Deferred that calls back with an asserted tx or gives up after trying attempts times, errback'ing with TXFailed.
+        """
+        ret = defer.Deferred()
         tx_id = self.get_next_tx_id()
-        d = self.wait_on_txs(tx_id)
+        d = self.txn.assert_tx(tx_id)
+        def retry(err):
+            if err.check(TXTaken):
+                # If we ran out of attempts, fail
+                if attempts == 0:
+                    ret.errback(TXFailed())
+                # If we are checking the number of attempts, decrement
+                if attempts > 0:
+                    attempts -= 1
+                # Try again
+                return self._get_tx(attempts)
+            return err
+        d.addCallbacks(ret.callback, retry)
+        return ret
+
+    def execute(self, s, attempts=-1):
+        """Execute statement s, giving up after attempts tries.
+
+        Return a Deferred that fires when a statement is executed. Errbacks with TXFailed if we exceed attempts tries.
+        """
+        l = [0]
+        d = self._get_tx(attempts)
+        # We need to store tx_id because wait_on_txs and sync_db don't pass it
+        # on
+        def store_tx(tx_id):
+            l[0] = tx_id
+            return tx_id
+        d.addCallback(store_tx)
+        d.addCallback(self.wait_on_txs)
         d.addCallback(cb(self.sync_db))
-        d.addCallback(cb(self.process, (tx_id, s)))
+        def restore_tx(ret):
+            return l[0]
+        d.addCallback(restore_tx)
+        d.addCallback(lambda t: self.process(t, s))
         return d

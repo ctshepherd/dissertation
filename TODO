@@ -10,3 +10,5 @@ DBP:
 - reserve TX, repeat if failed
 - actually hook into network
 - hook into paxos
+- investigate odd crash in dbp.test
+- fix up comments

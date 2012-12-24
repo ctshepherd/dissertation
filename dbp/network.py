@@ -1,0 +1,42 @@
+"""Network module.
+
+Network module, mainly contains the TXNetwork class, which handles all network traffic for the DBP.
+"""
+
+from twisted.internet import defer, reactor
+
+
+class TXTaken(Exception):
+    """Raised when we try to own a TX but it was taken by someone else."""
+
+
+class TXFailed(Exception):
+    """Raised when we have exceeded number of attempts to try to own a TX."""
+
+
+class TXNetwork(object):
+    """Fake network object. Will be replaced by something cleverer later.
+
+    Distributes TXs across the network and returns a prepopulated list of TXs when asked.
+    """
+    def __init__(self, txs=()):
+        self.tx_list = list(txs)
+        self.cur_tx = len(txs)
+        self.distributed_txs = []
+
+    def distribute(self, tx_id, op):
+        # XXX: this writes to the network
+        self.distributed_txs.append((tx_id, op))
+
+    def pop(self):
+        """Return a TX from the network."""
+        return self.tx_list.pop(0)
+
+    def assert_tx(self, tx_id):
+        """Attempt to assert that this node "owns" TX tx_id.
+
+        Returns a Deferred that calls back with tx_id if we can assert that we own tx_id, or errback with TXTaken otherwise."""
+        d = defer.Deferred()
+        # XXX: actually make this work
+        reactor.callLater(1, d.callback, tx_id)
+        return d

@@ -1,21 +1,7 @@
+from dbp.db import DB
+from dbp.network import TXNetwork, TXTaken, TXFailed
 from paxos.util import cb, dbprint
 from twisted.internet import defer, reactor
-
-
-class DB(object):
-    """Database backing store class"""
-    def __init__(self):
-        self._db = {}
-
-    def set(self, key, val):
-        """Set a key in the database to equal val."""
-        dbprint("setting %s to %s" % (key, val), level=1)
-        self._db[key] = val
-
-    def get(self, key):
-        """Return the value of key in the database. Raises a KeyError if key does not exist."""
-        dbprint("getting key %s" % key, level=1)
-        return self._db[key]
 
 
 class TXWindower(object):
@@ -45,39 +31,6 @@ class TXWindower(object):
             ret.append((self.min_tx+1, self.received_txs.pop(self.min_tx+1)))
             self.min_tx += 1
         return ret
-
-class TXTaken(Exception):
-    pass
-
-class TXFailed(Exception):
-    pass
-
-class TXNetwork(object):
-    """Fake network object. Will be replaced by something cleverer later.
-
-    Distributes TXs across the network and returns a prepopulated list of TXs when asked.
-    """
-    def __init__(self, txs=()):
-        self.tx_list = list(txs)
-        self.cur_tx = len(txs)
-        self.distributed_txs = []
-
-    def distribute(self, tx_id, op):
-        # XXX: this writes to the network
-        self.distributed_txs.append((tx_id, op))
-
-    def pop(self):
-        """Return a TX from the network."""
-        return self.tx_list.pop(0)
-
-    def assert_tx(self, tx_id):
-        """Attempt to assert that this node "owns" TX tx_id.
-
-        Returns a Deferred that calls back with tx_id if we can assert that we own tx_id, or errback with TXTaken otherwise."""
-        d = defer.Deferred()
-        # XXX: actually make this work
-        reactor.callLater(1, d.callback, tx_id)
-        return d
 
 
 class DBP(object):

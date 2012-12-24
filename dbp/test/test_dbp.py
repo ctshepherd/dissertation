@@ -1,7 +1,6 @@
-from dbp import dbp
 from dbp.dbp import DB, DBP, TXNetwork
 from paxos.util import cb
-from paxos.test import TestCase, enable_debug
+from paxos.test import TestCase
 from twisted.internet import defer
 from twisted.trial.unittest import SkipTest
 
@@ -36,7 +35,6 @@ class TestDBP(TestCase):
         self.assertEqual(p.txn.cur_tx, v+1)
 
     def test_distribute(self):
-        l = []
         o = object()
         p = DBP()
         p.distribute(0, o)

@@ -88,6 +88,7 @@ class DBP(object):
         self.windower = TXWindower()
         self.txn = TXNetwork()
         self.waiting_ds = {}
+        self.tx_version = 0
 
     def queue(self, tx):
         """Queue a TX for processing."""
@@ -116,7 +117,10 @@ class DBP(object):
         self.txn.distribute(tx_id, op)
 
     def sync_db(self):
-        """Process all unprocessed TXs"""
+        """Process all unprocessed TXs. Return the TX the database is at now.
+
+        Sync our local database up to all the TXs we have received so far.
+        """
         for tx in self._process_txs:
             tx_id, tx_op = tx
             self.process(tx_id, tx_op)
@@ -125,6 +129,7 @@ class DBP(object):
     def process(self, tx_id, s):
         """Perform the operation s with transaction id tx_id."""
         dbprint("processing op %r, tx id %d" % (s, tx_id), level=2)
+        assert tx_id == self.tx_version+1, "process: tx_id %d != tx_version+1: %d" % (tx_id, self.tx_version+1)
         k, v = s.split('=')
         k = k.strip(' ')
         v = v.strip(' ')
@@ -132,6 +137,7 @@ class DBP(object):
         # This will change in the future, eg, if we allowed reads then they
         # wouldn't need to be distributed
         self.distribute(tx_id, (k, v))
+        self.tx_version = tx_id
 
     def wait_on_next_tx(self):
         """Wait for the next TX received and return it."""

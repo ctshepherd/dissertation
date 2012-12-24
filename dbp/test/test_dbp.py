@@ -56,9 +56,11 @@ class TestDBP(TestCase):
 
     def test_process(self):
         p = DBP()
-        p.process(0, "a = b")
+        p.process(1, "a = b")
         self.assertEqual(p.db._db, {'a': 'b'})
-        self.assertRaises(ValueError, p.process, 0, "foobar")
+        self.assertRaises(ValueError, p.process, 2, "foobar")
+        self.assertRaises(AssertionError, p.process, 1, "a = b")
+        self.assertRaises(AssertionError, p.process, 3, "a = b")
 
     def test_wait_on_next_tx(self):
         l = [(1, "a = b"), (2, "b = c"), (3, "a = c")]

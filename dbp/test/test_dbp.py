@@ -1,28 +1,9 @@
-from dbp.core import DB, DBP, TXNetwork
+from dbp.core import DBP
+from dbp.network import TXNetwork
 from paxos.util import cb
 from paxos.test import TestCase
 from twisted.internet import defer
 from twisted.trial.unittest import SkipTest
-
-
-class TestDB(TestCase):
-    def test_set(self):
-        db = DB()
-        db.set("foo", "bar")
-        self.assertEqual(db.get("foo"), "bar")
-        self.assertRaises(KeyError, db.get, "foobar")
-
-
-class TestTXNetwork(TestCase):
-    def test_distribute(self):
-        d = TXNetwork()
-        d.distribute(0, ("a", "b"))
-        self.assertEqual(d.distributed_txs, [(0, ("a", "b"))])
-
-        d = TXNetwork()
-        o = object()
-        d.distribute(0, o)
-        self.assertEqual(d.distributed_txs, [(0, o)])
 
 
 class TestDBP(TestCase):

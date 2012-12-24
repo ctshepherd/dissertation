@@ -3,6 +3,7 @@ from dbp.dbp import DB, DBP, TXNetwork
 from paxos.util import cb
 from paxos.test import TestCase, enable_debug
 from twisted.internet import defer
+from twisted.trial.unittest import SkipTest
 
 
 class TestDB(TestCase):
@@ -98,6 +99,26 @@ class TestDBP(TestCase):
 
         return defer.DeferredList(ret)
 
+    def test_wait_on_txs_pause(self):
+        raise SkipTest("This hangs trial at the moment.")
+        ret = []
+
+        p = DBP()
+        p.txn = TXNetwork([(1, "a = b"), (3, "a = c"), (2, "b = c")])
+
+        d = p.wait_on_txs(3)
+        def cb(r):
+            print "called!"
+            raise RuntimeError()
+        #d.addCallback(cb)
+        ret.append(d)
+
+        d = p.wait_on_txs(4)
+        d.addCallback(cb)
+        ret.append(d)
+
+        return defer.DeferredList(ret)
+
     def test_wait_on_txs2(self):
         # check the same thing happens even if TXs arrive out of order
 
@@ -106,16 +127,16 @@ class TestDBP(TestCase):
         p = DBP()
         p.txn = TXNetwork([(1, "a = b"), (3, "a = c"), (2, "b = c")])
 
-        # d = p.wait_on_txs(2)
-        # d.addCallback(cb(p.sync_db))
-        # d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "b"})))
-        # ret.append(d)
+        d = p.wait_on_txs(2)
+        d.addCallback(cb(p.sync_db))
+        #d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "c", "b": "c"})))
+        ret.append(d)
 
-        # d = p.wait_on_txs(3)
-        # d.addCallback(cb(p.sync_db))
-        # # Because we've already received TX 3 it will be processed here
-        # d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "b", "b": "c"})))
-        # ret.append(d)
+        d = p.wait_on_txs(3)
+        d.addCallback(cb(p.sync_db))
+        # Because we've already received TX 3 it will be processed here
+        #d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "b", "b": "c"})))
+        ret.append(d)
 
         d = p.wait_on_txs(4)
         d.addCallback(cb(p.sync_db))
@@ -130,16 +151,19 @@ class TestDBP(TestCase):
         p = DBP()
         p.txn = TXNetwork([(1, "a = b"), (3, "a = e"), (2, "a = d")])
 
-        # d = p.wait_on_txs(2)
-        # d.addCallback(cb(p.sync_db))
-        # d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "b"})))
-        # ret.append(d)
+        def f(r): print p.db._db
+        d = p.wait_on_txs(2)
+        d.addCallback(cb(p.sync_db))
+        #d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "b"})))
+        d.addCallback(f)
+        ret.append(d)
 
-        # d = p.wait_on_txs(3)
-        # d.addCallback(cb(p.sync_db))
-        # # Because we've already received TX 3 it will be processed here
+        d = p.wait_on_txs(3)
+        d.addCallback(cb(p.sync_db))
+        # Because we've already received TX 3 it will be processed here
         # d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "e"})))
-        # ret.append(d)
+        d.addCallback(f)
+        ret.append(d)
 
         d = p.wait_on_txs(4)
         d.addCallback(cb(p.sync_db))
@@ -148,7 +172,6 @@ class TestDBP(TestCase):
 
         return defer.DeferredList(ret)
 
-    #@enable_debug
     def test_execute(self):
         p = DBP()
         p.txn = TXNetwork([(1, "a = b"), (2, "b = c"), (3, "a = c")])

@@ -73,6 +73,7 @@ class DBP(object):
         self.db = DB()
         self.windower = TXWindower()
         self.txn = TXNetwork()
+        self.waiting_ds = {}
 
     def queue(self, tx):
         """Queue a TX for processing."""
@@ -126,7 +127,6 @@ class DBP(object):
         reactor.callLater(0.1, d.callback, tx)
         return d
 
-    @defer.deferredGenerator
     def wait_on_txs(self, tx_id):
         """Wait until we have received all txs < tx_id.
 
@@ -137,16 +137,36 @@ class DBP(object):
         process it. When self._received_txs is empty then we can return.
         """
         wait_tx = tx_id - 1
+        # print "Was called waiting for tx %d" % tx_id
+        # print self.waiting_ds
         dbprint("waiting on tx %d (mix tx is %d)" % (tx_id, self.windower.min_tx), level=3)
         # This loop doesn't take into account missing/timedout txs yet
-        while self.windower.min_tx < wait_tx:
-            next_tx = self.wait_on_next_tx()
-            d = defer.waitForDeferred(next_tx)
-            yield d
-            next_tx_id, next_tx_op = d.getResult()
-            dbprint("next tx is %d (%d)" % (next_tx_id, self.windower.min_tx), level=2)
-            self.windower.insert_tx(next_tx_id, next_tx_op)
-            self.queue_multiple(self.windower.pop_valid_txs())
+        if tx_id in self.waiting_ds:
+            return self.waiting_ds[tx_id]
+        if self.windower.min_tx < wait_tx:
+            ret = defer.Deferred()
+            nearly = self.wait_on_txs(wait_tx)
+            def g(result):
+                tx_arrives = self.wait_on_next_tx()
+                # print "wait_on_txs: g: was waiting on tx_id-1 (%d), that returned so g was fired" % (wait_tx,)
+                def f(next_tx):
+                    # print "wait_on_txs: g: f: was waiting on a new tx (%d) which appeared so f was fired" % (wait_tx,)
+                    next_tx_id, next_tx_op = next_tx
+                    self.windower.insert_tx(next_tx_id, next_tx_op)
+                    self.queue_multiple(self.windower.pop_valid_txs())
+                    ret.callback(None)
+                tx_arrives.addCallback(f)
+            nearly.addCallback(g)
+            self.waiting_ds[tx_id] = ret
+            def cleanup(r):
+                # print "Cleaning up deferred for tx %d" % tx_id
+                del self.waiting_ds[tx_id]
+            ret.addCallback(cleanup)
+            return ret
+        else:
+            # print "wait_on_txs: was waiting on %d but %d < %d so return early" % (tx_id, self.windower.min_tx, wait_tx)
+            d = defer.succeed(None)
+            return d
 
     def execute(self, s):
         """Execute a statement."""

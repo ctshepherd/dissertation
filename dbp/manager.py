@@ -1,12 +1,11 @@
 """Contains TXWindower class."""
 
 from dbp.network import TXNetwork, TXTaken, TXFailed
-from paxos.util import dbprint
-from twisted.internet import defer, reactor
 from twisted.python import failure
+from twisted.internet import defer, reactor
 
 
-class TXWindower(object):
+class TXStore(object):
     """Maintains a moving "window" of received transactions.
 
     In order to ensure we process received transactions in order, we maintain a
@@ -14,37 +13,37 @@ class TXWindower(object):
     """
     def __init__(self):
         self.received_txs = {}
-        self.min_tx = 0
-        self.max_tx = 0
+        self._max_valid_tx = 0
 
     def insert_tx(self, tx_id, tx_op):
         """Insert a transaction.
 
-        Insert a transaction into the datastructure and potentially update max_tx.
+        Insert a transaction into the datastructure and potentially update _max_valid_tx.
         """
         self.received_txs[tx_id] = tx_op
-        if tx_id > self.max_tx:
-            self.max_tx = tx_id
+        while (self._max_valid_tx+1) in self.received_txs:
+            self._max_valid_tx += 1
 
-    def pop_valid_txs(self):
-        """Return the largest number of contiguous TXs, starting from min_tx."""
-        ret = []
-        while (self.min_tx+1) in self.received_txs:
-            ret.append((self.min_tx+1, self.received_txs.pop(self.min_tx+1)))
-            self.min_tx += 1
-        return ret
+    def __contains__(self, tx_id):
+        return tx_id <= self._max_valid_tx
+
+    def __get__(self, tx_id):
+        return self.received_txs[tx_id]
 
 
 class TXManager(object):
     def __init__(self, txs=(), clock=None):
-        self.windower = TXWindower()
-        self.waiting_ds = {}
-        self.txn = TXNetwork(txs)
+        self._store = TXStore()
+        self._waiters = {}
+        self.txn = TXNetwork()
         self.cur_tx = 0
         if clock is None:
             clock = reactor
         self.clock = clock
         self._taken_txs = set()
+        for tx_id, op in txs:
+            self._taken_txs.add(tx_id)
+            self._receive_tx(tx_id, op)
 
     def _get_next_tx_id(self):
         """Return the next (potentially) viable TX across the whole network.
@@ -60,16 +59,18 @@ class TXManager(object):
 
     def distribute(self, tx_id, op):
         """Distribute transaction to other nodes."""
-        self._taken_txs.add(tx_id)
+        self._receive_tx(tx_id, op)
         self.txn.distribute(tx_id, op)
 
-    def _wait_on_next_tx(self):
-        """Wait for the next TX received and return it."""
-        # XXX: this reads from the network
-        tx = self.txn.pop()
-        d = defer.Deferred()
-        self.clock.callLater(0.1, d.callback, tx)
-        return d
+    def _receive_tx(self, tx_id, op):
+        self._taken_txs.add(tx_id)
+        self._store.insert_tx(tx_id, op)
+        self._notify_waiters(tx_id)
+
+    def _notify_waiters(self, tx_id):
+        if tx_id in self._waiters:
+            for d in self._waiters.pop(tx_id):
+                d.callback(tx_id)
 
     def wait_on_tx(self, tx_id):
         """Wait until we have received all txs < tx_id.
@@ -80,54 +81,33 @@ class TXManager(object):
         When we have received the prior message, we pop the message off and
         process it. When self._received_txs is empty then we can return.
         """
-        wait_tx = tx_id - 1
-        # print "Was called waiting for tx %d" % tx_id
-        # print self.waiting_ds
-        dbprint("waiting on tx %d (mix tx is %d)" % (tx_id, self.windower.min_tx), level=3)
-        # This loop doesn't take into account missing/timedout txs yet
-        if tx_id in self.waiting_ds:
-            return self.waiting_ds[tx_id]
-        if self.windower.min_tx < wait_tx:
-            ret = defer.Deferred()
-            nearly = self.wait_on_tx(wait_tx)
-            def g(result):
-                tx_arrives = self._wait_on_next_tx()
-                # print "wait_on_tx: g: was waiting on tx_id-1 (%d), that returned so g was fired" % (wait_tx,)
-                def f(next_tx):
-                    # print "wait_on_tx: g: f: was waiting on a new tx (%d) which appeared so f was fired" % (wait_tx,)
-                    next_tx_id, next_tx_op = next_tx
-                    self.windower.insert_tx(next_tx_id, next_tx_op)
-                    self.queue_multiple(self.windower.pop_valid_txs())
-                    ret.callback(None)
-                tx_arrives.addCallback(f)
-            nearly.addCallback(g)
-            self.waiting_ds[tx_id] = ret
-            def cleanup(r):
-                # print "Cleaning up deferred for tx %d" % tx_id
-                del self.waiting_ds[tx_id]
-            ret.addCallback(cleanup)
-            return ret
+
+        if tx_id in self._store:
+            ret = defer.succeed(tx_id)
         else:
-            # print "wait_on_tx: was waiting on %d but %d < %d so return early" % (tx_id, self.windower.min_tx, wait_tx)
-            d = defer.succeed(None)
-            return d
+            ret = defer.Deferred()
+            self._waiters.setdefault(tx_id, []).append(ret)
+        return ret
 
     def get_tx(self, attempts=-1):
-        """Get a TX id that this node has reserved.
+        """Return a TX id reserved for this node.
 
         Return a Deferred that calls back with a reserved tx or gives up after trying attempts times, errback'ing with TXFailed.
         """
+
         ret = defer.Deferred()
         tx_id = self._get_next_tx_id()
         d = self._reserve_tx(tx_id)
+        a = [attempts]
+
         def retry(err):
             if err.check(TXTaken):
                 # If we ran out of attempts, fail
-                if attempts == 0:
+                if a[0] == 0:
                     ret.errback(TXFailed())
                 # If we are checking the number of attempts, decrement
-                if attempts > 0:
-                    attempts -= 1
+                if a[0] > 0:
+                    a[0] -= 1
                 # Try again
                 return self.get_tx(attempts)
             return err

@@ -45,6 +45,7 @@ class DBP(object):
     def _load_txs(self, tx_id):
         """Helper method for execute."""
         d = self.manager.wait_on_tx(tx_id)
+        d.addCallback(lambda r: self.queue_multiple(self.windower.pop_valid_txs()))
         d.addCallback(cb(self.sync_db))
         d.addCallback(lambda r: tx_id)
         return d

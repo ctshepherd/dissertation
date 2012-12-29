@@ -1,120 +1,42 @@
 from dbp.manager import TXManager
-from dbp.network import TXNetwork
-from paxos.util import cb
 from paxos.test import TestCase
 from twisted.python import failure
-from twisted.internet import defer
-from twisted.trial.unittest import SkipTest
+from twisted.internet.task import Clock
 
 
 class TestManager(TestCase):
 
-    # def test_wait_on_next_tx(self):
-    #     l = [(1, "a = b"), (2, "b = c"), (3, "a = c")]
-    #     p = TXManager()
-    #     p.txn = TXNetwork(list(l))
-    #     d1 = p.wait_on_next_tx()
-    #     d1.addCallback(self.assertEqual, l.pop(0))
-    #     d2 = p.wait_on_next_tx()
-    #     d2.addCallback(self.assertEqual, l.pop(0))
-    #     d3 = p.wait_on_next_tx()
-    #     d3.addCallback(self.assertEqual, l.pop(0))
-    #     d = defer.DeferredList([d1, d2, d3])
+    def test_wait_on_tx_received(self):
 
-    #     return d
+        c = Clock()
+        m = TXManager(txs=[(1, "a = b")], clock=c)
 
-    def test_wait_on_tx1(self):
-        ret = []
+        run_count = [0]
 
-        p = TXManager()
-        p.txn = TXNetwork([(1, "a = b"), (2, "b = c"), (3, "a = c")])
+        def f(r):
+            run_count[0] += 1
 
-        # d = p.wait_on_tx(2)
-        # d.addCallback(cb(p.sync_db))
-        # d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "b"})))
-        # ret.append(d)
+        d = m.wait_on_tx(1)
+        d.addCallback(f)
+        c.advance(1)
+        self.assertEqual(run_count[0], 1)
 
-        # d = p.wait_on_tx(3)
-        # d.addCallback(cb(p.sync_db))
-        # d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "b", "b": "c"})))
-        # ret.append(d)
+    def test_wait_on_tx_distribute(self):
 
-        d = p.wait_on_tx(4)
-        # d.addCallback(cb(p.sync_db))
-        d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "c", "b": "c"})))
-        ret.append(d)
+        c = Clock()
+        m = TXManager(clock=c)
 
-        return defer.DeferredList(ret)
+        run_count = [0]
 
-    def test_wait_on_tx_pause(self):
-        raise SkipTest("This hangs trial at the moment.")
-        ret = []
+        def f(r):
+            run_count[0] += 1
 
-        p = TXManager()
-        p.txn = TXNetwork([(1, "a = b"), (3, "a = c"), (2, "b = c")])
+        d = m.wait_on_tx(1)
+        d.addCallback(f)
+        m.distribute(1, "a = b")
+        c.advance(1)
+        self.assertEqual(run_count[0], 1)
 
-        d = p.wait_on_tx(3)
-        def cb(r):
-            print "called!"
-            raise RuntimeError()
-        #d.addCallback(cb)
-        ret.append(d)
-
-        d = p.wait_on_tx(4)
-        d.addCallback(cb)
-        ret.append(d)
-
-        return defer.DeferredList(ret)
-
-    def test_wait_on_tx2(self):
-        # check the same thing happens even if TXs arrive out of order
-
-        ret = []
-
-        p = TXManager()
-        p.txn = TXNetwork([(1, "a = b"), (3, "a = c"), (2, "b = c")])
-
-        d = p.wait_on_tx(2)
-        # d.addCallback(cb(p.sync_db))
-        #d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "c", "b": "c"})))
-        ret.append(d)
-
-        d = p.wait_on_tx(3)
-        # d.addCallback(cb(p.sync_db))
-        # Because we've already received TX 3 it will be processed here
-        #d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "b", "b": "c"})))
-        ret.append(d)
-
-        d = p.wait_on_tx(4)
-        # d.addCallback(cb(p.sync_db))
-        d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "c", "b": "c"})))
-        ret.append(d)
-
-        return defer.DeferredList(ret)
-
-    def test_wait_on_tx3(self):
-        ret = []
-
-        p = TXManager()
-        p.txn = TXNetwork([(1, "a = b"), (3, "a = e"), (2, "a = d")])
-
-        d = p.wait_on_tx(2)
-        # d.addCallback(cb(p.sync_db))
-        #d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "b"})))
-        ret.append(d)
-
-        d = p.wait_on_tx(3)
-        # d.addCallback(cb(p.sync_db))
-        # Because we've already received TX 3 it will be processed here
-        # d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "e"})))
-        ret.append(d)
-
-        d = p.wait_on_tx(4)
-        # d.addCallback(cb(p.sync_db))
-        d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "e"})))
-        ret.append(d)
-
-        return defer.DeferredList(ret)
 
 class TestReserveTX(TestCase):
     def gen_cbs(self):

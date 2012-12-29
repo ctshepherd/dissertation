@@ -2,9 +2,40 @@ from dbp.manager import TXManager
 from paxos.test import TestCase
 from twisted.python import failure
 from twisted.internet.task import Clock
+from twisted.trial.unittest import SkipTest
 
 
 class TestManager(TestCase):
+
+    def test_get_tx(self):
+        c = Clock()
+        m = TXManager(txs=[(1, "a = b")], clock=c)
+
+        results = []
+
+        def f(r):
+            results.append(r)
+
+        d = m.get_tx()
+        d.addCallback(f)
+        c.advance(1)
+        self.assertEqual(results, [2])
+
+    def test_get_tx_retry(self):
+        raise SkipTest("this doesn't work with the current code mockup")
+        c = Clock()
+        m = TXManager(txs=[(1, "a = b")], clock=c)
+
+        results = []
+
+        def f(r):
+            results.append(r)
+
+        d = m.get_tx()
+        d.addCallback(f)
+        m.distribute(2, "b = c")
+        c.advance(1)
+        self.assertEqual(results, [3])
 
     def test_wait_on_tx_received(self):
 

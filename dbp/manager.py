@@ -1,6 +1,7 @@
 """Contains TXWindower class."""
 
 from dbp.network import TXNetwork, TXTaken, TXFailed
+from paxos.util import dbprint
 from twisted.python import failure
 from twisted.internet import defer, reactor
 
@@ -27,8 +28,11 @@ class TXStore(object):
     def __contains__(self, tx_id):
         return tx_id <= self._max_valid_tx
 
-    def __get__(self, tx_id):
+    def __getitem__(self, tx_id):
         return self.received_txs[tx_id]
+
+    def get_txs_since(self, tx_id):
+        return [(x, self.received_txs[x]) for x in xrange(tx_id+1, self._max_valid_tx+1)]
 
 
 class TXManager(object):
@@ -65,6 +69,7 @@ class TXManager(object):
     def _receive_tx(self, tx_id, op):
         # Similar to assert in DPB.process
         assert tx_id == self.cur_tx+1, "_receive: tx_id %d != cur_tx+1: %d" % (tx_id, self.cur_tx+1)
+        dbprint("_receive_tx: tx_id: %s, op: %s" % (tx_id, op), level=1)
         # XXX: Should we do some kind of error checking here? (try/except etc)
         self._taken_txs.add(tx_id)
         self._store.insert_tx(tx_id, op)
@@ -72,6 +77,7 @@ class TXManager(object):
         self.cur_tx += 1
 
     def _notify_waiters(self, tx_id):
+        dbprint("_notify_waiters: notifying waiters on tx_id: %d (%s)" % (tx_id, self._waiters), level=1)
         if tx_id in self._waiters:
             for d in self._waiters.pop(tx_id):
                 d.callback(tx_id)
@@ -86,6 +92,7 @@ class TXManager(object):
         process it. When self._received_txs is empty then we can return.
         """
 
+        dbprint("wait_on_tx: adding waiter on tx_id: %d" % tx_id, level=1)
         if tx_id in self._store:
             ret = defer.succeed(tx_id)
         else:
@@ -123,6 +130,7 @@ class TXManager(object):
 
         Returns a Deferred that calls back with tx_id if we can reserve tx_id, or errback with TXTaken otherwise."""
         # This will call down to Paxos eventually
+        dbprint("_reserve_tx: tx_id: %d taken_txs: %s" % (tx_id, ','.join(str(i) for i in self._taken_txs)), level=1)
         d = defer.Deferred()
         if tx_id not in self._taken_txs:
             self.clock.callLater(0.1, d.callback, tx_id)

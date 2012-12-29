@@ -16,6 +16,7 @@ def title(s):
 def cb(f, args=()):
     def g(r):
         f(*args)
+        return r
     return g
 
 

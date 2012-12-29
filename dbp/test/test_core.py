@@ -1,6 +1,6 @@
 from dbp.core import DBP
 from dbp.manager import TXManager
-from paxos.test import TestCase, enable_debug
+from dbp.test import TestCase, enable_debug
 from twisted.internet.task import Clock
 
 

@@ -1,7 +1,7 @@
 """Contains TXWindower class."""
 
 from dbp.network import TXNetwork, TXTaken, TXFailed
-from paxos.util import dbprint
+from dbp.util import dbprint
 from twisted.python import failure
 from twisted.internet import defer, reactor
 

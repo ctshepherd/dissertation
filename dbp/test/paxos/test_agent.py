@@ -1,8 +1,8 @@
-from paxos import agent
-from paxos.agent import Acceptor, Learner, Proposer, Agent
-from paxos.message import Promise, Accept
-from paxos.proposal import Proposal
-from paxos.test import TestCase
+from dbp.paxos import agent
+from dbp.paxos.agent import Acceptor, Learner, Proposer, Agent
+from dbp.paxos.message import Promise, Accept
+from dbp.paxos.proposal import Proposal
+from dbp.test import TestCase
 
 
 class FakeAgent(Agent):

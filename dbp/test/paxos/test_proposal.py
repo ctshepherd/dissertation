@@ -1,5 +1,5 @@
-from paxos.proposal import Proposal
-from paxos.test import TestCase
+from dbp.paxos.proposal import Proposal
+from dbp.test import TestCase
 
 
 class TestProposal(TestCase):

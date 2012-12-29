@@ -1,6 +1,6 @@
 from dbp.db import DB
 from dbp.manager import TXManager
-from paxos.util import cb, dbprint
+from dbp.util import cb, dbprint
 
 
 class DBP(object):

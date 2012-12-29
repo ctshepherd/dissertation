@@ -1,5 +1,5 @@
 from dbp.manager import TXManager
-from paxos.test import TestCase
+from dbp.test import TestCase
 from twisted.python import failure
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SkipTest

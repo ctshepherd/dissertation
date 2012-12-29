@@ -1,2 +1,2 @@
 from twisted.trial import unittest
-from paxos.util import *
+from dbp.paxos.network import *

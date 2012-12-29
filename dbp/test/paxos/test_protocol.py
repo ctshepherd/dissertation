@@ -1,6 +1,6 @@
 from twisted.test.proto_helpers import StringTransport as TStringTransport
-from paxos.protocol import EchoClientDatagramProtocol
-from paxos.test import TestCase
+from dbp.paxos.protocol import EchoClientDatagramProtocol
+from dbp.test import TestCase
 
 
 class MockAgent(object):

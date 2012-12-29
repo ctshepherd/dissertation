@@ -4,7 +4,7 @@ This module contains the DB class, the backing store for all our operations. At
 the moment it only supports get and set operations but will support more later.
 """
 
-from paxos.util import dbprint
+from dbp.util import dbprint
 
 
 class InvalidOp(Exception):

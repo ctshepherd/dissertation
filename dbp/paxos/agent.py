@@ -1,8 +1,8 @@
-from paxos.network import network, network_num, hosts
-from paxos.util import title, dbprint
-from paxos.message import Accept, Promise, Prepare, send, parse_message, InvalidMessageException
-from paxos.proposal import Proposal
-from paxos.protocol import EchoClientDatagramProtocol, reactor
+from dbp.util import title, dbprint
+from dbp.paxos.network import network, network_num, hosts
+from dbp.paxos.message import Accept, Promise, Prepare, send, parse_message, InvalidMessageException
+from dbp.paxos.proposal import Proposal
+from dbp.paxos.protocol import EchoClientDatagramProtocol, reactor
 
 
 class Agent(object):

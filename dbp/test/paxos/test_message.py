@@ -1,7 +1,7 @@
-from paxos import message
-from paxos.message import parse_message, Message, Promise, Prepare, Accept, InvalidMessageException
-from paxos.proposal import Proposal
-from paxos.test import TestCase
+from dbp.paxos import message
+from dbp.paxos.message import parse_message, Message, Promise, Prepare, Accept, InvalidMessageException
+from dbp.paxos.proposal import Proposal
+from dbp.test import TestCase
 
 
 class FakeMessage(Message):

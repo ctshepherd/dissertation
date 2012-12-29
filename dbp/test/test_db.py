@@ -1,5 +1,5 @@
 from dbp.db import DB, NOP, Get, Set, parse_op, InvalidOp
-from paxos.test import TestCase
+from dbp.test import TestCase
 
 
 class TestDB(TestCase):

@@ -1,5 +1,5 @@
 from dbp.network import TXNetwork
-from paxos.test import TestCase
+from dbp.test import TestCase
 
 
 class TestTXNetwork(TestCase):

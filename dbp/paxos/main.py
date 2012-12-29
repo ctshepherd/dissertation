@@ -1,5 +1,5 @@
-from paxos.agent import Proposer, Learner, Acceptor
-from paxos.protocol import reactor
+from dbp.paxos.agent import Proposer, Learner, Acceptor
+from dbp.paxos.protocol import reactor
 
 p1 = Proposer()
 p2 = Proposer()

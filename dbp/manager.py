@@ -63,9 +63,13 @@ class TXManager(object):
         self.txn.distribute(tx_id, op)
 
     def _receive_tx(self, tx_id, op):
+        # Similar to assert in DPB.process
+        assert tx_id == self.cur_tx+1, "_receive: tx_id %d != cur_tx+1: %d" % (tx_id, self.cur_tx+1)
+        # XXX: Should we do some kind of error checking here? (try/except etc)
         self._taken_txs.add(tx_id)
         self._store.insert_tx(tx_id, op)
         self._notify_waiters(tx_id)
+        self.cur_tx += 1
 
     def _notify_waiters(self, tx_id):
         if tx_id in self._waiters:

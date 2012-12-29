@@ -52,25 +52,25 @@ class TestReserveTX(TestCase):
         return f
 
     def test_reserve_tx_succeeds(self):
-        l = [(0, "a = b"), (1, "b = c")]
+        l = [(1, "a = b"), (2, "b = c")]
         n = TXManager(l)
-        d = n._reserve_tx(2)
-        d.addCallback(self.gen_cb(2))
+        d = n._reserve_tx(3)
+        d.addCallback(self.gen_cb(3))
         return d
 
     def test_reserve_tx_recieved(self):
         # assert we fail if we've already recieved the TX we try to reserve
-        l = [(0, "a = b"), (1, "b = c")]
+        l = [(1, "a = b"), (2, "b = c")]
         n = TXManager(l)
-        d = n._reserve_tx(1)
+        d = n._reserve_tx(2)
         d.addBoth(self.gen_cbs())
         return d
 
     def test_reserve_tx_distributed(self):
         # assert we fail if we've already distributed the TX we try to reserve
-        l = [(0, "a = b"), (1, "b = c")]
+        l = [(1, "a = b"), (2, "b = c")]
         n = TXManager(l)
-        n.distribute(2, "a = c")
-        d = n._reserve_tx(2)
+        n.distribute(3, "a = c")
+        d = n._reserve_tx(3)
         d.addBoth(self.gen_cbs())
         return d

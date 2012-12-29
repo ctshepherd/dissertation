@@ -1,7 +1,8 @@
 from dbp.core import DBP
-from dbp.network import TXNetwork
+from dbp.manager import TXManager
 from paxos.test import TestCase
 from paxos.util import cb
+from twisted.trial.unittest import SkipTest
 
 
 class TestDBP(TestCase):
@@ -30,8 +31,18 @@ class TestDBP(TestCase):
 
     def test_execute(self):
         p = DBP()
-        p.txn = TXNetwork([(1, "a = b"), (2, "b = c"), (3, "a = c")])
+        p.manager = TXManager([(1, "a = b"), (2, "b = c"), (3, "a = c")])
         d = p.execute("b = a")
         d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "c", "b": "a"})))
+
+        return d
+
+    def test_execute2(self):
+        raise SkipTest('hangs test at the moment')
+        p = DBP()
+        p.manager = TXManager([(1, "a = b"), (2, "b = c"), (3, "a = c")])
+        d = p.execute("b = a")
+        d.addCallback(lambda r: p.execute("b = c"))
+        d.addCallback(cb(self.assertEqual, (p.db._db, {"a": "c", "b": "c"})))
 
         return d

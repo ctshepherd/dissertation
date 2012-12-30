@@ -1,0 +1,70 @@
+A list of problems I've encountered so far:
+
+Problem with terminology
+  - "op", "transaction", "commit", "reserve" etc.
+
+Problem with understanding Paxos
+  - academic style not implementation style
+  - took a while of writing code before being able to see how to turn academic
+    description into proper code
+  - didn't help had to use twisted
+  - trying to grok asynchronous paradigm + academic Paxos together
+
+Problem with twisted
+  - new framework to get to grips with
+  - some good examples/tutorials online but often not in depth enough to be
+    good examples for whole codebase
+  - had to go to IRC in some cases
+  - best practises not always immediately obvious
+
+Hangs etc.
+  - asynchronous unit tests had few issues
+  - had to go to IRC to find out how to fix
+  - big debugging effort just to make tests run
+  - led to refactoring design in order to make it simpler
+
+Getting in the mindset of unit tests
+  - used unit tests before extensively in projects
+  - never in network programming
+  - never with twisted
+  - haven't used them in a while
+  - took a while to get back in mindset of testing things properly and
+    breaking it down into small
+  - pieces, particularly for Paxos, which I started my prototype on. In
+    hindsight once I moved onto
+  - the database part was much easier to get into a programming flow, which I
+    could then bring back to Paxos
+
+Understanding asynchronous programming
+  - different paradigm of programming I've never used before
+  - took a while before I understood how to use event loop instead of work
+    against it
+  - Deferreds very odd construct to work with, never used them before
+    - wait_on_tx case in point, went through several different iterations before
+      redesigning class
+  - hierarchy which led to a simpler implementation
+  - still strange - no locking necessary but events may occur out of order
+  - debugging asynchronously not easy
+    - mainly with print statements
+
+Naming
+  - PDB is a common python module
+  - renamed some code DBP
+  - caused some confusion
+
+Design
+  - fast moving design meant comments/docs were out of date regularly
+  - last of experience with project domain meant very difficult to do
+    comprehensive design early on
+  - rapid prototyping was most efficient way to establish working design
+  - led to some artifacts though
+  - iterative process minimised bugs
+  - much easier to work iteratively with DBP than with Paxos
+  - unit test coverage has an interesting relationship with coding inertia
+  - too much - tests need constant refactoring
+  - too little - lack of confidence in working code
+  - adding CLI helped test obscure cases that would have required much mocking
+    up in unit tests
+  - big changes to design meant unit tests became a large time commitment
+  - difficult to predict which were more helpful and which were more constrictive
+  - did add big confidence to any refactoring efforts

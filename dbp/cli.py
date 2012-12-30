@@ -1,7 +1,7 @@
 from dbp.core import DBP
 from twisted.internet import stdio, reactor
 from twisted.protocols import basic
-from twisted.internet.error import ReactorNotRunning
+from twisted.internet.error import ConnectionLost
 
 
 class DBPProtocol(basic.LineReceiver):
@@ -63,8 +63,10 @@ class DBPProtocol(basic.LineReceiver):
 
     def connectionLost(self, reason):
         # stop the reactor, only because this is meant to be run in Stdio.
-        #reactor.stop()
-        pass
+        if reason.check(ConnectionLost):
+            pass
+        else:
+            reactor.stop()
 
 def main():
     stdio.StandardIO(DBPProtocol())

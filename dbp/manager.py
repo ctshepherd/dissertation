@@ -1,7 +1,7 @@
 """Contains TXWindower class."""
 
 from dbp.network import TXNetwork, TXTaken, TXFailed
-from dbp.util import dbprint
+from dbp.util import dbprint, cb
 from twisted.python import failure
 from twisted.internet import defer, reactor
 
@@ -39,12 +39,14 @@ class TXManager(object):
     def __init__(self, txs=(), clock=None):
         self._store = TXStore()
         self._waiters = {}
-        self.txn = TXNetwork()
+        self.txn = TXNetwork(self)
         self.cur_tx = 0
+        self._last_guess_tx = None
+
+        self._taken_txs = set()
         if clock is None:
             clock = reactor
         self.clock = clock
-        self._taken_txs = set()
         for tx_id, op in txs:
             self._taken_txs.add(tx_id)
             self._receive_tx(tx_id, op)
@@ -59,13 +61,32 @@ class TXManager(object):
         doesn't go into those complexities at this point but it will do soon,
         for now we use a global counter.
         """
-        return self.cur_tx + 1
+        # If we've made a guess before, we want to keep going higher
+        if self._last_guess_tx:
+            self._last_guess_tx += 1
+            return self._last_guess_tx
+        # We haven't guessed anything unsuccessfully
+        ret = self.cur_tx + 1
+        self._last_guess_tx = ret
+        return ret
 
     def distribute(self, tx_id, op):
         """Distribute transaction to other nodes."""
         self._receive_tx(tx_id, op)
         self.txn.distribute(tx_id, op)
 
+    def _passup_tx(self, tx):
+        tx_id, op = tx
+        self._taken_txs.add(tx_id)
+        self._store.insert_tx(tx_id, op)
+        # If this TX is valid, update our notion of cur_tx and notify people
+        # waiting on TXs up to this one.
+        if tx_id in self._store:
+            for ti in xrange(self.cur_tx+1, tx_id+1):
+                self._notify_waiters(ti)
+            self.cur_tx = tx_id
+
+    # passdown tx
     def _receive_tx(self, tx_id, op):
         # Similar to assert in DPB.process
         assert tx_id == self.cur_tx+1, "_receive: tx_id %d != cur_tx+1: %d" % (tx_id, self.cur_tx+1)
@@ -120,8 +141,16 @@ class TXManager(object):
                 if a[0] > 0:
                     a[0] -= 1
                 # Try again
-                return self.get_tx(attempts)
+                def f(r):
+                    print "f:", r
+                x = self.get_tx(attempts)
+                x.addCallback(ret.callback)
+                return x
             return err
+
+        def reset_upon_success():
+            self._last_guess_tx = None
+        d.addCallback(cb(reset_upon_success))
         d.addCallbacks(ret.callback, retry)
         return ret
 

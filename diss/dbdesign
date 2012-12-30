@@ -1,0 +1,52 @@
+3 Components:
+Local DB
+TX Distribution network
+Paxos network
+
+To perform an operation:
+- reserve a TX id
+- wait for previous TXs to be populated
+- sync db up to previous TXs
+- perform operation
+
+To distribute an operation:
+- reserve a TX id
+- distribute TX(commit)
+
+In practice the client does both of these things:
+- reserve a TX id
+- wait for previous TXs to be populated
+- sync db up to previous TXs
+- perform operation
+- distribute TX(commit)
+
+
+
+TX Distribution Protocol Design:
+
+Based on netstrings.
+Messages (encapsulated in netstring) are of the form:
+<command>(:<contents>) (contents is optional if the command has no other information).
+
+Possible commands:
+
+VERSION:<version number>
+
+Must be first command, informs the other party of the version of the protocol we are operating.
+Version number is an integer.
+
+SEND:<tx_id>|<tx_op>
+
+Distribute a TX across the network. tx_id is a TX id that has been reserved by the sending node
+for itself. tx_op is a serialization of an operation (this is not properly defined at the moment).
+
+QUIT
+
+End the connection gracefully.
+
+
+
+Paxos network:
+
+The Paxos network is used for reserving a TX id for a particular node's use. It is discussed in
+more detail in other documents.

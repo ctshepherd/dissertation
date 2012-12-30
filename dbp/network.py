@@ -3,9 +3,8 @@
 Network module, mainly contains the TXNetwork class, which handles all network traffic for the DBP.
 """
 
-from twisted.python import failure
 from twisted.protocols.basic import NetstringReceiver
-from twisted.internet import defer, reactor
+from twisted.internet import reactor
 from twisted.internet.protocol import ClientFactory
 from ast import literal_eval
 
@@ -34,11 +33,17 @@ class TXDistributeProtocol(NetstringReceiver):
         self.sendCommand("VERSION", self.VERSION)
 
     def stringReceived(self, s):
-        command, content = s.split(':', 1)
+        if ':' in s:
+            command, content = s.split(':', 1)
+        else:
+            command = s
+            content = ""
         if command == "VERSION":
             self.check_version(content)
         elif command == "SEND":
             self.receive_tx(content)
+        elif command == "QUIT":
+            self.transport.loseConnection()
 
     def check_version(self, s):
         if not self.version_check:
@@ -65,6 +70,7 @@ class TXDistributeProtocol(NetstringReceiver):
 
     def quit(self):
         self.sendCommand("QUIT")
+        self.transport.loseConnection()
 
 
 class TXDistributeFactory(ClientFactory):

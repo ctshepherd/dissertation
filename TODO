@@ -1,4 +1,5 @@
 Paxos:
+- finish tests
 - Implement NACKs
 - Move agents over to their own protocols
 - split Accept into AcceptRequest and AcceptNotify
@@ -8,16 +9,12 @@ Paxos:
 
 DBP:
 short:
-- reserve TX, repeat if failed
-- actually hook into network
 - hook into paxos
-- investigate odd crash in dbp.test
 - fix up comments
 - do we want assert_tx to insert no-op txs?
 - hook ops into dbp.core
-medium:
-- other types of ops
+- serialize/deserialize ops
 long:
 - simple SQL parsing
 - transactions
-- command line client
+- extend command line client

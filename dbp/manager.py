@@ -141,11 +141,7 @@ class TXManager(object):
                 if a[0] > 0:
                     a[0] -= 1
                 # Try again
-                def f(r):
-                    print "f:", r
-                x = self.get_tx(attempts)
-                x.addCallback(ret.callback)
-                return x
+                return self.get_tx(attempts).addCallback(ret.callback)
             return err
 
         def reset_upon_success():

@@ -99,9 +99,9 @@ class TXDistributeFactory(ClientFactory):
 
 
 class TXNetwork(object):
-    """Fake network object. Will be replaced by something cleverer later.
+    """Network object.
 
-    Distributes TXs across the network and returns a prepopulated list of TXs when asked.
+    Distributes TXs across the network.
     """
     def __init__(self, parent):
         factory = TXDistributeFactory(parent)

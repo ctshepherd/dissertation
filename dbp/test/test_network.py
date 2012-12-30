@@ -3,6 +3,7 @@ from dbp.test import TestCase
 
 
 class TestTXNetwork(TestCase):
+    skip = True
     def test_distribute(self):
         n = TXNetwork()
         n.distribute(0, ("a", "b"))

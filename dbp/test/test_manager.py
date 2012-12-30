@@ -5,11 +5,23 @@ from twisted.internet.task import Clock
 from twisted.trial.unittest import SkipTest
 
 
+class FakeNetwork(object):
+    """Fake network object."""
+    def __init__(self, parent=None):
+        self.parent = parent
+        self.distributed_txs = []
+
+    def distribute(self, tx_id, op):
+        self.distributed_txs.append((tx_id, op))
+
+
 class TestManager(TestCase):
 
     def test_get_tx(self):
         c = Clock()
         m = TXManager(txs=[(1, "a = b")], clock=c)
+        self.addCleanup(m.txn.sock.transport.stopConnecting)
+        m.txn = FakeNetwork()
 
         results = []
 
@@ -25,6 +37,8 @@ class TestManager(TestCase):
         raise SkipTest("this doesn't work with the current code mockup")
         c = Clock()
         m = TXManager(txs=[(1, "a = b")], clock=c)
+        self.addCleanup(m.txn.sock.transport.stopConnecting)
+        m.txn = FakeNetwork()
 
         results = []
 
@@ -41,6 +55,8 @@ class TestManager(TestCase):
 
         c = Clock()
         m = TXManager(txs=[(1, "a = b")], clock=c)
+        self.addCleanup(m.txn.sock.transport.stopConnecting)
+        m.txn = FakeNetwork()
 
         run_count = [0]
 
@@ -56,6 +72,8 @@ class TestManager(TestCase):
 
         c = Clock()
         m = TXManager(clock=c)
+        self.addCleanup(m.txn.sock.transport.stopConnecting)
+        m.txn = FakeNetwork()
 
         run_count = [0]
 
@@ -85,6 +103,9 @@ class TestReserveTX(TestCase):
     def test_reserve_tx_succeeds(self):
         l = [(1, "a = b"), (2, "b = c")]
         n = TXManager(l)
+        n.txn.sock.transport.stopConnecting()
+        n.txn = FakeNetwork()
+
         d = n._reserve_tx(3)
         d.addCallback(self.gen_cb(3))
         return d
@@ -93,6 +114,9 @@ class TestReserveTX(TestCase):
         # assert we fail if we've already recieved the TX we try to reserve
         l = [(1, "a = b"), (2, "b = c")]
         n = TXManager(l)
+        n.txn.sock.transport.stopConnecting()
+        n.txn = FakeNetwork()
+
         d = n._reserve_tx(2)
         d.addBoth(self.gen_cbs())
         return d
@@ -101,6 +125,9 @@ class TestReserveTX(TestCase):
         # assert we fail if we've already distributed the TX we try to reserve
         l = [(1, "a = b"), (2, "b = c")]
         n = TXManager(l)
+        n.txn.sock.transport.stopConnecting()
+        n.txn = FakeNetwork()
+
         n.distribute(3, "a = c")
         d = n._reserve_tx(3)
         d.addBoth(self.gen_cbs())

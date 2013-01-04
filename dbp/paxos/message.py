@@ -23,16 +23,6 @@ def parse_message(msg):
     return m
 
 
-def send(sender, receiver, message):
-    """Send a message from sender to receiver"""
-    if isinstance(receiver, tuple):
-        addr = receiver
-    else:
-        host = receiver.proto.transport.getHost()
-        addr = (host.host, host.port)
-    sender.proto.sendDatagram(message.serialize(), addr)
-
-
 class Message(object):
     """Message superclass"""
     msg_type = "message"

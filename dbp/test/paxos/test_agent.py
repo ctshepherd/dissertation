@@ -1,11 +1,39 @@
-from dbp.paxos import agent
-from dbp.paxos.agent import Acceptor, Learner, Proposer, Agent
+from dbp.paxos.agent import AcceptorProtocol, LearnerProtocol, ProposerProtocol, AgentProtocol
 from dbp.paxos.message import Promise, Accept
 from dbp.paxos.proposal import Proposal
 from dbp.test import TestCase
 
+from twisted.test.proto_helpers import StringTransport as TStringTransport
 
-class FakeAgent(Agent):
+
+class StringTransport(TStringTransport):
+    def write(self, data, host=None):
+        """Wrapper around TStringTransport.write"""
+        TStringTransport.write(self, data)
+
+
+# class TestEchoClient(TestCase):
+#     def setUp(self):
+#         self.proto = EchoClientDatagramProtocol()
+#         self.tr = StringTransport()
+#         self.ma = MockAgent()
+#         self.proto.parent = self.ma
+#         self.proto.makeConnection(self.tr)
+#
+#     def test_read(self):
+#         args = ("msg", "host")
+#         self.proto.datagramReceived(*args)
+#         self.assertEqual([args[0]], self.ma.msgs)
+#
+#     def test_write(self):
+#         data = ["foo", "bar"]
+#         host = "host"
+#         self.proto.sendDatagram(data[0], host)
+#         self.assertEqual(data[0], self.tr.value())
+#         self.proto.sendDatagram(data[1], host)
+#         self.assertEqual("".join(data), self.tr.value())
+
+class FakeAgent(AgentProtocol):
     """FakeAgent class to record messages passed"""
     def _receive(self, m, host):
         pass
@@ -20,15 +48,9 @@ class AgentTestMixin(object):
         def s(r, h, m):
             self.msgs.append(m)
             self.hmsgs[h] = m
-        # Save agent.send
-        self.s = agent.send
-        agent.send = s
-        # Save agent.host
-        self.h = agent.hosts
-        agent.hosts = {None: None}
         # Make sure we clean up after the test
         self.agent = self.kls()
-        self.addCleanup(self.agent.proto.transport.stopListening)
+        self.agent.writeMessage = s
 
     def test_receive(self):
         """Test all agents can receive any message without crashing"""
@@ -40,14 +62,10 @@ class AgentTestMixin(object):
         a.receive("promise:1,2", (None, None))
         a.receive("accept:1,2", (None, None))
 
-    def tearDown(self):
-        agent.send = self.s
-        agent.hosts = self.h
-
 
 class TestAcceptor(AgentTestMixin, TestCase):
     """Test the Acceptor agent class"""
-    kls = Acceptor
+    kls = AcceptorProtocol
 
     def test_promise(self):
         a = self.agent
@@ -79,23 +97,21 @@ class TestAcceptor(AgentTestMixin, TestCase):
         self.assertEqual([], self.msgs)
 
     def test_accept(self):
-        n = agent.network
         flearner1 = FakeAgent()
         flearner2 = FakeAgent()
         self.addCleanup(flearner1.proto.transport.stopListening)
         self.addCleanup(flearner2.proto.transport.stopListening)
-        agent.network = {'learner': [flearner1, flearner2]}
+        network = {'learner': [flearner1, flearner2]}
         a = self.agent
         a.receive("accept:1,2", (None, None))
         self.assertEqual(Proposal(1, 2), a._cur_prop)
         self.assertEqual(self.hmsgs[flearner1], Accept(Proposal(1, 2)))
         self.assertEqual(self.hmsgs[flearner2], Accept(Proposal(1, 2)))
-        agent.network = n
 
 
 class TestProposer(AgentTestMixin, TestCase):
     """Test the Proposer agent class"""
-    kls = Proposer
+    kls = ProposerProtocol
 
     def test_accept(self):
         a = self.agent
@@ -111,7 +127,7 @@ class TestProposer(AgentTestMixin, TestCase):
 
 class TestLearner(AgentTestMixin, TestCase):
     """Test the Learner agent class"""
-    kls = Learner
+    kls = LearnerProtocol
 
     # def test_accept(self):
     #     a = self.agent
@@ -119,7 +135,6 @@ class TestLearner(AgentTestMixin, TestCase):
     def test_regr1(self):
         # test that if we send a Learner different accept messages for the same
         # proposal, it only accepts a majority vote
-        n = agent.network
         l = []
         h = {}
         for x in xrange(5):
@@ -127,8 +142,8 @@ class TestLearner(AgentTestMixin, TestCase):
             l.append(fa)
             h[x] = fa
             self.addCleanup(fa.proto.transport.stopListening)
-        agent.network = {'acceptor': l}
-        agent.hosts = h
+        network = {'acceptor': l}
+        hosts = h
         a = self.agent
 
         a.receive("accept:1,2", (None, 0))
@@ -138,12 +153,9 @@ class TestLearner(AgentTestMixin, TestCase):
         a.receive("accept:1,2", (None, 3))
         self.assertEqual(a.accepted_proposals, {1: 2})
 
-        agent.network = n
-
     def test_regr2(self):
         # test that if we send a Learner a bunch of accept messages from the same
         # acceptor, it only accepts a majority vote
-        n = agent.network
         l = []
         h = {}
         for x in xrange(5):
@@ -151,8 +163,8 @@ class TestLearner(AgentTestMixin, TestCase):
             h[x] = fa
             l.append(fa)
             self.addCleanup(fa.proto.transport.stopListening)
-        agent.network = {'acceptor': l}
-        agent.hosts = h
+        network = {'acceptor': l}
+        hosts = h
         a = self.agent
 
         a.receive("accept:1,2", (None, 0))
@@ -161,5 +173,3 @@ class TestLearner(AgentTestMixin, TestCase):
         self.assertEqual(a.accepted_proposals, {})
         a.receive("accept:1,2", (None, 0))
         self.assertEqual(a.accepted_proposals, {})
-
-        agent.network = n

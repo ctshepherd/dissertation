@@ -1,11 +1,11 @@
 Paxos:
 - finish tests
 - Implement NACKs
-- Move agents over to their own protocols
 - split Accept into AcceptRequest and AcceptNotify
 - Add acceptor info to acceptnotify
 - Move network logic into factory class
-- Develop client separation logic
+- Develop client separation logic?
+- learn Acceptor number
 
 DBP:
 short:
@@ -18,3 +18,7 @@ long:
 - simple SQL parsing
 - transactions
 - extend command line client
+
+General:
+- use log instead of dbprint
+- multicast or not?

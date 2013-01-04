@@ -1,53 +1,70 @@
-from dbp.util import title, dbprint
-from dbp.paxos.network import network, network_num, hosts
-from dbp.paxos.message import Accept, Promise, Prepare, send, parse_message, InvalidMessageException
+from dbp.util import dbprint
+from dbp.paxos.network import network, port_map
+from dbp.paxos.message import Accept, Promise, Prepare, parse_message, InvalidMessageException
 from dbp.paxos.proposal import Proposal
-from dbp.paxos.protocol import EchoClientDatagramProtocol, reactor
+from twisted.internet import defer
+from twisted.internet.protocol import DatagramProtocol
 
 
-class Agent(object):
+class AgentProtocol(DatagramProtocol):
     agent_type = "agent"
 
-    def __init__(self):
-        self._msgs = []
-        network.setdefault(self.agent_type, []).append(self)
-        self._num = network_num.setdefault(self.agent_type, 1)
-        self.proto = EchoClientDatagramProtocol()
-        self.proto.parent = self
-        reactor.listenUDP(0, self.proto)  # this returns self.proto.transport
-        hosts[self.proto.transport.getHost().port] = self
-        network_num[self.agent_type] += 1
+    def stopProtocol(self):
+        """
+        Stop protocol: reset state variables.
+        """
 
-    def receive(self, msg, host):
+    def startProtocol(self):
+        """
+        Upon start, reset internal state.
+        """
+        self.transport.joinGroup("224.0.0.1")
+        self._msgs = []
+        # network.setdefault(self.agent_type, []).append(self)
+        # self._num = network_num.setdefault(self.agent_type, 1)
+        # reactor.listenUDP(0, self.proto)  # this returns self.proto.transport
+
+    def writeMessage(self, msg, addr):
+        dbprint("%s sent message %s to %s" % (self, msg, addr), level=2)
+        msg = msg.serialize()
+        self.transport.write(msg, addr)
+
+    def writeAll(self, msg, agent_type):
+        dbprint("%s sent message %s to all %s" % (self, msg, agent_type), level=2)
+        host = port_map[agent_type]
+        msg = msg.serialize()
+        self.transport.write(msg, (host, 8005))
+
+    def datagramReceived(self, msg, host):
         """Called when a message is received by a specific agent.
 
         """
-        host = hosts[host[1]]
         dbprint("%s got message %s from %s" % (self, msg, host), level=2)
         self._msgs.append((msg, host))
         try:
             m = parse_message(msg)
+            self._receive(m, host)
         except InvalidMessageException, e:
             dbprint("%s received invalid message %s (%s)" % (self, msg, e))
             return
-        self._receive(m, host)
 
     def _receive(self, msg, host):
         raise NotImplementedError()
 
-    def __str__(self):
-        return "%s(%s)" % (title(self.agent_type), self._num)
+    # def __str__(self):
+    #     return "%s" % (title(self.agent_type), self._num)
 
     def __repr__(self):
-        return "<%s @ %#lx>" % (self, id(self))
+        return "<%s @ %#lx>" % (self.agent_type, id(self))
 
 
-class Acceptor(Agent):
+class AcceptorProtocol(AgentProtocol):
     """Acceptor Agent"""
     agent_type = "acceptor"
 
-    def __init__(self):
-        super(Acceptor, self).__init__()
+    def startProtocol(self):
+        AgentProtocol.startProtocol(self)
+        self.transport.joinGroup(port_map[self.agent_type])
         self._cur_prop_num = 0
         self._cur_prop = Proposal(0)
 
@@ -63,7 +80,7 @@ class Acceptor(Agent):
                         % (self, msg), level=5)
                 return
             if msg.proposal.prop_num > self._cur_prop_num:
-                send(self, host, Promise(Proposal(msg.proposal.prop_num, self._cur_prop.value)))
+                self.writeMessage(Promise(Proposal(msg.proposal.prop_num, self._cur_prop.value)), host)
                 self._cur_prop_num = msg.proposal.prop_num
                 self._cur_prop = msg.proposal
             else:
@@ -75,17 +92,17 @@ class Acceptor(Agent):
             if msg.proposal.prop_num >= self._cur_prop_num:
                 dbprint("Accepting proposal %s (%s)" % (msg.proposal.prop_num, self._cur_prop_num))
                 self._cur_prop = msg.proposal
-                for l in network['learner']:
-                    send(self, l, Accept(msg.proposal))
+                self.writeAll(self, Accept(msg.proposal), "learner")
             else:
                 pass  # Can NACK here
 
 
-class Learner(Agent):
+class LearnerProtocol(AgentProtocol):
     agent_type = "learner"
 
-    def __init__(self):
-        super(Learner, self).__init__()
+    def startProtocol(self):
+        AgentProtocol.startProtocol(self)
+        self.transport.joinGroup(port_map[self.agent_type])
         self.received_proposals = {}
         self.accepted_proposals = {}
 
@@ -104,16 +121,19 @@ class Learner(Agent):
                 dbprint("Proposal %s accepted" % msg.proposal, level=3)
 
 
-class Proposer(Agent):
+class ProposerProtocol(AgentProtocol):
     agent_type = "proposer"
 
-    def __init__(self):
-        super(Proposer, self).__init__()
+    def startProtocol(self):
+        AgentProtocol.startProtocol(self)
+        self.transport.joinGroup(port_map[self.agent_type])
         self.cur_prop_num = 0
         self.accepted = False
         self.replies = []
         self.cur_value = None
         self.received = {}
+
+        self.d = None
 
     def _receive(self, msg, host):
         if msg.msg_type == "promise":
@@ -128,19 +148,22 @@ class Proposer(Agent):
             if not self.accepted and len(self.received.get(self.cur_prop_num, ())) > acceptor_num/2:
                 self.accepted = True
                 competing = max(self.received[self.cur_prop_num])
-                dbprint("Proposal %s accepted", self.cur_prop_num)
+                dbprint("Proposal %s accepted" % self.cur_prop_num)
+                self.d.callback(True)
                 for (m, acceptor) in self.received.get(self.cur_prop_num, ()):
-                    send(self, acceptor, Accept(msg.proposal))
+                    self.writeMessage(Accept(Proposal(msg.proposal.prop_num, self.cur_value)), acceptor)
             elif self.accepted:
-                send(self, host, Accept(msg.proposal))
+                self.writeMessage(Accept(msg.proposal), host)
 
     def run(self, value):
         # (a) A proposer selects a proposal number n, greater than any proposal number it
         # has selected before, and sends a request containing n to a majority of
         # acceptors. This message is known as a prepare request.
         self.received = {}
-        self.cur_prop_num += self._num
+        self.d = defer.Deferred()
+        #self.cur_prop_num += self._num
+        self.cur_prop_num += 5
         n = self.cur_prop_num
         self.cur_value = value
-        for a in network['acceptor']:
-            send(self, a, Prepare(Proposal(n, value)))
+        self.writeAll(Prepare(Proposal(n)), "acceptor")
+        return self.d

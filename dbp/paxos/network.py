@@ -11,3 +11,9 @@ network_num = {}
 # This is a dict of {(host, port): agent} to allow us to reverse map (purely
 # for debugging purposes
 hosts = {}
+
+port_map = {
+    'proposer': "224.0.0.2",
+    'learner':  "224.0.0.3",
+    'acceptor': "224.0.0.4",
+}

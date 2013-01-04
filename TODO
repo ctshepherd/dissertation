@@ -1,7 +1,6 @@
 Paxos:
 - finish tests
 - Implement NACKs
-- split Accept into AcceptRequest and AcceptNotify
 - Add acceptor info to acceptnotify
 - Move network logic into factory class
 - Develop client separation logic?

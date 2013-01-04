@@ -72,9 +72,13 @@ class Promise(Message):
     msg_type = "promise"
 
 
-class Accept(Message):
-    """Accept message"""
-    msg_type = "accept"
+class AcceptRequest(Message):
+    """Accept request message"""
+    msg_type = "acceptrequest"
+
+class AcceptNotify(Message):
+    """Accept notify message"""
+    msg_type = "acceptinfo"
 
 
 # This is a mapping from message types to the actual classes.
@@ -84,5 +88,6 @@ class Accept(Message):
 message_types = {
     Prepare.msg_type: Prepare,
     Promise.msg_type: Promise,
-    Accept.msg_type:  Accept,
+    AcceptRequest.msg_type:  AcceptRequest,
+    AcceptNotify.msg_type:  AcceptNotify,
 }

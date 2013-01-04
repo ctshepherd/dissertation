@@ -1,6 +1,6 @@
 from dbp.util import dbprint
 from dbp.paxos.network import network, port_map
-from dbp.paxos.message import Accept, Promise, Prepare, parse_message, InvalidMessageException
+from dbp.paxos.message import AcceptNotify, AcceptRequest, Promise, Prepare, parse_message, InvalidMessageException
 from dbp.paxos.proposal import Proposal
 from twisted.internet import defer
 from twisted.internet.protocol import DatagramProtocol
@@ -85,14 +85,14 @@ class AcceptorProtocol(AgentProtocol):
                 self._cur_prop = msg.proposal
             else:
                 pass  # Can NACK here
-        elif msg.msg_type == "accept":
+        elif msg.msg_type == "acceptrequest":
             # (b) If an acceptor receives an accept request for a proposal numbered n, it
             # accepts the proposal unless it has already responded to a prepare request
             # having a number greater than n.
             if msg.proposal.prop_num >= self._cur_prop_num:
                 dbprint("Accepting proposal %s (%s)" % (msg.proposal.prop_num, self._cur_prop_num))
                 self._cur_prop = msg.proposal
-                self.writeAll(self, Accept(msg.proposal), "learner")
+                self.writeAll(self, AcceptNotify(msg.proposal), "learner")
             else:
                 pass  # Can NACK here
 
@@ -108,7 +108,7 @@ class LearnerProtocol(AgentProtocol):
 
     def _receive(self, msg, host):
         acceptor_num = len(network['acceptor'])
-        if msg.msg_type == "accept":
+        if msg.msg_type == "acceptnotify":
             # if we've already learnt it's been accepted, there's no need to
             # deal with it any more
             if msg.proposal.prop_num in self.accepted_proposals:
@@ -146,14 +146,18 @@ class ProposerProtocol(AgentProtocol):
             # no proposals, a value of its own choosing.
             acceptor_num = len(network['acceptor'])
             if not self.accepted and len(self.received.get(self.cur_prop_num, ())) > acceptor_num/2:
+                # If this is the message that tips us over the edge and we
+                # finally accept the proposal, deal with it appropriately.
                 self.accepted = True
                 competing = max(self.received[self.cur_prop_num])
                 dbprint("Proposal %s accepted" % self.cur_prop_num)
                 self.d.callback(True)
                 for (m, acceptor) in self.received.get(self.cur_prop_num, ()):
-                    self.writeMessage(Accept(Proposal(msg.proposal.prop_num, self.cur_value)), acceptor)
+                    self.writeMessage(AcceptRequest(Proposal(msg.proposal.prop_num, self.cur_value)), acceptor)
             elif self.accepted:
-                self.writeMessage(Accept(msg.proposal), host)
+                # If we've already accepted the proposal, notify the acceptor
+                # to deal with it
+                self.writeMessage(AcceptRequest(Proposal(msg.proposal.prop_num, self.cur_value)), host)
 
     def run(self, value):
         # (a) A proposer selects a proposal number n, greater than any proposal number it

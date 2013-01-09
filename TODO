@@ -3,8 +3,9 @@ Paxos:
 - Implement NACKs
 - Add acceptor info to acceptnotify
 - Move network logic into factory class
-- Develop client separation logic?
+- Build paxos manager
 - learn Acceptor number
+- common transport layer?
 
 DBP:
 short:
@@ -21,3 +22,4 @@ long:
 General:
 - use log instead of dbprint
 - multicast or not?
+- unify message system

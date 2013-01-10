@@ -94,18 +94,18 @@ class TestAcceptor(AgentTestMixin, TestCase):
         a = self.agent
         a.datagramReceived("prepare:2,None", (None, None))
         self.assertEqual(Promise(Proposal(2, None)), parse_message(self.transport.value()))
+        self.transport.clear()
         a.datagramReceived("prepare:2,3", (None, None))
         self.assertEqual('', self.transport.value())
 
     def test_accept(self):
         flearner1 = FakeAgent()
         flearner2 = FakeAgent()
-        network = {'learner': [flearner1, flearner2]}
         a = self.agent
-        a.datagramReceived("acceptnotify:1,2", (None, None))
+        a.network = {'learner': [flearner1, flearner2]}
+        a.datagramReceived("acceptrequest:1,2", (None, None))
         self.assertEqual(Proposal(1, 2), a._cur_prop)
-        self.assertEqual(self.hmsgs[flearner1], AcceptRequest(Proposal(1, 2)))
-        self.assertEqual(self.hmsgs[flearner2], AcceptRequest(Proposal(1, 2)))
+        self.assertEqual(AcceptNotify(Proposal(1, 2)), parse_message(self.transport.value()))
 
 
 class TestProposer(AgentTestMixin, TestCase):
@@ -134,15 +134,9 @@ class TestLearner(AgentTestMixin, TestCase):
     def test_regr1(self):
         # test that if we send a Learner different accept messages for the same
         # proposal, it only accepts a majority vote
-        l = []
-        h = {}
-        for x in xrange(5):
-            fa = FakeAgent()
-            l.append(fa)
-            h[x] = fa
-        network = {'acceptor': l}
-        hosts = h
+        l = [FakeAgent() for x in xrange(5)]
         a = self.agent
+        a.network = {'acceptor': l}
 
         a.datagramReceived("acceptnotify:1,2", (None, 0))
         a.datagramReceived("acceptnotify:1,2", (None, 1))
@@ -154,15 +148,9 @@ class TestLearner(AgentTestMixin, TestCase):
     def test_regr2(self):
         # test that if we send a Learner a bunch of accept messages from the same
         # acceptor, it only accepts a majority vote
-        l = []
-        h = {}
-        for x in xrange(5):
-            fa = FakeAgent()
-            h[x] = fa
-            l.append(fa)
-        network = {'acceptor': l}
-        hosts = h
+        l = [FakeAgent() for x in xrange(5)]
         a = self.agent
+        a.network = {'acceptor': l}
 
         a.datagramReceived("acceptnotify:1,2", (None, 0))
         a.datagramReceived("acceptnotify:1,2", (None, 0))

@@ -78,7 +78,7 @@ class AcceptRequest(Message):
 
 class AcceptNotify(Message):
     """Accept notify message"""
-    msg_type = "acceptinfo"
+    msg_type = "acceptnotify"
 
 
 # This is a mapping from message types to the actual classes.

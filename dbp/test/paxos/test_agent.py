@@ -16,27 +16,6 @@ class StringTransport(TStringTransport):
         pass
 
 
-# class TestEchoClient(TestCase):
-#     def setUp(self):
-#         self.proto = EchoClientDatagramProtocol()
-#         self.tr = StringTransport()
-#         self.ma = MockAgent()
-#         self.proto.parent = self.ma
-#         self.proto.makeConnection(self.tr)
-#
-#     def test_read(self):
-#         args = ("msg", "host")
-#         self.proto.datagramReceived(*args)
-#         self.assertEqual([args[0]], self.ma.msgs)
-#
-#     def test_write(self):
-#         data = ["foo", "bar"]
-#         host = "host"
-#         self.proto.sendDatagram(data[0], host)
-#         self.assertEqual(data[0], self.tr.value())
-#         self.proto.sendDatagram(data[1], host)
-#         self.assertEqual("".join(data), self.tr.value())
-
 class FakeAgent(AgentProtocol):
     """FakeAgent class to record messages passed"""
     def _receive(self, m, host):
@@ -107,21 +86,59 @@ class TestAcceptor(AgentTestMixin, TestCase):
         self.assertEqual(Proposal(1, 2), a._cur_prop)
         self.assertEqual(AcceptNotify(Proposal(1, 2)), parse_message(self.transport.value()))
 
+    # test ignore propose with value, nacks
+
 
 class TestProposer(AgentTestMixin, TestCase):
     """Test the Proposer agent class"""
     kls = ProposerProtocol
 
-    def test_accept(self):
+    def test_promise_novalue(self):
+        # promises - no values - send value
+        fa1 = FakeAgent()
+        fa2 = FakeAgent()
+        fa3 = FakeAgent()
         a = self.agent
-        a.datagramReceived("prepare:1,None", (None, None))
-        #self.assertEqual(Promise(Proposal(1, None)), parse_message(self.transport.value()))
+        a.network = {'acceptor': [fa1, fa2, fa3]}
 
-    # def test_decline(self):
-    #     a = self.agent
+        a.datagramReceived("promise:1,None", (None, 0))
+        self.assertEqual('', self.transport.value())
+        self.assertFalse(a.accepted)
+        a.datagramReceived("promise:1,None", (None, 1))
+        self.assertEqual('', self.transport.value())
+        self.assertTrue(a.accepted)
+        self.assertEqual(Promise(Proposal(1, None)), parse_message(self.transport.value()))
 
-    # def test_run(self):
-    #     a = self.agent
+    def test_promise_onevalue(self):
+        # promises - one value - send orig value
+        fa1 = FakeAgent()
+        fa2 = FakeAgent()
+        fa3 = FakeAgent()
+        a = self.agent
+        a.network = {'acceptor': [fa1, fa2, fa3]}
+
+        a.datagramReceived("promise:1,None", (None, 0))
+        self.assertEqual('', self.transport.value())
+        self.assertFalse(a.accepted)
+        a.datagramReceived("promise:1,1", (None, 1))
+        self.assertEqual('', self.transport.value())
+        self.assertEqual(Promise(Proposal(1, None)), parse_message(self.transport.value()))
+
+    def test_promise_multiple_values(self):
+        # promises - multiple values - send highest value
+        fa1 = FakeAgent()
+        fa2 = FakeAgent()
+        fa3 = FakeAgent()
+        a = self.agent
+        a.network = {'acceptor': [fa1, fa2, fa3]}
+
+        a.datagramReceived("promise:1,2", (None, 0))
+        self.assertEqual('', self.transport.value())
+        self.assertFalse(a.accepted)
+        a.datagramReceived("promise:2,1", (None, 1))
+        self.assertEqual('', self.transport.value())
+        self.assertEqual(Promise(Proposal(1, None)), parse_message(self.transport.value()))
+        self.assertEqual(Promise(Proposal(1, None)), parse_message(self.transport.value()))
 
 
 class TestLearner(AgentTestMixin, TestCase):

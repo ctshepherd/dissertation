@@ -92,7 +92,7 @@ class AcceptorProtocol(AgentProtocol):
             if msg.proposal.prop_num >= self._cur_prop_num:
                 dbprint("Accepting proposal %s (%s)" % (msg.proposal.prop_num, self._cur_prop_num))
                 self._cur_prop = msg.proposal
-                self.writeAll(self, AcceptNotify(msg.proposal), "learner")
+                self.writeAll(AcceptNotify(msg.proposal), "learner")
             else:
                 pass  # Can NACK here
 

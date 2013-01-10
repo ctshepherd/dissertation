@@ -1,5 +1,5 @@
 from dbp.util import dbprint
-from dbp.paxos.network import network, port_map
+from dbp.paxos.network import port_map
 from dbp.paxos.message import AcceptNotify, AcceptRequest, Promise, Prepare, parse_message, InvalidMessageException
 from dbp.paxos.proposal import Proposal
 from twisted.internet import defer
@@ -20,9 +20,17 @@ class AgentProtocol(DatagramProtocol):
         """
         self.transport.joinGroup("224.0.0.1")
         self._msgs = []
+        self.discoverNetwork()
         # network.setdefault(self.agent_type, []).append(self)
         # self._num = network_num.setdefault(self.agent_type, 1)
         # reactor.listenUDP(0, self.proto)  # this returns self.proto.transport
+
+    def discoverNetwork(self):
+        self.network = {
+            "acceptor": [],
+            "proposer": [],
+            "learner":  [],
+        }
 
     def writeMessage(self, msg, addr):
         dbprint("%s sent message %s to %s" % (self, msg, addr), level=2)
@@ -107,7 +115,7 @@ class LearnerProtocol(AgentProtocol):
         self.accepted_proposals = {}
 
     def _receive(self, msg, host):
-        acceptor_num = len(network['acceptor'])
+        acceptor_num = len(self.network['acceptor'])
         if msg.msg_type == "acceptnotify":
             # if we've already learnt it's been accepted, there's no need to
             # deal with it any more
@@ -144,7 +152,7 @@ class ProposerProtocol(AgentProtocol):
             # acceptors for a proposal numbered n with a value v, where v is the value of
             # the highest-numbered proposal among the responses, or if the responses reported
             # no proposals, a value of its own choosing.
-            acceptor_num = len(network['acceptor'])
+            acceptor_num = len(self.network['acceptor'])
             if not self.accepted and len(self.received.get(self.cur_prop_num, ())) > acceptor_num/2:
                 # If this is the message that tips us over the edge and we
                 # finally accept the proposal, deal with it appropriately.

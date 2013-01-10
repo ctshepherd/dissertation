@@ -1,10 +1,3 @@
-# This is a dict of {agent_type: [agents]}
-network = {
-    "acceptor": [],
-    "proposer": [],
-    "learner":  [],
-}
-
 # This dict allows us to number agents properly
 network_num = {}
 

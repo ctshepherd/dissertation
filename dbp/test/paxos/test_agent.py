@@ -102,7 +102,7 @@ class TestAcceptor(AgentTestMixin, TestCase):
         flearner2 = FakeAgent()
         network = {'learner': [flearner1, flearner2]}
         a = self.agent
-        a.datagramReceived("accept:1,2", (None, None))
+        a.datagramReceived("acceptnotify:1,2", (None, None))
         self.assertEqual(Proposal(1, 2), a._cur_prop)
         self.assertEqual(self.hmsgs[flearner1], AcceptRequest(Proposal(1, 2)))
         self.assertEqual(self.hmsgs[flearner2], AcceptRequest(Proposal(1, 2)))

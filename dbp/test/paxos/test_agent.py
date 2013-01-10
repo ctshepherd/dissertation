@@ -85,8 +85,8 @@ class TestAcceptor(AgentTestMixin, TestCase):
         a = self.agent
         a.datagramReceived("prepare:1,None", (None, None))
         self.assertEqual(Promise(Proposal(1, None)), parse_message(self.transport.value()))
-        a.datagramReceived("prepare:2,None", (None, None))
         self.transport.clear()
+        a.datagramReceived("prepare:2,None", (None, None))
         self.assertEqual(Promise(Proposal(2, None)), parse_message(self.transport.value()))
 
     def test_promise4(self):

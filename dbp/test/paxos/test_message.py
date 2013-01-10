@@ -33,6 +33,10 @@ class TestParseMessage(FMTestCase):
             fm_new = parse_message(fm_orig.serialize())
             self.assertEqual(fm_orig, fm_new)
 
+    def test_errors(self):
+        self.assertRaises(InvalidMessageException, parse_message, "foobar:1,2")
+        self.assertRaises(InvalidMessageException, parse_message, "promise:1")
+
 
 class TestMessageTypes(TestCase):
     """Test that we can do all of the message types we want"""

@@ -1,5 +1,5 @@
 from dbp.paxos import message
-from dbp.paxos.message import parse_message, Message, Promise, Prepare, Accept, InvalidMessageException
+from dbp.paxos.message import parse_message, Message, Promise, Prepare, AcceptRequest, AcceptNotify, InvalidMessageException
 from dbp.paxos.proposal import Proposal
 from dbp.test import TestCase
 
@@ -51,7 +51,7 @@ class TestMessageTypes(TestCase):
 
     def test_deserialize(self):
         for args in ((1,), (2, 3), (4, 5)):
-            for (msg_type, msg_class) in (("promise", Promise), ("accept", Accept)):
+            for (msg_type, msg_class) in (("promise", Promise), ("acceptrequest", AcceptRequest), ("acceptnotify", AcceptNotify)):
                 self._roundtrip(args, msg_type, msg_class)
         # We have to do Prepare separately because it doesn't take values
         self._roundtrip((1,), "prepare", Prepare)
@@ -59,7 +59,7 @@ class TestMessageTypes(TestCase):
     def test_serialization(self):
         # Try to go the whole round trip
         for args in ((1,), (2, 3), (4, 5)):
-            for msg_class in (Promise, Accept):
+            for msg_class in (Promise, AcceptRequest, AcceptNotify):
                 self._roundtrip_s(args, msg_class)
         # We have to do Prepare separately because it doesn't take values
         self._roundtrip_s((1,), Prepare)

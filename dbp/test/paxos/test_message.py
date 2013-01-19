@@ -1,10 +1,10 @@
 from dbp.paxos import message
-from dbp.paxos.message import parse_message, Message, Promise, Prepare, AcceptRequest, AcceptNotify, InvalidMessageException
+from dbp.paxos.message import parse_message, LegacyMessage, Msg, Promise, Prepare, AcceptRequest, AcceptNotify, InvalidMessageException, lm
 from dbp.paxos.proposal import Proposal
 from dbp.test import TestCase
 
 
-class FakeMessage(Message):
+class FakeMessage(LegacyMessage):
     msg_type = "fm"
 
 
@@ -23,7 +23,7 @@ class TestParseMessage(FMTestCase):
     def test_deserialize(self):
         for args in ((1, None), (2, 3), (4, 5)):
             fm = FakeMessage(Proposal(*args))
-            res = parse_message("fm:%s" % ",".join(map(str, args)))
+            res = parse_message(lm("fm:%s" % ",".join(map(str, args))))
             self.assertEqual(fm, res)
 
     def test_serialization(self):
@@ -34,8 +34,8 @@ class TestParseMessage(FMTestCase):
             self.assertEqual(fm_orig, fm_new)
 
     def test_errors(self):
-        self.assertRaises(InvalidMessageException, parse_message, "foobar:1,2")
-        self.assertRaises(InvalidMessageException, parse_message, "promise:1")
+        self.assertRaises(InvalidMessageException, parse_message, lm("foobar:1,2"))
+        self.assertRaises(InvalidMessageException, parse_message, lm("promise:1"))
 
 
 class TestMessageTypes(TestCase):
@@ -44,7 +44,7 @@ class TestMessageTypes(TestCase):
     def _roundtrip(self, args, msg_type, msg_class):
         """Helper function for test_deserialize"""
         m = msg_class(Proposal(*args))
-        res = parse_message("%s:%s" % (msg_type, Proposal(*args).serialize()))
+        res = parse_message(lm("%s:%s" % (msg_type, Proposal(*args).serialize())))
         self.assertEqual(m, res)
 
     def _roundtrip_s(self, args, msg_class):

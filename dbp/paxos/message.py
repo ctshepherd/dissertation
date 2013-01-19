@@ -1,4 +1,4 @@
-from dbp.util import title, dbprint, PaxosException
+from dbp.util import dbprint, PaxosException
 from dbp.paxos.proposal import Proposal
 from ast import literal_eval
 
@@ -8,6 +8,16 @@ class InvalidMessageException(PaxosException):
     pass
 
 
+def lm(msg):
+    mtype, p = msg.split(':')
+    pt = p.split(',')  # proposal value tuple
+    m = message_types[mtype](
+        Proposal(literal_eval(pt[0]),   # literal_eval is a safe version of eval,
+                 literal_eval(pt[1])))  # that only works for literal values
+    dbprint("converting '%s' to '%s'" % (msg, m), level=1)
+    return m.serialize()
+
+
 def parse_message(msg):
     """Convert a message from string format to a Python object
 
@@ -15,49 +25,63 @@ def parse_message(msg):
     corresponding Message object.
     """
     try:
-        mtype, p = msg.split(':')
-        pt = p.split(',')  # proposal value tuple
-        m = message_types[mtype](
-            Proposal(literal_eval(pt[0]),   # literal_eval is a safe version of eval,
-                    literal_eval(pt[1])))  # that only works for literal values
-        dbprint("converting '%s' to '%s'" % (msg, m), level=1)
-        return m
-    except (KeyError, ValueError), e:
+        # literal_eval is a safe version of eval
+        d = literal_eval(msg)
+        if 'proposal' in d:
+            pt = d['proposal'].split(',')  # proposal value tuple
+            d['proposal'] = Proposal(literal_eval(pt[0]), literal_eval(pt[1]))
+        return Msg(d)
+    except (SyntaxError, ValueError, KeyError), e:
         raise InvalidMessageException("invalid msg '%s' (%r)" % (msg, e))
 
 
-class Message(object):
-    """Message superclass"""
-    msg_type = "message"
+class Msg(object):
+    """Message container"""
 
-    def __init__(self, proposal):
-        self.proposal = proposal
+    def __init__(self, contents):
+        self.contents = contents
 
     def __str__(self):
-        return "%s(%s)" % (title(self.msg_type), self.proposal)
+        return "Msg(%s)" % (self.contents)
 
     def __repr__(self):
         return "<%s @ %#lx>" % (self, id(self))
 
     def __eq__(self, other):
-        if not isinstance(other, Message):
+        if not isinstance(other, Msg):
             return NotImplemented
-        return (self.msg_type == other.msg_type and
-                self.proposal == other.proposal)
+        return self.contents == other.contents
 
     def __ne__(self, other):
         return not self == other
+
+    def __getattr__(self, n):
+        if n in self.contents:
+            return self.contents[n]
+        return object.__getattr__(self, n)
 
     def serialize(self):
         """Serialize into a format for on the wire transfer
 
         This returns a string which can be sent over the network and
-        reconstructed by parse_message
+        reconstructed by parse_message.
         """
-        return "%s:%s" % (self.msg_type, self.proposal.serialize())
+        return str(self.contents)
 
 
-class Prepare(Message):
+class LegacyMessage(Msg):
+    def __init__(self, proposal):
+        d = {'msg_type': self.msg_type,
+             'proposal': proposal,
+             }
+        Msg.__init__(self, d)
+
+    def serialize(self):
+        self.contents['proposal'] = self.contents['proposal'].serialize()
+        return Msg.serialize(self)
+
+
+class Prepare(LegacyMessage):
     """Prepare message"""
     def __init__(self, proposal):
         super(Prepare, self).__init__(proposal)
@@ -70,16 +94,17 @@ class Prepare(Message):
     msg_type = "prepare"
 
 
-class Promise(Message):
+class Promise(LegacyMessage):
     """Promise message"""
     msg_type = "promise"
 
 
-class AcceptRequest(Message):
+class AcceptRequest(LegacyMessage):
     """Accept request message"""
     msg_type = "acceptrequest"
 
-class AcceptNotify(Message):
+
+class AcceptNotify(LegacyMessage):
     """Accept notify message"""
     msg_type = "acceptnotify"
 

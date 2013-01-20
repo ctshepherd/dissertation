@@ -34,8 +34,8 @@ class TestParseMessage(FMTestCase):
             self.assertEqual(fm_orig, fm_new)
 
     def test_errors(self):
-        self.assertRaises(InvalidMessageException, parse_message, lm("foobar:1,2"))
-        self.assertRaises(InvalidMessageException, parse_message, lm("promise:1"))
+        self.assertRaises(InvalidMessageException, parse_message, Msg({"msg_type":"foobar","proposal":"1,2"}))
+        self.assertRaises(InvalidMessageException, parse_message, Msg({"msg_type":"promise","proposal":"1"}))
 
 
 class TestMessageTypes(TestCase):

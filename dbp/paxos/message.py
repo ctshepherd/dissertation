@@ -77,8 +77,11 @@ class LegacyMessage(Msg):
         Msg.__init__(self, d)
 
     def serialize(self):
+        p = self.contents['proposal']
         self.contents['proposal'] = self.contents['proposal'].serialize()
-        return Msg.serialize(self)
+        ret = Msg.serialize(self)
+        self.contents['proposal'] = p
+        return ret
 
 
 class Prepare(LegacyMessage):

@@ -145,6 +145,7 @@ class ProposerProtocol(AgentProtocol):
 
     def _receive(self, msg, host):
         if msg.msg_type == "promise":
+            # {prop num -> [(msg, host)]}
             self.received.setdefault(msg.proposal.prop_num, []).append((msg, host))
 
             # (a) If the proposer receives a response to its prepare requests (numbered n)
@@ -157,11 +158,17 @@ class ProposerProtocol(AgentProtocol):
                 # If this is the message that tips us over the edge and we
                 # finally accept the proposal, deal with it appropriately.
                 self.accepted = True
-                competing = max(self.received[self.cur_prop_num])
+                competing = max(self.received[self.cur_prop_num], key=lambda t: t[0].proposal.prop_num)
                 dbprint("Proposal %s accepted" % self.cur_prop_num)
                 self.d.callback(True)
+                if competing is None:
+                    # if no-one else asserted a value, we can set ours
+                    value = self.cur_value
+                else:
+                    # otherwise, we need to restart
+                    value = competing[0].proposal.value
                 for (m, acceptor) in self.received.get(self.cur_prop_num, ()):
-                    self.writeMessage(AcceptRequest(Proposal(msg.proposal.prop_num, self.cur_value)), acceptor)
+                    self.writeMessage(AcceptRequest(Proposal(msg.proposal.prop_num, value)), acceptor)
             elif self.accepted:
                 # If we've already accepted the proposal, notify the acceptor
                 # to deal with it

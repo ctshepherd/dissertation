@@ -24,3 +24,5 @@ General:
 - use log instead of dbprint
 - multicast or not?
 - unify message system - more general
+- only pass messages over Paxos?
+- global lock for TXs

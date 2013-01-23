@@ -4,12 +4,22 @@ from dbp.paxos.proposal import Proposal
 from dbp.test import TestCase, enable_debug
 
 from twisted.test.proto_helpers import StringTransport as TStringTransport
+from twisted.internet import defer
 
 
 class StringTransport(TStringTransport):
+    def __init__(self):
+        TStringTransport.__init__(self)
+        self.msgs = []
+
     def write(self, data, host=None):
         """Wrapper around TStringTransport.write"""
         TStringTransport.write(self, data)
+        self.msgs.append(data)
+
+    def clear(self):
+        TStringTransport.clear(self)
+        self.msgs = []
 
     def joinGroup(self, group):
         #print group
@@ -93,7 +103,6 @@ class TestProposer(AgentTestMixin, TestCase):
     """Test the Proposer agent class"""
     kls = ProposerProtocol
 
-    @enable_debug
     def test_promise_novalue(self):
         # promises - no values - send value
         fa1 = FakeAgent()
@@ -101,14 +110,17 @@ class TestProposer(AgentTestMixin, TestCase):
         fa3 = FakeAgent()
         a = self.agent
         a.network = {'acceptor': [fa1, fa2, fa3]}
+        a.cur_prop_num = 1
+        a.d = defer.Deferred()
 
         a.datagramReceived(lm("promise:1,None"), (None, 0))
         self.assertEqual('', self.transport.value())
         self.assertFalse(a.accepted)
         a.datagramReceived(lm("promise:1,None"), (None, 1))
-        self.assertEqual('', self.transport.value())
         self.assertTrue(a.accepted)
-        self.assertEqual(Promise(Proposal(1, None)), parse_message(self.transport.value()))
+        self.assertEqual(AcceptRequest(Proposal(1, None)), parse_message(self.transport.msgs[0]))
+        self.assertEqual(AcceptRequest(Proposal(1, None)), parse_message(self.transport.msgs[1]))
+        self.assertTrue(a.d)
 
     @enable_debug
     def test_promise_onevalue(self):
@@ -118,13 +130,17 @@ class TestProposer(AgentTestMixin, TestCase):
         fa3 = FakeAgent()
         a = self.agent
         a.network = {'acceptor': [fa1, fa2, fa3]}
+        a.cur_prop_num = 1
+        a.d = defer.Deferred()
 
         a.datagramReceived(lm("promise:1,None"), (None, 0))
         self.assertEqual('', self.transport.value())
         self.assertFalse(a.accepted)
         a.datagramReceived(lm("promise:1,1"), (None, 1))
-        self.assertEqual('', self.transport.value())
-        self.assertEqual(Promise(Proposal(1, None)), parse_message(self.transport.value()))
+        self.assertTrue(a.accepted)
+        self.assertEqual(AcceptRequest(Proposal(1, 1)), parse_message(self.transport.msgs[0]))
+        self.assertEqual(AcceptRequest(Proposal(1, 1)), parse_message(self.transport.msgs[1]))
+        self.assertTrue(a.d)
 
     @enable_debug
     def test_promise_multiple_values(self):

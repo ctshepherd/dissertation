@@ -1,13 +1,137 @@
+from uuid import uuid4
 from dbp.util import dbprint
-from dbp.paxos.network import port_map
-from dbp.paxos.message import AcceptNotify, AcceptRequest, Promise, Prepare, parse_message, InvalidMessageException
+from dbp.paxos.message import AcceptNotify, AcceptRequest, Msg, Prepare, parse_message, InvalidMessageException
 from dbp.paxos.proposal import Proposal
-from twisted.internet import defer
 from twisted.internet.protocol import DatagramProtocol
+from twisted.internet import defer
 
 
-class AgentProtocol(DatagramProtocol):
-    agent_type = "agent"
+class Acceptor(object):
+    """Acceptor Agent"""
+
+    @staticmethod
+    def acceptor_init_instance(instance):
+        instance['acceptor_prepare_prop_num'] = None
+        instance['acceptor_cur_prop_num'] = 0
+        instance['acceptor_cur_prop_value'] = None
+
+    def recv_prepare(self, msg, instance):
+        """Update instance state appropriately based upon msg.
+
+        (b) If an acceptor receives a prepare request with number n greater than that
+        of any prepare request to which it has already responded, then it responds to
+        the request with a promise not to accept any more proposals numbered less than
+        n and with the highest-numbered proposal (if any) that it has accepted.
+        """
+        if msg.prop_num > instance['acceptor_prepare_prop_num']:
+            self.writeMessage(msg['uid'],
+                              Msg({
+                                  'msg_type': 'promise',
+                                  'prop_num': msg['prop_num'],
+                                  'prev_prop_num': instance['acceptor_cur_prop_num'],
+                                  'prev_prop_value': instance['acceptor_cur_prop_value']
+                                  }))
+            instance['acceptor_prepare_prop_num'] = msg.prop_num
+        else:
+            pass  # Can NACK here
+
+    def recv_acceptrequest(self, msg, instance):
+        """Update instance state appropriately based upon msg.
+
+        (b) If an acceptor receives an accept request for a proposal numbered n, it
+        accepts the proposal unless it has already responded to a prepare request
+        having a number greater than n.
+        """
+        if msg['prop_num'] >= instance['acceptor_prepare_prop_num']:
+            dbprint("Accepting proposal %s (current accepted is %s)" % (msg['prop_num'], instance['acceptor_cur_prop_num']))
+            instance['acceptor_cur_prop_num'] = msg.prop_num
+            instance['acceptor_cur_prop_value'] = msg.prop_value
+            self.writeAll(AcceptNotify(Proposal(msg.prop_num, msg.prop_value)))
+        else:
+            pass  # Can NACK here
+
+
+class Learner(object):
+    """Learner Agent"""
+
+    @staticmethod
+    def learner_init_instance(instance):
+        # Global
+        instance['completed'] = False
+        instance['value'] = None
+        # Learner specific
+        instance['learner_accepted'] = {}
+
+    def recv_acceptnotify(self, msg, instance):
+        """Update instance state appropriately based upon msg.
+
+        If the proposal has been accepted by a quorum, it's completed.
+        """
+        # if we've already learnt it's been accepted, there's no need to
+        # deal with it any more
+        if instance['completed']:
+            return
+        s = instance['learner_accepted'].setdefault(msg['prop_num'], set())
+        s.add(msg['uid'])
+        if len(s) >= self.quorum_size:
+            instance['completed'] = True
+            instance['value'] = msg['prop_value']
+            instance['callback'].callback(instance['value'])
+
+
+class Proposer(object):
+    """Proposer Agent"""
+
+    @staticmethod
+    def proposer_init_instance(instance):
+        # Global
+        instance['last_tried'] = 0
+        instance['quorum'] = set()
+
+    def recv_promise(self, msg, instance):
+        """Update instance state appropriately based upon msg.
+
+        (a) If the proposer receives a response to its prepare requests (numbered n)
+        from a majority of acceptors, then it sends an accept request to each of those
+        acceptors for a proposal numbered n with a value v, where v is the value of
+        the highest-numbered proposal among the responses, or if the responses reported
+        no proposals, a value of its own choosing.
+        """
+        if instance['completed']:
+            # if we're done, ignore this message
+            return
+
+        instance['quorum'].add(msg['uid'])
+        if len(instance['quorum']) >= self.quorum_size:
+            # If this is the message that tips us over the edge and we
+            # finally accept the proposal, deal with it appropriately.
+            if msg['prev_prop_num'] is None:
+                # if no-one else asserted a value, we can set ours
+                if 'our_val' in instance:
+                    value = instance['our_val']
+                else:
+                    # if 'our_val' isn't in instance, we didn't try and
+                    # initiate this Paxos round
+                    raise Exception("error!")
+            else:
+                # otherwise, we need to restart
+                value = msg['prev_prop_value']
+            for uid in instance['quorum']:
+                self.writeMessage(uid, AcceptRequest(Proposal(msg.prop_num, value)))
+
+    def proposer_start(self, instance, value):
+        """Start an instance of Paxos!
+
+        Try and complete an instance of Paxos, setting the decree to value.
+        """
+        # (a) A proposer selects a proposal number n, greater than any proposal number it
+        # has selected before, and sends a request containing n to a majority of
+        # acceptors. This message is known as a prepare request.
+        instance['our_value'] = value
+        self.writeAll(Prepare(Proposal(1)))
+
+
+class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
 
     def stopProtocol(self):
         """
@@ -18,12 +142,21 @@ class AgentProtocol(DatagramProtocol):
         """
         Upon start, reset internal state.
         """
-        self.transport.joinGroup("224.0.0.1")
-        self._msgs = []
+        self.instances = {}
+        self.hosts = {}
+        self.uid = uuid4()
+        #reactor.listenUDP(0, self.proto)  # this returns self.proto.transport
+        # Initiate discovery
         self.discoverNetwork()
-        # network.setdefault(self.agent_type, []).append(self)
-        # self._num = network_num.setdefault(self.agent_type, 1)
-        # reactor.listenUDP(0, self.proto)  # this returns self.proto.transport
+
+    def create_instance(self, instance_id):
+        instance = {}
+        instance['instance_id'] = instance_id
+        instance['callback'] = defer.Deferred()
+        self.proposer_init_instance(instance)
+        self.acceptor_init_instance(instance)
+        self.learner_init_instance(instance)
+        return instance
 
     def discoverNetwork(self):
         self.network = {
@@ -32,16 +165,16 @@ class AgentProtocol(DatagramProtocol):
             "learner":  [],
         }
 
-    def writeMessage(self, msg, addr):
-        dbprint("%s sent message %s to %s" % (self, msg, addr), level=2)
+    def writeMessage(self, uid, msg):
+        dbprint("%s sent message %s to %s" % (self, msg, uid), level=2)
         msg = msg.serialize()
+        addr = self.hosts[uid]
         self.transport.write(msg, addr)
 
-    def writeAll(self, msg, agent_type):
-        dbprint("%s sent message %s to all %s" % (self, msg, agent_type), level=2)
-        host = port_map[agent_type]
-        msg = msg.serialize()
-        self.transport.write(msg, (host, 8005))
+    def writeAll(self, msg):
+        dbprint("%s sent message %s to all" % (self, msg), level=2)
+        for uid in self.hosts:
+            self.writeMessage(uid, msg)
 
     def datagramReceived(self, msg, host):
         """Called when a message is received by a specific agent.
@@ -51,138 +184,22 @@ class AgentProtocol(DatagramProtocol):
         self._msgs.append((msg, host))
         try:
             m = parse_message(msg)
-            self._receive(m, host)
+            t = m['msg_type']
+            instance = self.instances[m['instance_id']]
+            method = getattr(self, "recv_%s" % t)
+            method(m, instance)
         except InvalidMessageException, e:
             dbprint("%s received invalid message %s (%s)" % (self, msg, e))
             return
 
-    def _receive(self, msg, host):
-        raise NotImplementedError()
-
-    # def __str__(self):
-    #     return "%s" % (title(self.agent_type), self._num)
-
     def __repr__(self):
-        return "<%s @ %#lx>" % (self.agent_type, id(self))
+        u = getattr(self, "uid", None)
+        if u is None:
+            u = "Unknown UID"
+        return "<Node(%s) @ %#lx>" % (u, id(self))
 
-
-class AcceptorProtocol(AgentProtocol):
-    """Acceptor Agent"""
-    agent_type = "acceptor"
-
-    def startProtocol(self):
-        AgentProtocol.startProtocol(self)
-        self.transport.joinGroup(port_map[self.agent_type])
-        self._cur_prop_num = 0
-        self._cur_prop = Proposal(0)
-
-    def _receive(self, msg, host):
-        if msg.msg_type == "prepare":
-            # (b) If an acceptor receives a prepare request with number n greater than that
-            # of any prepare request to which it has already responded, then it responds to
-            # the request with a promise not to accept any more proposals numbered less than
-            # n and with the highest-numbered proposal (if any) that it has accepted.
-            if msg.proposal.value is not None:
-                # Sanity check - prepare messages should not have a value
-                dbprint("Warning: %s received a Prepare message %s with an unexpected value"
-                        % (self, msg), level=5)
-                return
-            if msg.proposal.prop_num > self._cur_prop_num:
-                self.writeMessage(Promise(Proposal(msg.proposal.prop_num, self._cur_prop.value)), host)
-                self._cur_prop_num = msg.proposal.prop_num
-                self._cur_prop = msg.proposal
-            else:
-                pass  # Can NACK here
-        elif msg.msg_type == "acceptrequest":
-            # (b) If an acceptor receives an accept request for a proposal numbered n, it
-            # accepts the proposal unless it has already responded to a prepare request
-            # having a number greater than n.
-            if msg.proposal.prop_num >= self._cur_prop_num:
-                dbprint("Accepting proposal %s (%s)" % (msg.proposal.prop_num, self._cur_prop_num))
-                self._cur_prop = msg.proposal
-                self.writeAll(AcceptNotify(msg.proposal), "learner")
-            else:
-                pass  # Can NACK here
-
-
-class LearnerProtocol(AgentProtocol):
-    agent_type = "learner"
-
-    def startProtocol(self):
-        AgentProtocol.startProtocol(self)
-        self.transport.joinGroup(port_map[self.agent_type])
-        self.received_proposals = {}
-        self.accepted_proposals = {}
-
-    def _receive(self, msg, host):
-        acceptor_num = len(self.network['acceptor'])
-        if msg.msg_type == "acceptnotify":
-            # if we've already learnt it's been accepted, there's no need to
-            # deal with it any more
-            if msg.proposal.prop_num in self.accepted_proposals:
-                return
-            p = self.received_proposals.setdefault(msg.proposal.prop_num, {})
-            s = p.setdefault(msg.proposal.value, set())
-            s.add(host)
-            if len(s) > acceptor_num/2:
-                self.accepted_proposals[msg.proposal.prop_num] = msg.proposal.value
-                dbprint("Proposal %s accepted" % msg.proposal, level=3)
-
-
-class ProposerProtocol(AgentProtocol):
-    agent_type = "proposer"
-
-    def startProtocol(self):
-        AgentProtocol.startProtocol(self)
-        self.transport.joinGroup(port_map[self.agent_type])
-        self.cur_prop_num = 0
-        self.accepted = False
-        self.replies = []
-        self.cur_value = None
-        self.received = {}
-
-        self.d = None
-
-    def _receive(self, msg, host):
-        if msg.msg_type == "promise":
-            # {prop num -> [(msg, host)]}
-            self.received.setdefault(msg.proposal.prop_num, []).append((msg, host))
-
-            # (a) If the proposer receives a response to its prepare requests (numbered n)
-            # from a majority of acceptors, then it sends an accept request to each of those
-            # acceptors for a proposal numbered n with a value v, where v is the value of
-            # the highest-numbered proposal among the responses, or if the responses reported
-            # no proposals, a value of its own choosing.
-            acceptor_num = len(self.network['acceptor'])
-            if not self.accepted and len(self.received.get(self.cur_prop_num, ())) > acceptor_num/2:
-                # If this is the message that tips us over the edge and we
-                # finally accept the proposal, deal with it appropriately.
-                self.accepted = True
-                competing = max(self.received[self.cur_prop_num], key=lambda t: t[0].proposal.prop_num)
-                dbprint("Proposal %s accepted" % self.cur_prop_num)
-                self.d.callback(True)
-                if competing is None:
-                    # if no-one else asserted a value, we can set ours
-                    value = self.cur_value
-                else:
-                    # otherwise, we need to restart
-                    value = competing[0].proposal.value
-                for (m, acceptor) in self.received.get(self.cur_prop_num, ()):
-                    self.writeMessage(AcceptRequest(Proposal(msg.proposal.prop_num, value)), acceptor)
-            elif self.accepted:
-                # If we've already accepted the proposal, notify the acceptor
-                # to deal with it
-                self.writeMessage(AcceptRequest(Proposal(msg.proposal.prop_num, self.cur_value)), host)
-
-    def run(self, value):
-        # (a) A proposer selects a proposal number n, greater than any proposal number it
-        # has selected before, and sends a request containing n to a majority of
-        # acceptors. This message is known as a prepare request.
-        self.received = {}
-        self.d = defer.Deferred()
-        #self.cur_prop_num += self._num
-        self.cur_prop_num += 5
-        n = self.cur_prop_num
-        self.cur_value = value
-        self.writeAll(Prepare(Proposal(n)), "acceptor")
-        return self.d
+    def run(self, operation):
+        i_num = self.current_instance_number
+        self.current_instance_number += 1
+        i = self.create_instance(i_num)
+        self.proposer_start(i, operation)

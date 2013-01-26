@@ -55,6 +55,9 @@ class Msg(object):
     def __ne__(self, other):
         return not self == other
 
+    def __getitem__(self, item):
+        return self.contents[item]
+
     def __getattr__(self, n):
         if n in self.contents:
             return self.contents[n]

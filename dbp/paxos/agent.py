@@ -221,7 +221,7 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
         self.transport.write(msg, addr)
 
     def writeAll(self, msg):
-        dbprint("%s sent message %s to all" % (self, msg), level=2)
+        dbprint("%s sent message %s to all" % (self, msg), level=1)
         for uid in self.hosts:
             self.writeMessage(uid, msg)
 

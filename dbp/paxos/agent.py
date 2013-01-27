@@ -128,8 +128,12 @@ class Proposer(object):
                     # initiate this Paxos round
                     raise Exception("error!")
             else:
-                # otherwise, we need to restart
                 value = instance['proposer_prev_prop_value']
+                # if we wanted to set a value, try again
+                if 'our_val' in instance:
+                    self.run(instance['our_val'])
+                    # delete our_val so we don't try and restart too often
+                    del instance['our_val']
             for uid in instance['quorum']:
                 self.writeMessage(uid,
                                   Msg({

@@ -1,5 +1,5 @@
 from dbp.paxos.agent import NodeProtocol
-from dbp.paxos.message import Msg, AcceptRequest, AcceptNotify, parse_message, lm
+from dbp.paxos.message import Msg, AcceptRequest, AcceptNotify, parse_message
 from dbp.paxos.proposal import Proposal
 from dbp.test import TestCase
 
@@ -39,20 +39,6 @@ class AgentTestMixin(object):
         self.node.makeConnection(self.transport)
         # Simple hosts mapping for the tests
         self.node.hosts = {x: x for x in xrange(10)}
-
-
-class NodeTest(object):
-    def test_receive(self):
-        """Test all agents can receive any message without crashing"""
-        a = self.agent
-        a.datagramReceived(lm("prepare:1,None"), (None, None))
-        a.datagramReceived(lm("promise:1,None"), (None, None))
-        a.datagramReceived(lm("acceptnotify:1,None"), (None, None))
-        a.datagramReceived(lm("acceptrequest:1,None"), (None, None))
-        #a.datagramReceived(lm("prepare:1,2"), (None, None))
-        a.datagramReceived(lm("promise:1,2"), (None, None))
-        a.datagramReceived(lm("acceptnotify:1,2"), (None, None))
-        a.datagramReceived(lm("acceptrequest:1,2"), (None, None))
 
 
 class TestAcceptor(AgentTestMixin, TestCase):
@@ -196,3 +182,22 @@ class TestLearner(AgentTestMixin, TestCase):
         n.recv_acceptnotify(Msg({'prop_num': 1, 'prop_value': 1, 'uid': 1}), i)
         n.recv_acceptnotify(Msg({'prop_num': 2, 'prop_value': 2, 'uid': 1}), i)
         self.assertFalse(i['completed'])
+
+
+class NodeTest(AgentTestMixin, TestCase):
+    def test_receive(self):
+        """Test all agents can receive any message without crashing"""
+        a = self.node
+        a.datagramReceived(Msg({'msg_type': "prepare", 'uid': 1, 'instance_id': 1, 'prop_num': 1, 'prop_value': None}), None)
+        a.datagramReceived(Msg({'msg_type': "promise", 'uid': 1, 'instance_id': 1, 'prop_num': 1, 'prop_value': None}), None)
+        a.datagramReceived(Msg({'msg_type': "acceptnotify", 'uid': 1, 'instance_id': 1, 'prop_num': 1, 'prop_value': None}), None)
+        a.datagramReceived(Msg({'msg_type': "acceptrequest", 'uid': 1, 'instance_id': 1, 'prop_num': 1, 'prop_value': None}), None)
+        a.datagramReceived(Msg({'msg_type': "prepare", 'uid': 1, 'instance_id': 1, 'prop_num': 1, 'prop_value': 2}), None)
+        a.datagramReceived(Msg({'msg_type': "promise", 'uid': 1, 'instance_id': 1, 'prop_num': 1, 'prop_value': 2}), None)
+        a.datagramReceived(Msg({'msg_type': "acceptnotify", 'uid': 1, 'instance_id': 1, 'prop_num': 1, 'prop_value': 2}), None)
+        a.datagramReceived(Msg({'msg_type': "acceptrequest", 'uid': 1, 'instance_id': 1, 'prop_num': 1, 'prop_value': 2}), None)
+
+    def test_run(self):
+        n = self.node
+        n.run("foo")
+        self.assertEqual('', self.transport.value())

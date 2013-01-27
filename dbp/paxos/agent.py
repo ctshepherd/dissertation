@@ -1,7 +1,6 @@
 from uuid import uuid4
 from dbp.util import dbprint
-from dbp.paxos.message import AcceptNotify, AcceptRequest, Msg, Prepare, parse_message, InvalidMessageException
-from dbp.paxos.proposal import Proposal
+from dbp.paxos.message import Msg, parse_message, InvalidMessageException
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet import defer
 
@@ -29,7 +28,8 @@ class Acceptor(object):
                                   'msg_type': 'promise',
                                   'prop_num': msg['prop_num'],
                                   'prev_prop_num': instance['acceptor_cur_prop_num'],
-                                  'prev_prop_value': instance['acceptor_cur_prop_value']
+                                  'prev_prop_value': instance['acceptor_cur_prop_value'],
+                                  'instance_id': instance['instance_id'],
                                   }))
             instance['acceptor_prepare_prop_num'] = msg.prop_num
         else:
@@ -46,7 +46,12 @@ class Acceptor(object):
             dbprint("Accepting proposal %s (current accepted is %s)" % (msg['prop_num'], instance['acceptor_cur_prop_num']))
             instance['acceptor_cur_prop_num'] = msg.prop_num
             instance['acceptor_cur_prop_value'] = msg.prop_value
-            self.writeAll(AcceptNotify(Proposal(msg.prop_num, msg.prop_value)))
+            self.writeAll(Msg({
+                "msg_type": "acceptnotify",
+                "prop_num": msg.prop_num,
+                "prop_value": msg.prop_value,
+                "instance_id": instance['instance_id']
+            }))
         else:
             pass  # Can NACK here
 
@@ -117,7 +122,13 @@ class Proposer(object):
                 # otherwise, we need to restart
                 value = msg['prev_prop_value']
             for uid in instance['quorum']:
-                self.writeMessage(uid, AcceptRequest(Proposal(msg.prop_num, value)))
+                self.writeMessage(uid,
+                                  Msg({
+                                      "msg_type": "acceptrequest",
+                                      "prop_num": msg.prop_num,
+                                      "prop_value": value,
+                                      "instance_id": instance['instance_id']
+                                  }))
 
     def proposer_start(self, instance, value):
         """Start an instance of Paxos!
@@ -128,10 +139,13 @@ class Proposer(object):
         # has selected before, and sends a request containing n to a majority of
         # acceptors. This message is known as a prepare request.
         instance['our_value'] = value
-        self.writeAll(Prepare(Proposal(1)))
+        self.writeAll(Msg({"msg_type": "prepare", "prop_num": (1, str(self.uid)), "instance_id": instance['instance_id']}))
 
 
 class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
+
+    def __init__(self, bootstrap=None):
+        self.bootstrap = bootstrap
 
     def stopProtocol(self):
         """
@@ -143,8 +157,11 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
         Upon start, reset internal state.
         """
         self.instances = {}
+        self.current_instance_number = 1
+        self.quorum_size = 1
         self.hosts = {}
         self.uid = uuid4()
+        self._msgs = []
         #reactor.listenUDP(0, self.proto)  # this returns self.proto.transport
         # Initiate discovery
         self.discoverNetwork()
@@ -158,15 +175,29 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
         self.learner_init_instance(instance)
         return instance
 
+    def recv_ping(self, msg, instance):
+        self.writeMessage(msg['uid'], Msg({"msg_type": "pong", "instance_id": None}))
+
+    def recv_ehlo(self, msg, instance):
+        self.writeMessage(msg['uid'], Msg({"msg_type": "notify", "hosts": self.hosts, "instance_id": None}))
+
+    def recv_notify(self, msg, instance):
+        h = msg['hosts']
+        for host in self.hosts:
+            h.pop(host, None)
+        if h:
+            for host, addr in h.iteritems():
+                self.addHost(host, addr)
+                self.writeMessage(msg['uid'], Msg({"msg_type": "ehlo", "instance_id": None}))
+
     def discoverNetwork(self):
-        self.network = {
-            "acceptor": [],
-            "proposer": [],
-            "learner":  [],
-        }
+        if self.bootstrap is not None:
+            m = Msg({"msg_type": "ehlo", "uid": str(self.uid), "instance_id": None})
+            self.transport.write(m.serialize(), self.bootstrap)
 
     def writeMessage(self, uid, msg):
-        dbprint("%s sent message %s to %s" % (self, msg, uid), level=2)
+        dbprint("Sent %s message to %s\n%s\n" % (msg['msg_type'], uid, msg), level=1)
+        msg.contents['uid'] = str(self.uid)
         msg = msg.serialize()
         addr = self.hosts[uid]
         self.transport.write(msg, addr)
@@ -176,16 +207,30 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
         for uid in self.hosts:
             self.writeMessage(uid, msg)
 
+    def addHost(self, uid, host):
+        dbprint("Adding node %s (%s)" % (uid, host), level=3)
+        self.hosts[uid] = host
+        self.quorum_size = len(self.hosts) // 2
+
     def datagramReceived(self, msg, host):
         """Called when a message is received by a specific agent.
 
         """
-        dbprint("%s got message %s from %s" % (self, msg, host), level=2)
         self._msgs.append((msg, host))
         try:
             m = parse_message(msg)
+            # If we haven't heard this host before, add them to the record
+            if m['uid'] not in self.hosts and m['uid'] != self.uid:
+                self.addHost(m['uid'], host)
             t = m['msg_type']
-            instance = self.instances[m['instance_id']]
+            dbprint("Got %s message from %s\n%s\n" % (m['msg_type'], host, m), level=2)
+            if m['instance_id'] is not None:
+                i = m['instance_id']
+                if i not in self.instances:
+                    self.instances[i] = self.create_instance(i)
+                instance = self.instances[i]
+            else:
+                instance = None
             method = getattr(self, "recv_%s" % t)
             method(m, instance)
         except InvalidMessageException, e:

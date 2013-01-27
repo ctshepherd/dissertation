@@ -92,6 +92,9 @@ class Proposer(object):
         # Global
         instance['last_tried'] = 0
         instance['quorum'] = set()
+        # Proposer only
+        instance['proposer_prev_prop_num'] = 0
+        instance['proposer_prev_prop_value'] = None
 
     def recv_promise(self, msg, instance):
         """Update instance state appropriately based upon msg.
@@ -107,10 +110,16 @@ class Proposer(object):
             return
 
         instance['quorum'].add(msg['uid'])
+
+        if msg['prev_prop_value'] is not None:
+            dbprint("loading old prop value of %s (num %s)" % (msg['prev_prop_value'], msg['prev_prop_num']), level=2)
+            if msg['prev_prop_num'] > instance['proposer_prev_prop_num']:
+                instance['proposer_prev_prop_value'] = msg['prev_prop_value']
+
         if len(instance['quorum']) >= self.quorum_size:
             # If this is the message that tips us over the edge and we
             # finally accept the proposal, deal with it appropriately.
-            if msg['prev_prop_num'] is None:
+            if instance['proposer_prev_prop_value'] is None:
                 # if no-one else asserted a value, we can set ours
                 if 'our_val' in instance:
                     value = instance['our_val']
@@ -120,7 +129,7 @@ class Proposer(object):
                     raise Exception("error!")
             else:
                 # otherwise, we need to restart
-                value = msg['prev_prop_value']
+                value = instance['proposer_prev_prop_value']
             for uid in instance['quorum']:
                 self.writeMessage(uid,
                                   Msg({
@@ -138,8 +147,13 @@ class Proposer(object):
         # (a) A proposer selects a proposal number n, greater than any proposal number it
         # has selected before, and sends a request containing n to a majority of
         # acceptors. This message is known as a prepare request.
-        instance['our_value'] = value
-        self.writeAll(Msg({"msg_type": "prepare", "prop_num": (1, str(self.uid)), "instance_id": instance['instance_id']}))
+        instance['our_val'] = value
+        self.writeAll(
+            Msg({
+                "msg_type": "prepare",
+                "prop_num": (1, str(self.uid)),
+                "instance_id": instance['instance_id']
+            }))
 
 
 class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
@@ -227,6 +241,8 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
             if m['instance_id'] is not None:
                 i = m['instance_id']
                 if i not in self.instances:
+                    if i > self.current_instance_number:
+                        self.current_instance_number = i+1
                     self.instances[i] = self.create_instance(i)
                 instance = self.instances[i]
             else:
@@ -247,4 +263,5 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
         i_num = self.current_instance_number
         self.current_instance_number += 1
         i = self.create_instance(i_num)
+        self.instances[i_num] = i
         self.proposer_start(i, operation)

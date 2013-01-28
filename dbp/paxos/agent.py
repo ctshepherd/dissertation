@@ -240,8 +240,6 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
 
 
     def timeout_test(self, init=False):
-        for h in self.hosts:
-            self.writeMessage(h, Msg({"msg_type": "ping", "instance_id": None}))
         # If this isn't the first time we've run, do some pruning
         if not init:
             # Remove any hosts we haven't heard from yet
@@ -250,6 +248,8 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
 
         # Start again
         self.timeout_hosts = dict(self.hosts)
+        for h in self.hosts:
+            self.writeMessage(h, Msg({"msg_type": "ping", "instance_id": None}))
         self.reactor.callLater(self.timeout, self.timeout_test)
 
     def recv_ping(self, msg, instance):

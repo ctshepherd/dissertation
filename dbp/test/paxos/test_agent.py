@@ -165,6 +165,52 @@ class TestProposer(AgentTestMixin, TestCase):
         self.assertMsg(Msg({"msg_type": "acceptrequest", "prop_num": (3, ''), "prop_value": 6}), parse_message(self.transport.msgs[0]))
         self.assertMsg(Msg({"msg_type": "acceptrequest", "prop_num": (3, ''), "prop_value": 6}), parse_message(self.transport.msgs[1]))
 
+    def test_prepare_timeout(self):
+        """Test what happens when a Prepare message times out"""
+        n = self.node
+        i = n.create_instance(1)
+        n.uid = ''
+
+        n.proposer_start(i, "foo")
+        self.assertEqual(i['our_val'], "foo")
+        self.assertEqual(i['status'], "trying")
+        self.assertEqual(i['last_tried'], (1, ''))
+
+        self.clock.advance(2*n.proposer_timeout)
+
+        self.assertEqual(i['our_val'], "foo")
+        self.assertEqual(i['status'], "trying")
+        self.assertEqual(i['last_tried'], (2, ''))
+
+    def test_prepare_notimeout(self):
+        """Check the timeout doesn't run if we receive responses to our message"""
+        n = self.node
+        i = n.create_instance(1)
+        n.uid = ''
+
+        n.proposer_start(i, "foo")
+        i['status'] = "polling"
+
+        self.clock.advance(2*n.proposer_timeout)
+
+        self.assertEqual(i['our_val'], "foo")
+        self.assertEqual(i['status'], "polling")
+        self.assertEqual(i['last_tried'], (1, ''))
+
+    def test_prepare_timeout_responses(self):
+        n = self.node
+        i = n.create_instance(1)
+        n.quorum_size = 2
+        n.uid = ''
+
+        n.proposer_start(i, "foo")
+        n.recv_promise(Msg({'prop_num':  (1, ''), 'prev_prop_num': None, 'prev_prop_value': None, 'uid': 1}), i)
+        n.recv_promise(Msg({'prop_num':  (1, ''), 'prev_prop_num': None, 'prev_prop_value': None, 'uid': 2}), i)
+
+        self.assertEqual(i['our_val'], "foo")
+        self.assertEqual(i['status'], "polling")
+        self.assertEqual(i['last_tried'], (1, ''))
+
 
 class TestLearner(AgentTestMixin, TestCase):
     """Test the Learner agent class"""
@@ -199,7 +245,7 @@ class TestLearner(AgentTestMixin, TestCase):
         self.assertEqual(i['status'], "polling")
 
 
-class NodeTest(AgentTestMixin, TestCase):
+class TestNode(AgentTestMixin, TestCase):
     def test_receive(self):
         """Test all agents can receive any message without crashing"""
         a = self.node
@@ -218,3 +264,47 @@ class NodeTest(AgentTestMixin, TestCase):
         n.run("foo")
         for m in self.transport.msgs:
             self.assertMsg(Msg({'msg_type': "prepare", 'uid': 1, 'instance_id': 1, 'prop_num': (1, 1)}), parse_message(m))
+
+    def test_invalid_message(self):
+        """Test there's no problems with invalid messages"""
+        self.node.datagramReceived("foobar", None)
+        self.node.datagramReceived("'baz'", None)
+        self.node.datagramReceived("bar()", None)
+        self.node.datagramReceived("{xyz", None)
+
+    def test_unknown_host(self):
+        self.node.datagramReceived(Msg({'msg_type': "pong", 'uid': 100, 'instance_id': None}).serialize(), None)
+        self.assertTrue(100 in self.node.hosts)
+        self.assertEqual(self.node.hosts[100], None)
+        self.node.datagramReceived(Msg({'msg_type': "pong", 'uid': 101, 'instance_id': None}).serialize(), None)
+        self.node.datagramReceived(Msg({'msg_type': "pong", 'uid': 102, 'instance_id': None}).serialize(), None)
+        self.assertEqual(self.node.quorum_size, 7)
+
+    def test_unknown_instance(self):
+        self.node.datagramReceived(Msg({'msg_type': "prepare", 'uid': 1, 'instance_id': 500, 'prop_num': (1, ''), 'prop_value': None}).serialize(), None)
+        self.assertTrue(self.node.instances[500])
+
+    def test_autodiscover(self):
+        self.node.bootstrap = object()
+        self.node.discoverNetwork()
+        self.assertMsg(Msg({"msg_type": "ehlo", "instance_id": None}), parse_message(self.transport.value()))
+
+    def test_receive_ehlo(self):
+        self.node.recv_ehlo(Msg({"uid": 1}), None)
+        self.assertMsg(Msg({"msg_type": "notify", "hosts": self.node.hosts, "instance_id": None}), parse_message(self.transport.value()))
+
+    def test_receive_notify(self):
+        self.node.recv_notify(Msg({'msg_type': "notify", "uid": 1, "hosts": {"foo": "bar"}}), None)
+        self.assertEqual(self.node.hosts["foo"], "bar")
+        self.assertMsg(Msg({"msg_type": "ehlo", "instance_id": None}), parse_message(self.transport.value()))
+
+    def test_receive_ping(self):
+        self.node.recv_ping(Msg({"uid": 1}), None)
+        self.assertMsg(Msg({"msg_type": "pong"}), parse_message(self.transport.value()))
+
+    def test_timeout(self):
+        self.clock.advance(self.node.timeout)
+        self.node.recv_pong(Msg({"uid": 1}), None)
+        self.node.recv_pong(Msg({"uid": 2}), None)
+        self.clock.advance(self.node.timeout)
+        self.assertEqual(self.node.hosts, {1: 1, 2: 2})

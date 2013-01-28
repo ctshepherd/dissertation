@@ -108,7 +108,7 @@ class Proposer(object):
         no proposals, a value of its own choosing.
         """
         # If this is an old message or we're in the wrong state, ignore
-        if msg['prop_num'][0] != instance['last_tried'] or instance['status'] != "trying":
+        if msg['prop_num'] != instance['last_tried'] or instance['status'] != "trying":
             dbprint("proposer ignoring msg %s, not appropriate (%s)" % (msg, instance), level=1)
             return
 
@@ -155,7 +155,7 @@ class Proposer(object):
                                       "prop_value": value,
                                       "instance_id": instance['instance_id']
                                   }))
-            reactor.callLater(self.proposer_timeout, self.handle_proposer_timeout, instance, "polling")
+            self.reactor.callLater(self.proposer_timeout, self.handle_proposer_timeout, instance, "polling")
 
 
     def proposer_start(self, instance, value, prop_num=1):
@@ -168,14 +168,15 @@ class Proposer(object):
         # acceptors. This message is known as a prepare request.
         instance['our_val'] = value
         instance['status'] = "trying"
-        instance['last_tried'] = prop_num
+        p = (prop_num, self.uid)
+        instance['last_tried'] = p
         self.writeAll(
             Msg({
                 "msg_type": "prepare",
-                "prop_num": (prop_num, str(self.uid)),
+                "prop_num": p,
                 "instance_id": instance['instance_id']
             }))
-        reactor.callLater(self.proposer_timeout, self.handle_proposer_timeout, instance, "trying")
+        self.reactor.callLater(self.proposer_timeout, self.handle_proposer_timeout, instance, "trying")
 
     def handle_proposer_timeout(self, instance, expected_status):
         """What to do if no-one replied to our prepare message.
@@ -188,7 +189,7 @@ class Proposer(object):
         # proposal number
         if instance['status'] == expected_status:
             v = instance['our_val']
-            l = instance['last_tried']
+            l = instance['last_tried'][0]
             self.proposer_init_instance(instance)
             self.proposer_start(instance, v, l+1)
 
@@ -198,8 +199,12 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
     # If we don't hear from a node every 30s, time them out
     timeout = 30
 
-    def __init__(self, bootstrap=None):
+    def __init__(self, bootstrap=None, clock=None):
         self.bootstrap = bootstrap
+        if clock is not None:
+            self.reactor = clock
+        else:
+            self.reactor = reactor
 
     def stopProtocol(self):
         """
@@ -214,9 +219,8 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
         self.current_instance_number = 1
         self.quorum_size = 1
         self.hosts = {}
-        self.uid = uuid4()
+        self.uid = str(uuid4())
         self._msgs = []
-        self.reactor = reactor
 
         # Initiate discovery
         self.discoverNetwork()
@@ -274,7 +278,7 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
 
     def discoverNetwork(self):
         if self.bootstrap is not None:
-            m = Msg({"msg_type": "ehlo", "uid": str(self.uid), "instance_id": None})
+            m = Msg({"msg_type": "ehlo", "uid": self.uid, "instance_id": None})
             self.transport.write(m.serialize(), self.bootstrap)
 
     def addHost(self, uid, host):
@@ -285,7 +289,7 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
 
     def writeMessage(self, uid, msg):
         dbprint("Sent %s message to %s\n%s\n" % (msg['msg_type'], uid, msg), level=1)
-        msg.contents['uid'] = str(self.uid)
+        msg.contents['uid'] = self.uid
         msg = msg.serialize()
         addr = self.hosts[uid]
         self.transport.write(msg, addr)

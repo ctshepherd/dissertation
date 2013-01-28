@@ -2,7 +2,7 @@ from uuid import uuid4
 from dbp.util import dbprint
 from dbp.paxos.message import Msg, parse_message, InvalidMessageException
 from twisted.internet.protocol import DatagramProtocol
-from twisted.internet import defer
+from twisted.internet import reactor, defer
 
 
 class Acceptor(object):
@@ -62,7 +62,6 @@ class Learner(object):
     @staticmethod
     def learner_init_instance(instance):
         # Global
-        instance['completed'] = False
         instance['value'] = None
         # Learner specific
         instance['learner_accepted'] = {}
@@ -74,12 +73,12 @@ class Learner(object):
         """
         # if we've already learnt it's been accepted, there's no need to
         # deal with it any more
-        if instance['completed']:
+        if instance['status'] != "polling":
             return
         s = instance['learner_accepted'].setdefault(msg['prop_num'], set())
         s.add(msg['uid'])
         if len(s) >= self.quorum_size:
-            instance['completed'] = True
+            instance['status'] = "completed"
             instance['value'] = msg['prop_value']
             instance['callback'].callback(instance['value'])
 
@@ -87,11 +86,14 @@ class Learner(object):
 class Proposer(object):
     """Proposer Agent"""
 
+    proposer_timeout = 3
+
     @staticmethod
     def proposer_init_instance(instance):
         # Global
-        instance['last_tried'] = 0
         instance['quorum'] = set()
+        instance['status'] = "idle"
+        instance['last_tried'] = 0
         # Proposer only
         instance['proposer_prev_prop_num'] = 0
         instance['proposer_prev_prop_value'] = None
@@ -105,8 +107,9 @@ class Proposer(object):
         the highest-numbered proposal among the responses, or if the responses reported
         no proposals, a value of its own choosing.
         """
-        if instance['completed']:
-            # if we're done, ignore this message
+        # If this is an old message or we're in the wrong state, ignore
+        if msg['prop_num'][0] != instance['last_tried'] or instance['status'] != "trying":
+            dbprint("proposer ignoring msg %s, not appropriate (%s)" % (msg, instance), level=1)
             return
 
         instance['quorum'].add(msg['uid'])
@@ -122,6 +125,11 @@ class Proposer(object):
         if len(instance['quorum']) >= self.quorum_size:
             # If this is the message that tips us over the edge and we
             # finally accept the proposal, deal with it appropriately.
+
+            # Set our status from trying to polling
+            instance['status'] = "polling"
+
+            # Decide what value to use
             if instance['proposer_prev_prop_value'] is None:
                 # if no-one else asserted a value, we can set ours
                 if 'our_val' in instance:
@@ -137,6 +145,8 @@ class Proposer(object):
                     self.run(instance['our_val'])
                     # delete our_val so we don't try and restart too often
                     del instance['our_val']
+
+            # Send our AcceptRequests
             for uid in instance['quorum']:
                 self.writeMessage(uid,
                                   Msg({
@@ -145,8 +155,10 @@ class Proposer(object):
                                       "prop_value": value,
                                       "instance_id": instance['instance_id']
                                   }))
+            reactor.callLater(self.proposer_timeout, self.handle_proposer_timeout, instance, "polling")
 
-    def proposer_start(self, instance, value):
+
+    def proposer_start(self, instance, value, prop_num=1):
         """Start an instance of Paxos!
 
         Try and complete an instance of Paxos, setting the decree to value.
@@ -155,15 +167,36 @@ class Proposer(object):
         # has selected before, and sends a request containing n to a majority of
         # acceptors. This message is known as a prepare request.
         instance['our_val'] = value
+        instance['status'] = "trying"
+        instance['last_tried'] = prop_num
         self.writeAll(
             Msg({
                 "msg_type": "prepare",
-                "prop_num": (1, str(self.uid)),
+                "prop_num": (prop_num, str(self.uid)),
                 "instance_id": instance['instance_id']
             }))
+        reactor.callLater(self.proposer_timeout, self.handle_proposer_timeout, instance, "trying")
+
+    def handle_proposer_timeout(self, instance, expected_status):
+        """What to do if no-one replied to our prepare message.
+
+        This method is called after a timeout period. If we haven't moved on to
+        the next stage of a proposal in time, this method will restart with a
+        higher proposal number.
+        """
+        # If we're still waiting to hear back from enough people, try a higher
+        # proposal number
+        if instance['status'] == expected_status:
+            v = instance['our_val']
+            l = instance['last_tried']
+            self.proposer_init_instance(instance)
+            self.proposer_start(instance, v, l+1)
 
 
 class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
+
+    # If we don't hear from a node every 30s, time them out
+    timeout = 30
 
     def __init__(self, bootstrap=None):
         self.bootstrap = bootstrap
@@ -183,11 +216,16 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
         self.hosts = {}
         self.uid = uuid4()
         self._msgs = []
-        #reactor.listenUDP(0, self.proto)  # this returns self.proto.transport
+        self.reactor = reactor
+
         # Initiate discovery
         self.discoverNetwork()
 
+        # Start timeout tests
+        self.timeout_test(init=True)
+
     def create_instance(self, instance_id):
+        """Create an instance dict with id instance_id and return it."""
         instance = {}
         instance['instance_id'] = instance_id
         instance['callback'] = defer.Deferred()
@@ -196,13 +234,36 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
         self.learner_init_instance(instance)
         return instance
 
+
+    def timeout_test(self, init=False):
+        for h in self.hosts:
+            self.writeMessage(h, Msg({"msg_type": "ping", "instance_id": None}))
+        # If this isn't the first time we've run, do some pruning
+        if not init:
+            # Remove any hosts we haven't heard from yet
+            for h in self.timeout_hosts:
+                self.hosts.pop(h, None)
+
+        # Start again
+        self.timeout_hosts = dict(self.hosts)
+        self.reactor.callLater(self.timeout, self.timeout_test)
+
     def recv_ping(self, msg, instance):
+        """Reply to a PING with a PONG (as a heartbeat)"""
         self.writeMessage(msg['uid'], Msg({"msg_type": "pong", "instance_id": None}))
 
+    def recv_pong(self, msg, instance):
+        """When we get a PONG from someone, remove them from the timeout pruning dictionary."""
+        self.timeout_hosts.pop(msg['uid'], None)
+
+
+    # Network discovery methods
     def recv_ehlo(self, msg, instance):
+        """Reply to an EHLO message with all the hosts we know about."""
         self.writeMessage(msg['uid'], Msg({"msg_type": "notify", "hosts": self.hosts, "instance_id": None}))
 
     def recv_notify(self, msg, instance):
+        """Add any hosts we don't know about on receiving a NOTIFY message, and send them EHLOs too."""
         h = msg['hosts']
         for host in self.hosts:
             h.pop(host, None)
@@ -216,6 +277,12 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
             m = Msg({"msg_type": "ehlo", "uid": str(self.uid), "instance_id": None})
             self.transport.write(m.serialize(), self.bootstrap)
 
+    def addHost(self, uid, host):
+        dbprint("Adding node %s (%s)" % (uid, host), level=3)
+        self.hosts[uid] = host
+        self.quorum_size = len(self.hosts) // 2
+
+
     def writeMessage(self, uid, msg):
         dbprint("Sent %s message to %s\n%s\n" % (msg['msg_type'], uid, msg), level=1)
         msg.contents['uid'] = str(self.uid)
@@ -228,10 +295,6 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
         for uid in self.hosts:
             self.writeMessage(uid, msg)
 
-    def addHost(self, uid, host):
-        dbprint("Adding node %s (%s)" % (uid, host), level=3)
-        self.hosts[uid] = host
-        self.quorum_size = len(self.hosts) // 2
 
     def datagramReceived(self, msg, host):
         """Called when a message is received by a specific agent.

@@ -16,8 +16,10 @@ def parse_message(msg):
     try:
         # literal_eval is a safe version of eval
         d = literal_eval(msg)
+        if not isinstance(d, dict):
+            raise InvalidMessageException("%s is not a dict" % msg)
         return Msg(d)
-    except SyntaxError, e:
+    except (ValueError, SyntaxError), e:
         raise InvalidMessageException("invalid msg '%s' (%r)" % (msg, e))
 
 

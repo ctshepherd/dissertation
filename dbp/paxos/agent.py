@@ -284,7 +284,7 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
     def addHost(self, uid, host):
         dbprint("Adding node %s (%s)" % (uid, host), level=3)
         self.hosts[uid] = host
-        self.quorum_size = len(self.hosts) // 2
+        self.quorum_size = (len(self.hosts)+1) // 2
 
 
     def writeMessage(self, uid, msg):

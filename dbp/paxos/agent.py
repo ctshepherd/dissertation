@@ -112,9 +112,12 @@ class Proposer(object):
         instance['quorum'].add(msg['uid'])
 
         if msg['prev_prop_value'] is not None:
-            dbprint("loading old prop value of %s (num %s)" % (msg['prev_prop_value'], msg['prev_prop_num']), level=2)
             if msg['prev_prop_num'] > instance['proposer_prev_prop_num']:
+                dbprint("loading old prop value of %s (num %s)" % (msg['prev_prop_value'], msg['prev_prop_num']), level=2)
+                instance['proposer_prev_prop_num'] = msg['prev_prop_num']
                 instance['proposer_prev_prop_value'] = msg['prev_prop_value']
+            else:
+                dbprint("ignoring old prop value of %s (num %s) for prop %s" % (msg['prev_prop_value'], msg['prev_prop_num'], instance['proposer_prev_prop_value']), level=2)
 
         if len(instance['quorum']) >= self.quorum_size:
             # If this is the message that tips us over the edge and we

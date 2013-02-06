@@ -1,0 +1,8 @@
+#!/usr/bin/env python
+
+from dbp.paxos.agent import NodeProtocol
+from twisted.internet import reactor
+
+n = NodeProtocol()
+t = reactor.listenUDP(10000, n)
+reactor.run()

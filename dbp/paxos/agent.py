@@ -80,7 +80,7 @@ class Learner(object):
         if len(s) >= self.quorum_size:
             instance['status'] = "completed"
             instance['value'] = msg['prop_value']
-            instance['callback'].callback(instance['value'])
+            instance['callback'].callback(instance)
 
 
 class Proposer(object):
@@ -339,3 +339,4 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
         i = self.create_instance(i_num)
         self.instances[i_num] = i
         self.proposer_start(i, operation)
+        return i['callback']

@@ -7,13 +7,18 @@ from twisted.internet.error import ConnectionLost
 class DBPProtocol(basic.LineReceiver):
     delimiter = '\n'
 
+    def __init__(self, port=None, bootstrap=None):
+        self.port = port
+        self.bootstrap = bootstrap
+
     def connectionMade(self):
-        self.dbp = DBP()
+        self.dbp = DBP(self.port, self.bootstrap)
         self.sendLine("DBP console. Type 'help' for help.")
 
     def lineReceived(self, line):
         # Ignore blank lines
-        if not line: return
+        if not line:
+            return
 
         # Parse the command
         commandParts = line.split()
@@ -30,7 +35,11 @@ class DBPProtocol(basic.LineReceiver):
             try:
                 method(*args)
             except Exception, e:
-                self.sendLine('Error: ' + str(e))
+                if not self.debug:
+                    self.sendLine('Error: ' + str(e))
+                else:
+                    raise
+
 
     def do_help(self, command=None):
         """help [command]: List commands, or show help on the given command"""
@@ -69,5 +78,19 @@ class DBPProtocol(basic.LineReceiver):
             reactor.stop()
 
 def main():
-    stdio.StandardIO(DBPProtocol())
+    import sys
+    if len(sys.argv) == 1:
+        port = None
+        bootstrap = None
+    elif len(sys.argv) == 2:
+        port = int(sys.argv[1])
+        bootstrap = None
+    elif len(sys.argv) == 3:
+        port = int(sys.argv[1])
+        bootstrap = ("localhost", int(sys.argv[2]))
+    else:
+        print >>sys.stderr, "Usage: %s [<bootstrap node address>]" % sys.argv[0]
+    p = DBPProtocol(port=port, bootstrap=bootstrap)
+    p.debug = True
+    stdio.StandardIO(p)
     reactor.run()

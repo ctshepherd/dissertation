@@ -63,6 +63,12 @@ class DBPProtocol(basic.LineReceiver):
             self.__checkSuccess).addErrback(
             self.__checkFailure)
 
+    def do_read(self):
+        self.dbp.execute("nop")
+
+    def do_cur_tx(self):
+        self.sendLine("Current processed TX: %s" % self.dbp.tx_version)
+
     def __checkSuccess(self, res):
         self.sendLine("Success: %r." % res)
 

@@ -4,6 +4,7 @@ Network module, mainly contains the DBPNode class, which handles communication t
 """
 
 from dbp.paxos.agent import NodeProtocol as PaxosNode
+from dbp.util import dbprint
 
 class DBPNode(PaxosNode):
     def __init__(self, manager, *args, **kwargs):
@@ -17,4 +18,5 @@ class DBPNode(PaxosNode):
 
     def value_learned(self, instance):
         assert instance['status'] == "completed"
+        dbprint("passing TX(%s, %s) up" % (instance['instance_id'], instance['value']), level=3)
         self.manager._passup_tx((instance['instance_id'], instance['value']))

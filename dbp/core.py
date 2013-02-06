@@ -11,14 +11,20 @@ class DBP(object):
         self.manager = TXManager(self, port, bootstrap)
         self.tx_version = 0
 
-    def process(self, tx_id, s):
-        """Process an operation that's been passed up through Paxos."""
-        dbprint("processing op %r, tx id %d" % (s, tx_id), level=2)
-        assert tx_id == self.tx_version+1, "process: tx_id %d != tx_version+1: %d" % (tx_id, self.tx_version+1)
+    def process_assign(self, s):
         k, v = s.split('=')
         k = k.strip(' ')
         v = v.strip(' ')
         self.db.set(k, v)
+
+    def process(self, tx_id, s):
+        """Process an operation that's been passed up through Paxos."""
+        dbprint("processing op %r, tx id %d" % (s, tx_id), level=4)
+        assert tx_id == self.tx_version+1, "process: tx_id %d != tx_version+1: %d" % (tx_id, self.tx_version+1)
+        if s == "nop":
+            pass
+        else:
+            self.process_assign(s)
         self.tx_version = tx_id
 
     def execute(self, s):

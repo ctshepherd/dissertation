@@ -43,7 +43,7 @@ class Acceptor(object):
         having a number greater than n.
         """
         if msg['prop_num'] >= instance['acceptor_prepare_prop_num']:
-            dbprint("Accepting proposal %s (current accepted is %s)" % (msg['prop_num'], instance['acceptor_cur_prop_num']))
+            dbprint("Instance %d: accepting prop %s (current is %s)" % (instance['instance_id'], msg['prop_num'], instance['acceptor_cur_prop_num']))
             instance['acceptor_cur_prop_num'] = msg.prop_num
             instance['acceptor_cur_prop_value'] = msg.prop_value
             self.writeAll(Msg({
@@ -78,6 +78,7 @@ class Learner(object):
         s = instance['learner_accepted'].setdefault(msg['prop_num'], set())
         s.add(msg['uid'])
         if len(s) >= self.quorum_size:
+            dbprint("Instance %d: learnt value %s (prop %s)" % (instance['instance_id'], msg['prop_value'], msg['prop_num']))
             instance['status'] = "completed"
             instance['value'] = msg['prop_value']
             instance['callback'].callback(instance)
@@ -259,12 +260,17 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
     def recv_pong(self, msg, instance):
         """When we get a PONG from someone, remove them from the timeout pruning dictionary."""
         self.timeout_hosts.pop(msg['uid'], None)
+        self.write_notify(msg['uid'])
 
 
     # Network discovery methods
+    def write_notify(self, uid):
+        """Send a NOTIFY message with all the hosts we know about."""
+        self.writeMessage(uid, Msg({"msg_type": "notify", "hosts": self.hosts, "instance_id": None}))
+
     def recv_ehlo(self, msg, instance):
-        """Reply to an EHLO message with all the hosts we know about."""
-        self.writeMessage(msg['uid'], Msg({"msg_type": "notify", "hosts": self.hosts, "instance_id": None}))
+        """Reply to an EHLO message with a NOTIFY message."""
+        self.write_notify(msg['uid'])
 
     def recv_notify(self, msg, instance):
         """Add any hosts we don't know about on receiving a NOTIFY message, and send them EHLOs too."""

@@ -1,5 +1,4 @@
 from dbp.core import DBP
-from twisted.internet import stdio, reactor
 from twisted.protocols import basic
 from twisted.internet.error import ConnectionLost
 
@@ -76,21 +75,3 @@ class DBPProtocol(basic.LineReceiver):
             pass
         else:
             reactor.stop()
-
-def main():
-    import sys
-    if len(sys.argv) == 1:
-        port = None
-        bootstrap = None
-    elif len(sys.argv) == 2:
-        port = int(sys.argv[1])
-        bootstrap = None
-    elif len(sys.argv) == 3:
-        port = int(sys.argv[1])
-        bootstrap = ("localhost", int(sys.argv[2]))
-    else:
-        print >>sys.stderr, "Usage: %s [<bootstrap node address>]" % sys.argv[0]
-    p = DBPProtocol(port=port, bootstrap=bootstrap)
-    p.debug = True
-    stdio.StandardIO(p)
-    reactor.run()

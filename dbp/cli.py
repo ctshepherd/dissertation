@@ -66,6 +66,12 @@ class DBPProtocol(basic.LineReceiver):
     def do_read(self):
         self.dbp.execute("nop")
 
+    def do_hosts(self):
+        self.sendLine(str(self.dbp.manager.node.hosts))
+
+    def do_instances(self):
+        self.sendLine(str(self.dbp.manager.node.instances))
+
     def do_cur_tx(self):
         self.sendLine("Current processed TX: %s" % self.dbp.tx_version)
 

@@ -20,3 +20,14 @@ class DBPNode(PaxosNode):
         assert instance['status'] == "completed"
         dbprint("passing TX(%s, %s) up" % (instance['instance_id'], instance['value']), level=3)
         self.manager._passup_tx((instance['instance_id'], instance['value']))
+
+    def chase_up(self, instance_id):
+        dbprint("chasing up instance %s" % instance_id, level=2)
+        if instance_id not in self.instances:
+            dbprint("chase up: haven't heard of %s yet, starting again" % instance_id, level=2)
+            self.instances[i] = self.create_instance(instance_id)
+            self.proposer_start(i, "nop", restart=False)
+        else:
+            dbprint("chase up: already heard of %s, being mean anyway" % instance_id, level=2)
+            i = self.instances[instance_id]
+            self.proposer_start(i, "nop", restart=False)

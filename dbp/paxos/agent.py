@@ -95,6 +95,7 @@ class Proposer(object):
         instance['quorum'] = set()
         instance['status'] = "idle"
         instance['last_tried'] = 0
+        instance['restart'] = True
         # Proposer only
         instance['proposer_prev_prop_num'] = 0
         instance['proposer_prev_prop_value'] = None
@@ -142,7 +143,7 @@ class Proposer(object):
             else:
                 value = instance['proposer_prev_prop_value']
                 # if we wanted to set a value, try again
-                if 'our_val' in instance:
+                if 'our_val' in instance and instance['restart']:
                     self.run(instance['our_val'])
                     # delete our_val so we don't try and restart too often
                     del instance['our_val']
@@ -159,7 +160,7 @@ class Proposer(object):
             self.reactor.callLater(self.proposer_timeout, self.handle_proposer_timeout, instance, "polling")
 
 
-    def proposer_start(self, instance, value, prop_num=1):
+    def proposer_start(self, instance, value, prop_num=1, restart=True):
         """Start an instance of Paxos!
 
         Try and complete an instance of Paxos, setting the decree to value.
@@ -171,6 +172,7 @@ class Proposer(object):
         instance['status'] = "trying"
         p = (prop_num, self.uid)
         instance['last_tried'] = p
+        instance['restart'] = restart
         self.writeAll(
             Msg({
                 "msg_type": "prepare",

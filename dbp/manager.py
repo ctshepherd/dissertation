@@ -57,6 +57,11 @@ class TXManager(object):
                 self.dbp.process(ti, self._store[ti])
                 # self._notify_waiters(ti)
             self.cur_tx = tx_id
+        else:
+            # otherwise try and push for ops we haven't heard about
+            for ti in xrange(self.cur_tx+1, tx_id):
+                if ti not in self._store.received_txs:
+                    self.node.chase_up(ti)
 
     # def _notify_waiters(self, tx_id):
     #     dbprint("_notify_waiters: notifying waiters on tx_id: %d (%s)" % (tx_id, self._waiters), level=1)

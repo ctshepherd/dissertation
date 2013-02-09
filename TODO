@@ -1,28 +1,12 @@
 Paxos:
 - finish tests
 - Implement NACKs
-- Add acceptor info to acceptnotify
-- Move network logic into factory class
-- Build paxos manager
-- learn Acceptor number
-- common transport layer?
-- multipaxos
 
 DBP:
 short:
-- hook into paxos
 - fix up comments
-- do we want assert_tx to insert no-op txs?
-- hook ops into dbp.core
-- serialize/deserialize ops
 long:
 - simple SQL parsing
-- transactions
-- extend command line client
 
 General:
 - use log instead of dbprint
-- multicast or not?
-- unify message system - more general
-- only pass messages over Paxos?
-- global lock for TXs

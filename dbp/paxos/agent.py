@@ -270,6 +270,13 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
         """Send a NOTIFY message with all the hosts we know about."""
         self.writeMessage(uid, Msg({"msg_type": "notify", "hosts": self.hosts, "instance_id": None}))
 
+    def do_ehlo(self):
+        for host in self.hosts:
+            self.writeMessage(host, Msg({"msg_type": "ehlo", "instance_id": None}))
+
+    def write_ehlo(self, uid):
+        self.writeMessage(uid, Msg({"msg_type": "ehlo", "instance_id": None}))
+
     def recv_ehlo(self, msg, instance):
         """Reply to an EHLO message with a NOTIFY message."""
         self.write_notify(msg['uid'])
@@ -282,7 +289,7 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
         if h:
             for host, addr in h.iteritems():
                 self.addHost(host, addr)
-                self.writeMessage(msg['uid'], Msg({"msg_type": "ehlo", "instance_id": None}))
+                self.write_ehlo(msg['uid'])
 
     def discoverNetwork(self):
         if self.bootstrap is not None:

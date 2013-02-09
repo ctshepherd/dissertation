@@ -1,6 +1,7 @@
 from dbp.core import DBP
 from twisted.protocols import basic
 from twisted.internet.error import ConnectionLost
+from twisted.internet import reactor
 
 
 class DBPProtocol(basic.LineReceiver):
@@ -74,6 +75,26 @@ class DBPProtocol(basic.LineReceiver):
 
     def do_cur_tx(self):
         self.sendLine("Current processed TX: %s" % self.dbp.tx_version)
+
+    def do_begin(self):
+        self.sendLine("Trying to take lock")
+        d = self.dbp.take_lock()
+        def won(instance):
+            if self.dbp.owns_lock():
+                print "we took the lock!"
+            else:
+                print "we didn't get the lock"
+        d.addCallback(won)
+
+    def do_commit(self):
+        if self.dbp.owns_lock():
+            self.dbp.release_lock()
+        else:
+            print "we don't have the lock!"
+
+    def do_ehlo(self):
+        self.dbp.manager.node.do_ehlo()
+
 
     def __checkSuccess(self, res):
         self.sendLine("Success: %r." % res)

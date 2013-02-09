@@ -3,7 +3,7 @@
 Various utility functions, at the moment just title and dbprint
 """
 
-DEBUG = 1
+from dbp.config import DEBUG
 
 
 def title(s):

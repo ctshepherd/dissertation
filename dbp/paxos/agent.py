@@ -1,5 +1,6 @@
 from uuid import uuid4
 from dbp.util import dbprint
+from dbp.config import NODE_TIMEOUT, PROPOSER_TIMEOUT
 from dbp.paxos.message import Msg, parse_message, InvalidMessageException
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet import reactor, defer
@@ -87,7 +88,7 @@ class Learner(object):
 class Proposer(object):
     """Proposer Agent"""
 
-    proposer_timeout = 3
+    proposer_timeout = PROPOSER_TIMEOUT
 
     @staticmethod
     def proposer_init_instance(instance):
@@ -199,8 +200,8 @@ class Proposer(object):
 
 class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
 
-    # If we don't hear from a node every 30s, time them out
-    timeout = 30
+    # If we don't hear from a node every timeout period, time them out
+    timeout = NODE_TIMEOUT
 
     def __init__(self, bootstrap=None, clock=None):
         self.bootstrap = bootstrap

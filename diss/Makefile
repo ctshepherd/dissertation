@@ -4,7 +4,7 @@
 # Note that continuation lines require '\'
 # and that TAB is used after ':' and before unix commands.
 
-DISS = diss.tex refs.bib propbody.tex figs/diagram.eps makefile.txt
+DISS = diss.tex refs.bib propbody.tex figs/diagram.eps
 
 PROP = proposal.tex propbody.tex
 
@@ -48,8 +48,6 @@ proposal.ps:	$(PROP)
 proposal.pdf:	proposal.ps
 	ps2pdf proposal.ps
 
-makefile.txt:	Makefile
-	expand Makefile >makefile.txt
 count:
 	detex diss.tex | tr -cd '0-9A-Za-z \n' | wc -w
 propcount:
@@ -61,14 +59,12 @@ proposal.dvi: $(PROP)
 all:	proposal.dvi diss.ps
 
 pub:	diss.pdf
-	cp diss.pdf /homes/mr/public_html/demodiss.pdf
-	make clean
-	(cd ..; tar cfv /homes/mr/public_html/demodiss.tar demodiss)
+	cp diss.pdf ~/public_html/
 
 clean:
 	rm -f diss.ps *.dvi *.aux *.log *.err
 	rm -f core *~ *.lof *.toc *.blg *.bbl
-	rm -f makefile.txt
+	rm -f proposal.pdf diss.pdf
 
 gv:	diss.ps
 	ghostview diss.ps

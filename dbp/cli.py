@@ -2,6 +2,7 @@ from dbp.core import DBP
 from twisted.protocols import basic
 from twisted.internet.error import ConnectionLost
 from twisted.internet import reactor
+from pprint import pformat
 
 
 class DBPProtocol(basic.LineReceiver):
@@ -56,10 +57,12 @@ class DBPProtocol(basic.LineReceiver):
 
     def do_list(self):
         """list: Output the contents of the database"""
-        self.sendLine(str(self.dbp.db._db))
+        self.sendLine(pformat(self.dbp.db._db))
 
     def do_assign(self, s):
         """assign key=val: Set key to val in the database"""
+        if self.dbp.lock_holder is not None and not self.dbp.owns_lock():
+            self.sendLine("Unable to assign: lock held by %s" % self.dbp.lock_holder)
         self.dbp.execute(s).addCallback(
             self.__checkSuccess).addErrback(
             self.__checkFailure)
@@ -68,7 +71,7 @@ class DBPProtocol(basic.LineReceiver):
         self.dbp.execute("nop")
 
     def do_hosts(self):
-        self.sendLine(str(self.dbp.manager.node.hosts))
+        self.sendLine(pformat(self.dbp.manager.node.hosts))
 
     def do_instances(self):
         self.sendLine(str(self.dbp.manager.node.instances))
@@ -77,23 +80,26 @@ class DBPProtocol(basic.LineReceiver):
         self.sendLine("Current processed TX: %s" % self.dbp.tx_version)
 
     def do_begin(self):
-        self.sendLine("Trying to take lock")
+        self.sendLine("Lock: Attempting to take lock")
         d = self.dbp.take_lock()
         def won(instance):
             if self.dbp.owns_lock():
-                print "we took the lock!"
+                self.sendLine("Lock: lock acquired")
             else:
-                print "we didn't get the lock"
+                self.sendLine("Lock: not able to acquire lock")
         d.addCallback(won)
 
     def do_commit(self):
         if self.dbp.owns_lock():
             self.dbp.release_lock()
         else:
-            print "we don't have the lock!"
+            self.sendLine("Lock: lock currently not held")
 
     def do_ehlo(self):
         self.dbp.manager.node.do_ehlo()
+
+    def do_history(self):
+        self.sendLine(pformat(self.dbp.history))
 
 
     def __checkSuccess(self, res):

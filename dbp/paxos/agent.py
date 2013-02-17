@@ -74,7 +74,7 @@ class Learner(object):
         """
         # if we've already learnt it's been accepted, there's no need to
         # deal with it any more
-        if instance['status'] != "polling":
+        if instance['status'] == "completed":
             return
         s = instance['learner_accepted'].setdefault(msg['prop_num'], set())
         s.add(msg['uid'])
@@ -96,7 +96,7 @@ class Proposer(object):
         instance['quorum'] = set()
         instance['status'] = "idle"
         instance['last_tried'] = 0
-        instance['restart'] = True
+        instance['restart'] = False
         # Proposer only
         instance['proposer_prev_prop_num'] = 0
         instance['proposer_prev_prop_value'] = None
@@ -111,7 +111,7 @@ class Proposer(object):
         no proposals, a value of its own choosing.
         """
         # If this is an old message or we're in the wrong state, ignore
-        if msg['prop_num'] != instance['last_tried'] or instance['status'] != "trying":
+        if msg['prop_num'] != instance['last_tried']:# or instance['status'] != "trying":
             dbprint("proposer ignoring msg %s, not appropriate (%s)" % (msg, instance), level=1)
             return
 

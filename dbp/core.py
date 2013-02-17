@@ -12,6 +12,7 @@ class DBP(object):
         self.uid = self.manager.node.uid
         self.tx_version = 0
         self.lock_holder = None
+        self.history = []
 
     def process_assign(self, s):
         k, v = s.split('=')
@@ -50,6 +51,7 @@ class DBP(object):
         """Process an operation that's been passed up through Paxos."""
         dbprint("processing op %r, tx id %d" % (s, tx_id), level=4)
         assert tx_id == self.tx_version+1, "process: tx_id %d != tx_version+1: %d" % (tx_id, self.tx_version+1)
+        self.history.append((tx_id, s))
         if s == "nop":
             pass
         elif s.startswith("attemptlock"):

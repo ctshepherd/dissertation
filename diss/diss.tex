@@ -75,7 +75,39 @@ Supervisor:         & Stephen Cross                    \\
 
 \section*{Original Aims of the Project}
 
-Project aims
+\subsection*{Project aims}
+
+I aim to implement a distributed database. This will be based on the Paxos protocol.
+
+\subsubsection*{Paxos}
+
+The first half of the project is to implement the Paxos protocol. This will be done in a module,
+providing an interface which the database can then use to 
+
+The project must correctly implement the Paxos protocol.
+The library must be capable of forming a running network,
+in particular dynamic leader election,
+as well as achieving consensus on a key/value store across the network.
+
+\subsubsection*{Database}
+
+The database must implement a subset of SQL, specifically:
+\begin{enumerate}
+\item A single table with a static name
+\item SELECT/INSERT
+\item WHERE
+\item GROUP BY
+\item ORDER BY
+\item Aggregation
+\end{enumerate}
+
+The database must have all ACID properties, that is:
+\begin{enumerate}
+\item Atomic
+\item Consistent
+\item Isolated
+\item Durable
+\end{enumerate}
 
 
 \section*{Work Completed}
@@ -123,22 +155,60 @@ Acknowledge various people
 
 \chapter{Introduction}
 
-Short introduction to the project
+\section{Motivation}
 
-
+I set out to build a distributed database based on Paxos. Paxos was first described in Leslie
+Lamport's paper \emph{The Part Time Parliament} \cite{lamport98}.
 
 \cleardoublepage
 
-
-
 \chapter{Preparation}
 
-Preparation chapter:
-
 \section{Requirements Analysis}
-According to the Pink Book this section should be here.
 
-\cite{Lamport86}
+Requirements for my system:
+Transcations
+ACID properties
+\begin{enumerate}
+\item Atomic
+\item Consistent
+\item Isolated
+\item Durable
+\end{enumerate}
+
+
+\section{Software Engineering}
+
+\subsection{Version Control}
+
+For version control I decided to use Git, as it is a system I am familiar with, and serves my need
+both as a VCS and as a remote backup. In my experience it is more usable than other DVCSs such as
+Bazaar, Darcs or Mercurial, and much faster than centralised VCSs such as CVS or SVN. Using Git I
+backed up my project both to bitbucket, an online repository service which provides free private
+repository hosting, and to my own server.
+
+\subsection{Testing}
+
+Testing is really important
+network
+lots of effects
+lots of subsystems
+
+\subsubsection{Unit Testing}
+
+unit testing really key
+regression testing
+testing different subsystems
+
+\subsubsection{Integration Testing}
+
+test program etc
+see simple change propogate across complex system
+
+%\subsection{Code Style}
+
+%In order to make this
+
 
 \cleardoublepage
 \chapter{Implementation}
@@ -150,7 +220,17 @@ This is where most of the marks are gained.
 \cleardoublepage
 \chapter{Evaluation}
 
-This the where the second most amount of marks are gained.
+This is where the second most amount of marks are gained.
+
+\section{Testing}
+
+\begin{enumerate}
+	\item unit test inertia
+	\item test programs, see complex effects of single change.
+	\item durable - network - stable storage
+\end{enumerate}
+
+
 
 \cleardoublepage
 \chapter{Conclusion}

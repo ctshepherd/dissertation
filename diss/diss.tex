@@ -160,14 +160,68 @@ Acknowledge various people
 I set out to build a distributed database based on Paxos. Paxos was first described in Leslie
 Lamport's paper \emph{The Part Time Parliament} \cite{lamport98}.
 
+how it integrates with ecosystem (aka what's already out there).
+
+
+talk about distributed, p2p advantages
+
+\section{Distributed Consensus Problem}
+
+
+Paxos vs 2PC etc.
+
+\section{Databases}
+\subsection{ACID}
+
+what is ACID
+
+Why do we want it?
+
+\subsection{Centralisation vs Distributed}
+
+Centralised databases are used in different situations to distributed databases.
+C: Easier to perform organise, edit, query, backup. May slow down under load.
+easier to maintain integrity of data
+D: Can be slow accessing non local data. Need to ensure consistency
+
+centralised: simpler, faster vs distributed: resilient, scalable
+
+\subsection{Existing Paxos databases}
+
+
+
+
 \cleardoublepage
 
 \chapter{Preparation}
 
+\section{Paxos}
+
+Paxos works by 
+
+\section{ACID}
+
+ACID in more detail
+
+
+\section{Choices}
+
+\subsection{Twisted}
+
+I chose Twisted in order to make implementing the protocol easier. Twisted provides a lot of
+support for implementing protocols and helper classes etc. Also as I am using a state machine
+approach to implementing DBP and Paxos, twisted's asynchronous system works very well with this
+approach.
+
+\subsection{Python}
+
+There were several options for which programming language to use for this project. C - too
+verbose, erlang - too weird, python - just right?
+
 \section{Requirements Analysis}
 
 Requirements for my system:
-Transcations
+Transactions
 ACID properties
 \begin{enumerate}
 \item Atomic
@@ -179,6 +233,11 @@ ACID properties
 
 \section{Software Engineering}
 
+\subsection{The Model}
+
+Considered using the waterfall model, but didn't fit my requirements (fast prototyping to
+understand Paxos). Decided on spiral because of xyz.
+
 \subsection{Version Control}
 
 For version control I decided to use Git, as it is a system I am familiar with, and serves my need
@@ -186,6 +245,11 @@ both as a VCS and as a remote backup. In my experience it is more usable than ot
 Bazaar, Darcs or Mercurial, and much faster than centralised VCSs such as CVS or SVN. Using Git I
 backed up my project both to bitbucket, an online repository service which provides free private
 repository hosting, and to my own server.
+
+\subsection{backups}
+
+For backups I use the PWF to develop my project on. As it is stored in Git I can back it up simply
+by pushing the repo to other hosts. I currently have it backed up to two other hosts.
 
 \subsection{Testing}
 
@@ -203,18 +267,22 @@ testing different subsystems
 \subsubsection{Integration Testing}
 
 test program etc
-see simple change propogate across complex system
+see simple change propagate across complex system
 
-%\subsection{Code Style}
-
-%In order to make this
 
 
 \cleardoublepage
 \chapter{Implementation}
 
-This is where most of the marks are gained.
+SQL parser
+- what it supports
 
+-start up costs
+  - ping time etc
+  - inefficiencies
+  - cf. "supernodes" vs DHTs to organise nodes
+
+Talk about laptop breaking
 
 
 \cleardoublepage

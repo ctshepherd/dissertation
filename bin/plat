@@ -1,0 +1,92 @@
+#!/usr/bin/env python
+
+import sys
+from itertools import cycle, count, izip
+from optparse import OptionParser
+from dbp.util import dbprint
+from dbp.paxos.agent import NodeProtocol
+from dbp import config, util
+from twisted.internet import reactor
+from timeit import default_timer as clock
+
+start = None
+end = None
+
+class LimitedTransport(object):
+
+    limit = 125000  # 1 megabit == 125,000 bytes
+    #div = 10
+    div = 1
+
+    def __init__(self, transport, clock=None, debug=False):
+        if clock is None:
+            self.clock = reactor
+        self.transport = transport
+        self.dropped_count = 0
+        self.debug = debug
+        self.reset_quota()
+
+    def reset_quota(self):
+        self.quota = self.limit//self.div
+        self.clock.callLater(1.0/self.div, self.reset_quota)
+
+    def write(self, data, host=None):
+        """Wrapper around TStringTransport.write"""
+        # drop packet if we don't have room for it
+        if len(data) > self.quota:
+            self.dropped_count += 1
+            if self.debug:
+                print >>sys.stderr, "dropped %d'th packet (%s)" % (self.dropped_count, data)
+            return
+        self.quota -= len(data)
+        self.transport.write(data, host)
+
+
+class Monitor(object):
+    def __init__(self, transport):
+        self.transport = transport
+
+    def end_run(self, *args):
+        self.end = clock()
+        print "%s seconds" % (self.end-self.start)
+        print self.transport.dropped_count
+        reactor.stop()
+
+    def start_run(self, node, amount, values):
+        self.start = clock()
+        for n, v in izip(xrange(amount), values):
+            d = node.run(v)
+            d.addCallback(self.end_run)
+
+
+def main():
+    usage = "usage: %prog [options] <values>"
+    parser = OptionParser(usage=usage)
+    parser.add_option("-p", "--port", type="int", default=10000,
+                      help="port to run on", metavar="PORT")
+    parser.add_option("-b", "--bootstrap", type="int", default=10000,
+                      help="bootstrap port to connect to", metavar="BOOTSTRAP")
+    parser.add_option("-d", "--amount", action="store", type="int",
+                      help="amount of operations to run")
+    parser.add_option("-D", "--debug", action="store", type="int", default=config.DEBUG,
+                      help="debug level to run at")
+
+    (options, args) = parser.parse_args()
+    if not args:
+        i = (x+1 for x in count())
+    else:
+        i = cycle(args)
+
+    util.DEBUG = options.debug
+
+    n = NodeProtocol(("localhost", options.bootstrap))
+    t = reactor.listenUDP(options.port, n)
+    n.transport = LimitedTransport(t)
+    m = Monitor(n.transport)
+    vals = args
+
+    reactor.callLater(7, m.start_run, n, options.amount, i)
+    reactor.run()
+
+if __name__ == "__main__":
+    main()

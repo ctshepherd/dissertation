@@ -24,7 +24,7 @@ def main():
     if args:
         parser.error("incorrect number of arguments")
     p = DBPProtocol(port=options.port, bootstrap=options.bootstrap)
-    p.debug = True
+    p.debug = options.debug
     stdio.StandardIO(p)
     reactor.run()
 

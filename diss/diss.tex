@@ -102,12 +102,6 @@ The database must implement a subset of SQL, specifically:
 \end{enumerate}
 
 The database must have all ACID properties, that is:
-\begin{enumerate}
-\item Atomic
-\item Consistent
-\item Isolated
-\item Durable
-\end{enumerate}
 
 
 \section*{Work Completed}
@@ -155,6 +149,8 @@ Acknowledge various people
 
 \chapter{Introduction}
 
+\section{Overview}
+
 \section{Motivation}
 
 I set out to build a distributed database based on Paxos. Paxos was first described in Leslie
@@ -165,15 +161,50 @@ how it integrates with ecosystem (aka what's already out there).
 
 talk about distributed, p2p advantages
 
+
 \section{Distributed Consensus Problem}
 
 
 Paxos vs 2PC etc.
 
 \section{Databases}
+
 \subsection{ACID}
 
-what is ACID
+Commonly all databases provide ACID properties. ACID stands for:
+
+\begin{itemize}
+\item Atomic
+\item Consistent
+\item Isolated
+\item Durable
+\end{itemize}
+
+\subsubsection*{Atomic}
+
+Atomicity means that either an operation completes, or it does not, ie, that the database is not
+left in a "halfway" state. This means that we do not need to worry about cleaning up after an
+operation, if it does not succeed we can simply retry it, without needing to worry about the state
+it has left the database in. Atomicity also applies to transactions in the same way - if we have
+a transaction as an operation composed of smaller single operations (for example, INCR B, READ A
+-> X, WRITE X+10->A), we don't want some of the operations to complete and some not to. In this
+example, we may have the constraint A=10*B. If B was incremented but then the transaction failed
+before A was updated, we would leave the database in an inconsistent state.
+
+\subsubsection*{Consistent}
+
+Consistency is very closely related to atomicity, as consistency refers to a property of the
+database, and atomicity refers to a property of operations performed on the database. In the
+example used for atomicity, we had a constraint on the database (that A=B*10). We want operations
+(or transactions) to transform the database from one consistent state to another. This becomes
+more pertinent in distributed databases, as we may receive operations in one order at one node,
+and in a different order at another node. If we apply the operations in the order that we receive
+them, the two nodes are likely to be in inconsistent states. XXX: define consistency in a
+distributed system.
+
+\subsubsection*{Isolated}
+
+Isolation means 
 
 Why do we want it?
 
@@ -186,10 +217,10 @@ D: Can be slow accessing non local data. Need to ensure consistency
 
 centralised: simpler, faster vs distributed: resilient, scalable
 
+
 \subsection{Existing Paxos databases}
 
-
-
+\section{Summary of chapters}
 
 \cleardoublepage
 
@@ -197,23 +228,74 @@ centralised: simpler, faster vs distributed: resilient, scalable
 
 \section{Paxos}
 
-Paxos works by 
+\subsection{Introduction}
+
+Paxos is a distributed consensus protocol. It was developed by Leslie Lamport at Microsoft
+research when he was trying to disprove its existence. Paxos is failure tolerant for up to F
+simulatneous failures in a network of 2F+1 nodes.
+
+Paxos is actually a family of protocols, based around the same main algorithm. the Paxos algorithm
+is an algorithm for agreeing on a single value across a network of processors. Paxos provides
+three guarantees: safety, liveness and non-triviality.
+
+\begin{enumerate}
+	\item Safety: All nodes eventually agree on the value chosen
+	\item Liveness: If a value is proposed, it will eventually be chosen (?? XXX)
+	\item Non-triviality: Some value is learnt (this constraint is because the previous two guarantees can
+be satisfied without any values being learnt).
+\end{enumerate}
+
+Paxos can tolerate certain kinds of failures. These are: messages being delivered late or not at
+all, etc XXX.
+
+However Paxos cannot tolerate "rogue" processes, that is, processes deliberately sending malicious
+or incorrect messages. There is a variant of Paxos called Byzantine Paxos which can tolerate this,
+albeit at a failure tolerance of F for XXX nodes.
+
+
+\subsection{Definitions}
+
+\subsubsection*{Proposal Numbering}
+
+One of the assumptions that Paxos makes is that every proposal has a unique proposal number. This
+is necessary so that proposals have a \emph{total order}, ie we can compare any two proposals to
+find the maximum ordered proposal. The conventional way to achieve this is to define a proposal
+number as a 2-tuple of (sequence number, node address). These can be compared lexicographically,
+and as node addresses are unique, every proposal number will be unique. In practice I plan to use
+UUIDs as node identifiers, in order to be confident on uniqueness.
+
+\subsubsection*{Quorums}
+
+Paxos relies on quorums to ensure that 
+
+\subsubsection*{Messages}
+
+Paxos utilises several message types
+
+\subsection{How it works}
+
+\subsection{MultiPaxos}
+
+MultiPaxos is multiple rounds of Paxos occuring at the same time. The way this is outlined in
+\emph{Paxos Made Simple} is by a form of leader election. I will outline this here but, for
+simplicity, in my project I will simply use multiple Paxos rounds to form the basis of a
+distributed operation log. This will be explained in more detail in the Implementation chapter.
 
 \section{ACID}
 
 ACID in more detail
 
 
-\section{Choices}
+\section{Software Engineering}
 
-\subsection{Twisted}
+\subsection{Module Dependencies}
 
 I chose Twisted in order to make implementing the protocol easier. Twisted provides a lot of
 support for implementing protocols and helper classes etc. Also as I am using a state machine
 approach to implementing DBP and Paxos, twisted's asynchronous system works very well with this
 approach.
 
-\subsection{Python}
+\subsection{Programming Language}
 
 There were several options for which programming language to use for this project. C - too
 verbose, erlang - too weird, python - just right?
@@ -230,23 +312,18 @@ ACID properties
 \item Durable
 \end{enumerate}
 
-
-\section{Software Engineering}
-
-\subsection{The Model}
+\subsection{Software Development Process}
 
 Considered using the waterfall model, but didn't fit my requirements (fast prototyping to
 understand Paxos). Decided on spiral because of xyz.
 
-\subsection{Version Control}
+\subsection{Version Control and Backup Strategy}
 
 For version control I decided to use Git, as it is a system I am familiar with, and serves my need
 both as a VCS and as a remote backup. In my experience it is more usable than other DVCSs such as
 Bazaar, Darcs or Mercurial, and much faster than centralised VCSs such as CVS or SVN. Using Git I
 backed up my project both to bitbucket, an online repository service which provides free private
 repository hosting, and to my own server.
-
-\subsection{backups}
 
 For backups I use the PWF to develop my project on. As it is stored in Git I can back it up simply
 by pushing the repo to other hosts. I currently have it backed up to two other hosts.

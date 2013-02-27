@@ -27,7 +27,6 @@ help:
 
 prop:	proposal.dvi proposal.pdf
 	cp proposal.pdf ~/public_html/
-	#xdvi proposal.dvi
 
 diss.ps:	$(DISS)
 	latex diss
@@ -48,10 +47,12 @@ proposal.ps:	$(PROP)
 proposal.pdf:	proposal.ps
 	ps2pdf proposal.ps
 
-count:
-	detex diss.tex | tr -cd '0-9A-Za-z \n' | wc -w
 propcount:
 	detex proposal.tex | tr -cd '0-9A-Za-z \n' | wc -w
+
+count:
+	@echo -n "Wordcount: "
+	@bash count.sh
 
 proposal.dvi: $(PROP)
 	latex proposal

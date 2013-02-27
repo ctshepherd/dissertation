@@ -1,3 +1,5 @@
+import sys
+from pprint import pformat
 from uuid import uuid4
 from dbp.util import dbprint
 from dbp.config import NODE_TIMEOUT, PROPOSER_TIMEOUT
@@ -44,7 +46,8 @@ class Acceptor(object):
         having a number greater than n.
         """
         if msg['prop_num'] >= instance['acceptor_prepare_prop_num']:
-            dbprint("Instance %d: accepting prop %s (current is %s)" % (instance['instance_id'], msg['prop_num'], instance['acceptor_cur_prop_num']))
+            dbprint("Instance %d: accepting prop %s (current is %s)" % (instance['instance_id'],
+                msg['prop_num'], instance['acceptor_cur_prop_num']), level=4)
             instance['acceptor_cur_prop_num'] = msg.prop_num
             instance['acceptor_cur_prop_value'] = msg.prop_value
             self.writeAll(Msg({
@@ -79,7 +82,8 @@ class Learner(object):
         s = instance['learner_accepted'].setdefault(msg['prop_num'], set())
         s.add(msg['uid'])
         if len(s) >= self.quorum_size:
-            dbprint("Instance %d: learnt value %s (prop %s)" % (instance['instance_id'], msg['prop_value'], msg['prop_num']))
+            dbprint("Instance %d: learnt value %s (prop %s)" % (instance['instance_id'],
+                msg['prop_value'], msg['prop_num']), level=4)
             instance['status'] = "completed"
             instance['value'] = msg['prop_value']
             instance['callback'].callback(instance)
@@ -148,6 +152,8 @@ class Proposer(object):
                     self.run(instance['our_val'])
                     # delete our_val so we don't try and restart too often
                     del instance['our_val']
+                    instance['restart'] = None
+                    instance['restarted'] = True
 
             # Send our AcceptRequests
             for uid in instance['quorum']:
@@ -192,10 +198,14 @@ class Proposer(object):
         # If we're still waiting to hear back from enough people, try a higher
         # proposal number
         if instance['status'] == expected_status:
+            if 'restarted' in instance:
+                dbprint("restarted instance %d" % instance['instance_id'], level=2)
+                return
             v = instance['our_val']
             l = instance['last_tried'][0]
+            r = instance['restart']
             self.proposer_init_instance(instance)
-            self.proposer_start(instance, v, l+1)
+            self.proposer_start(instance, v, prop_num=l+1, restart=r)
 
 
 class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
@@ -340,7 +350,7 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
             method = getattr(self, "recv_%s" % t)
             method(m, instance)
         except InvalidMessageException, e:
-            dbprint("%s received invalid message %s (%s)" % (self, msg, e))
+            dbprint("%s received invalid message %s (%s)" % (self, msg, e), level=4)
             return
 
     def __repr__(self):

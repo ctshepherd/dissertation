@@ -164,63 +164,85 @@ talk about distributed, p2p advantages
 
 \section{Distributed Consensus Problem}
 
+Consensus is an integral problem in distributed systems. The consensus problem is that of getting
+all nodes in a distributed system to agree on a value. Formally, an algorithm that satisfies the
+consensus problem satisfies three properties:
 
-Paxos vs 2PC etc.
+A process must decide on a value only once, and cannot change the value once it has been decided.
+
+\begin{enumerate}
+\item Agreement - all nodes must decide the same value
+\item Validity - the value that is decided upon must have been proposed by some node in the
+	network
+\item Termination - all nodes eventually decide on a value
+\end{enumerate}
+
+\subsection*{2 Phase Commit}
+
+2 Phase Commit (2PC) is one of the simplest consensus protocol, and one of the most brittle. It has two
+phases:
+
+\begin{enumerate}
+\item Send a message to each node asking them to accept the value proposed.
+\item If all nodes respond with a YES message, send a CONFIRM message. Else, send an ABORT message
+	to all nodes.
+\end{enumerate}
+
+This has a number of failures that it is vulnerable too. If a single node crashes, the entire
+protocol will hang, as the co-ordinator will wait for the node to come back online. 
+
+\subsection*{3 Phase Commit}
+
+3 Phase Commit (3PC) is a modification of 2PC that avoids the most common failure mode - that of a
+cohort member.
+
+\subsection*{Paxos}
+
+Paxos is a generalisation of 2PC and 3PC that handles more failure modes. I will go into a detailed
+explanation in the Preparation chapter, here I will just summarise it. 
 
 \section{Databases}
 
-\subsection{ACID}
+\subsection*{ACID}
 
 Commonly all databases provide ACID properties. ACID stands for:
 
 \begin{itemize}
-\item Atomic
-\item Consistent
-\item Isolated
-\item Durable
+\item Atomic - an operation is either performed or is not performed.
+\item Consistent - the database remains in a consistent state at all times.
+\item Isolated - one operation cannot see the intermediate state due to another operation occurring
+	at the same time.
+\item Durable - once an operation is "commited" it is permanently stored - the effects of it will
+	not be lost.
 \end{itemize}
 
-\subsubsection*{Atomic}
+\subsection*{Centralisation vs Distributed}
 
-Atomicity means that either an operation completes, or it does not, ie, that the database is not
-left in a "halfway" state. This means that we do not need to worry about cleaning up after an
-operation, if it does not succeed we can simply retry it, without needing to worry about the state
-it has left the database in. Atomicity also applies to transactions in the same way - if we have
-a transaction as an operation composed of smaller single operations (for example, INCR B, READ A
--> X, WRITE X+10->A), we don't want some of the operations to complete and some not to. In this
-example, we may have the constraint A=10*B. If B was incremented but then the transaction failed
-before A was updated, we would leave the database in an inconsistent state.
+Databases are generally found in one of two topologies - centralised or distributed. These
+different topologies are used in different situations and to different ends.
 
-\subsubsection*{Consistent}
+A centralised database is a single node in a single location.
+In general, centralised databases are simpler in design and on the whole faster than distributed
+databases.
+Many general properties of centralised vs. distributed systems apply to centralised databases -
+they are easier to perform organise, to edit, to query and to backup. May slow down under load. It
+is easier to maintain the integrity of data on a centralised database, as there is only one
+"current" version of the data under consideration.
 
-Consistency is very closely related to atomicity, as consistency refers to a property of the
-database, and atomicity refers to a property of operations performed on the database. In the
-example used for atomicity, we had a constraint on the database (that A=B*10). We want operations
-(or transactions) to transform the database from one consistent state to another. This becomes
-more pertinent in distributed databases, as we may receive operations in one order at one node,
-and in a different order at another node. If we apply the operations in the order that we receive
-them, the two nodes are likely to be in inconsistent states. XXX: define consistency in a
-distributed system.
+In contrast, distributed databases are more resilient and scalable than centralised databases.
+There is no longer a single point of failure, and they can be extended by adding nodes, although
+this will have a point of diminishing returns. Distributed databases are often more complex in
+design, as they have to ensure consistency between nodes (although there is a recent trend to
+relax this constraint in certain "NoSQL" databases. Here I will only consider traditional RDBMS
+systems). In particular, distributed databases can be slow accessing non local data.
 
-\subsubsection*{Isolated}
+\subsection*{Existing Paxos databases}
 
-Isolation means 
+Paxos has recently become a very popular algorithm for ensuring distributed consensus. One good
+example is Google using Paxos for a distributed lock service called "Chubby". This underpins their
+BigTable distributed database which is used across Google.
 
-Why do we want it?
-
-\subsection{Centralisation vs Distributed}
-
-Centralised databases are used in different situations to distributed databases.
-C: Easier to perform organise, edit, query, backup. May slow down under load.
-easier to maintain integrity of data
-D: Can be slow accessing non local data. Need to ensure consistency
-
-centralised: simpler, faster vs distributed: resilient, scalable
-
-
-\subsection{Existing Paxos databases}
-
-\section{Summary of chapters}
+(XXX: Need some more examples.)
 
 \cleardoublepage
 
@@ -283,8 +305,31 @@ distributed operation log. This will be explained in more detail in the Implemen
 
 \section{ACID}
 
-ACID in more detail
+\subsubsection*{Atomic}
 
+Atomicity means that either an operation completes, or it does not, ie, that the database is not
+left in a "halfway" state. This means that we do not need to worry about cleaning up after an
+operation, if it does not succeed we can simply retry it, without needing to worry about the state
+it has left the database in. Atomicity also applies to transactions in the same way - if we have
+a transaction as an operation composed of smaller single operations (for example, INCR B, READ A
+$\rightarrow$ X, WRITE X+10 $\rightarrow$ A), we don't want some of the operations to complete
+and some not to. In this example, we may have the constraint $A = 10 * B$. If B was incremented but then
+the transaction failed before A was updated, we would leave the database in an inconsistent state.
+
+\subsubsection*{Consistent}
+
+Consistency is very closely related to atomicity, as consistency refers to a property of the
+database, and atomicity refers to a property of operations performed on the database. In the
+example used for atomicity, we had a constraint on the database (that A=B*10). We want operations
+(or transactions) to transform the database from one consistent state to another. This becomes
+more pertinent in distributed databases, as we may receive operations in one order at one node,
+and in a different order at another node. If we apply the operations in the order that we receive
+them, the two nodes are likely to be in inconsistent states. XXX: define consistency in a
+distributed system.
+
+\subsubsection*{Isolated}
+
+\subsubsection*{Durable}
 
 \section{Software Engineering}
 
@@ -305,12 +350,6 @@ verbose, erlang - too weird, python - just right?
 Requirements for my system:
 Transactions
 ACID properties
-\begin{enumerate}
-\item Atomic
-\item Consistent
-\item Isolated
-\item Durable
-\end{enumerate}
 
 \subsection{Software Development Process}
 

@@ -8,9 +8,11 @@ from dbp.paxos.agent import NodeProtocol
 from dbp import config, util
 from twisted.internet import reactor
 from timeit import default_timer as clock
+from collections import namedtuple
+from math import sqrt
 
-start = None
-end = None
+Timing = namedtuple('Timing', ('start', 'end'))
+
 
 class LimitedTransport(object):
 
@@ -43,20 +45,32 @@ class LimitedTransport(object):
 
 
 class Monitor(object):
-    def __init__(self, transport):
+    def __init__(self, transport, num):
         self.transport = transport
+        self.timings = []
+        self.num = num
 
-    def end_run(self, *args):
-        self.end = clock()
-        print "%s seconds" % (self.end-self.start)
-        print self.transport.dropped_count
+    def end_run(self, start):
+        t = Timing(start, clock())
+        self.timings.append(t)
+        self.num -= 1
+        if not self.num:
+            self.finish()
+
+    def finish(self):
+        n = len(self.timings)
+        a = [t.end-t.start for t in self.timings]
+        average = float(sum(a))/n
+        sd = sqrt(sum((x-average)**2 for x in a) / n)
+        print "Average:", average, "Stddev:", sd, "N:", n
         reactor.stop()
 
     def start_run(self, node, amount, values):
         self.start = clock()
         for n, v in izip(xrange(amount), values):
+            c = clock()
             d = node.run(v)
-            d.addCallback(self.end_run)
+            d.addCallback(lambda r:self.end_run(c))
 
 
 def main():
@@ -72,6 +86,8 @@ def main():
                       help="debug level to run at")
 
     (options, args) = parser.parse_args()
+    if options.amount is None:
+        parser.error("Need to specify amount")
     if not args:
         i = (x+1 for x in count())
     else:
@@ -82,7 +98,7 @@ def main():
     n = NodeProtocol(("localhost", options.bootstrap))
     t = reactor.listenUDP(options.port, n)
     n.transport = LimitedTransport(t)
-    m = Monitor(n.transport)
+    m = Monitor(n.transport, options.amount)
     vals = args
 
     reactor.callLater(7, m.start_run, n, options.amount, i)

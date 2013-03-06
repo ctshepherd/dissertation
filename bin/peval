@@ -9,9 +9,6 @@ from dbp import config, util
 from twisted.internet import reactor
 from timeit import default_timer as clock
 
-start = None
-end = None
-
 class LimitedTransport(object):
 
     limit = 125000  # 1 megabit == 125,000 bytes
@@ -43,10 +40,16 @@ class LimitedTransport(object):
 
 
 class Monitor(object):
-    def __init__(self, transport):
+    def __init__(self, transport, num):
         self.transport = transport
+        self.num = num
 
-    def end_run(self, *args):
+    def end_run(self, _):
+        self.num -= 1
+        if not self.num:
+            self.finish()
+
+    def finish(self):
         self.end = clock()
         print "%s seconds" % (self.end-self.start)
         print self.transport.dropped_count
@@ -56,7 +59,7 @@ class Monitor(object):
         self.start = clock()
         for n, v in izip(xrange(amount), values):
             d = node.run(v)
-        d.addCallback(self.end_run)
+            d.addCallback(self.end_run)
 
 
 def main():
@@ -72,6 +75,8 @@ def main():
                       help="debug level to run at")
 
     (options, args) = parser.parse_args()
+    if options.amount is None:
+        parser.error("Need to specify amount")
     if not args:
         i = (x+1 for x in count())
     else:
@@ -82,7 +87,7 @@ def main():
     n = NodeProtocol(("localhost", options.bootstrap))
     t = reactor.listenUDP(options.port, n)
     n.transport = LimitedTransport(t)
-    m = Monitor(n.transport)
+    m = Monitor(n.transport, options.amount)
     vals = args
 
     reactor.callLater(7, m.start_run, n, options.amount, i)

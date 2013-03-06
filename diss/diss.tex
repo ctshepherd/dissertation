@@ -6,12 +6,6 @@
 \usepackage{verbatim}
 
 \input{epsf}                            % to allow postscript inclusions
-% On thor and CUS read top of file:
-%     /opt/TeX/lib/texmf/tex/dvips/epsf.sty
-% On CL machines read:
-%     /usr/lib/tex/macros/dvips/epsf.tex
-
-
 
 \raggedbottom                           % try to avoid widows and orphans
 \sloppy
@@ -168,38 +162,72 @@ Consensus is an integral problem in distributed systems. The consensus problem i
 all nodes in a distributed system to agree on a value. Formally, an algorithm that satisfies the
 consensus problem satisfies three properties:
 
-A process must decide on a value only once, and cannot change the value once it has been decided.
-
 \begin{enumerate}
-\item Agreement - all nodes must decide the same value
+\item Agreement - all nodes must decide the same value.
 \item Validity - the value that is decided upon must have been proposed by some node in the
-	network
-\item Termination - all nodes eventually decide on a value
+	network.
+\item Termination - all nodes eventually decide on a value.
 \end{enumerate}
+
+Decision is defined as follows - a process must decide on a value only once, and cannot change the
+value once it has been decided.
+
+\subsection*{Failure Modes}
+
+Distributed networks must be able to deal with failure in a number of forms. Nodes may fail and
+stop executing completely, this is known as the \emph{fail-stop} model. In practice, a more accurate
+model is the \emph{fail-recover} model. This is where a node stops executing, then resumes execution
+at a later time. This more accurately models real life, where asynchronous networks mean that it
+may take an arbitrarily long time to receive a message, and that messages may arrive out of order
+or not at all. The most general failure model is that of \emph{Byzantine failure}, where nodes may
+respond incorrectly or even deliberately lie in order to mislead the protocol. In practice this is
+unlikely, and can be mediated using checksums, message digests and authentication. In the
+Preparation chapter I will go into detail about the types of failure that my database can handle.
 
 \subsection*{2 Phase Commit}
 
-2 Phase Commit (2PC) is one of the simplest consensus protocol, and one of the most brittle. It has two
-phases:
+2 Phase Commit (2PC) is one of the simplest consensus protocol, and one of the most brittle. It
+has two phases:
 
 \begin{enumerate}
-\item Send a message to each node asking them to accept the value proposed.
-\item If all nodes respond with a YES message, send a CONFIRM message. Else, send an ABORT message
-	to all nodes.
+\item The co-ordinator (the node initiating the protocol) sends a {\bf PROPOSE} message to each
+	node in a cohort of size $N$, asking them to accept the value proposed.
+\item If all nodes respond with a {\bf YES} message, send a {\bf CONFIRM} message. Otherwise, if
+	any node responds with a {\bf NO} message, send an {\bf ABORT} message to all nodes.
 \end{enumerate}
 
-This has a number of failures that it is vulnerable too. If a single node crashes, the entire
-protocol will hang, as the co-ordinator will wait for the node to come back online. 
+2PC solves the consensus problem in a failure free network. However if we can have failures then
+the protocol can suffer from a number of limitations. If the co-ordinator crashes before sending
+any messages, we satisfy consensus trivially. However, if the co-ordinator crashes after sending
+$x$ messages, where $1 \le x < N$, the protocol cannot continue - it is blocked on the
+co-ordinator resuming, and if it never resumes then some members of the cohort are blocked
+permanently. In fact, once a node has sent a {\bf YES} message, it is blocked until it receives a
+response. This is a big disadvantage for a concurrent system. While there are extensions to
+resolve the problem of a crashing co-ordinator, these do not fix the fundamental problem of using
+a blocking protocol in an asynchronous network. (These extensions often involve a "watchdog" or
+"recovery node". This is still not a satisfactory solution as the simultaneous crash of the
+co-ordinator and a cohort member means the state of the network is not recoverable (ie, we cannot
+tell if the cohort member who crashed voted {\bf YES} or {\bf NO}.))
 
 \subsection*{3 Phase Commit}
 
-3 Phase Commit (3PC) is a modification of 2PC that avoids the most common failure mode - that of a
-cohort member.
+3 Phase Commit (3PC) is a modification of 2PC that turns it from a synchronous protocol into an
+asynchronous protocol. This is done by adding a third phase, so that we can use timeouts to assert
+the state of the system at any point in time. The three phases are:
+
+\begin{enumerate}
+\item Prepare - the coordinator
+\end{enumerate}
+
+This fixes the problem of node failure, but still suffers from a significant problem. If there is
+a network partition, and all nodes who voted {\bf YES} are in one half and all nodes who voted
+{\bf NO} are in the other, both partitions will recover into different, inconsistent states. This
+is not what we want, and this is what Paxos provides.
 
 \subsection*{Paxos}
 
-Paxos is a generalisation of 2PC and 3PC that handles more failure modes. I will go into a detailed
-explanation in the Preparation chapter, here I will just summarise it. 
+Paxos is a generalisation of 2PC and 3PC that handles more failure modes. I will go into a
+detailed explanation in the Preparation chapter, here I will just summarise it. 
 
 \section{Databases}
 
@@ -212,9 +240,17 @@ Commonly all databases provide ACID properties. ACID stands for:
 \item Consistent - the database remains in a consistent state at all times.
 \item Isolated - one operation cannot see the intermediate state due to another operation occurring
 	at the same time.
-\item Durable - once an operation is "commited" it is permanently stored - the effects of it will
+\item Durable - once an operation is "committed" it is permanently stored - the effects of it will
 	not be lost.
 \end{itemize}
+
+There are many reasons why ACID is a key requirement of most databases. ACID makes it far easier
+for application developers to reason about concurrency in a system where there may be multiple
+clients reading and writing the same data simultaneously. It also enable effective abstraction, as
+the atomicity requirement in particular gives the well defined characteristics when an operation
+or transaction fails. ACID also provides clear guarantees with regard to data stability and
+longevity, in particular how this relates to consistency, so that users can be clear as to the
+overall state of the system.
 
 \subsection*{Centralisation vs Distributed}
 
@@ -253,18 +289,17 @@ BigTable distributed database which is used across Google.
 \subsection{Introduction}
 
 Paxos is a distributed consensus protocol. It was developed by Leslie Lamport at Microsoft
-research when he was trying to disprove its existence. Paxos is failure tolerant for up to F
-simulatneous failures in a network of 2F+1 nodes.
+research when he was trying to disprove its existence. Paxos is failure tolerant for up to $F$
+simultaneous failures in a network of $2F + 1$ nodes.
 
-Paxos is actually a family of protocols, based around the same main algorithm. the Paxos algorithm
+Paxos is actually a family of protocols, based around the same main algorithm. The Paxos algorithm
 is an algorithm for agreeing on a single value across a network of processors. Paxos provides
-three guarantees: safety, liveness and non-triviality.
+three guarantees: safety, liveness and non-triviality:
 
 \begin{enumerate}
-	\item Safety: All nodes eventually agree on the value chosen
-	\item Liveness: If a value is proposed, it will eventually be chosen (?? XXX)
-	\item Non-triviality: Some value is learnt (this constraint is because the previous two guarantees can
-be satisfied without any values being learnt).
+	\item Consistency: Only one value is chosen.
+	\item Liveness: If a value is proposed, eventually some value is chosen.
+	\item Non-triviality: only proposed values may be chosen.
 \end{enumerate}
 
 Paxos can tolerate certain kinds of failures. These are: messages being delivered late or not at
@@ -288,13 +323,48 @@ UUIDs as node identifiers, in order to be confident on uniqueness.
 
 \subsubsection*{Quorums}
 
-Paxos relies on quorums to ensure that 
+Paxos relies on quorums to ensure that even in the event of failures, consistency is preserved. A
+quorum is defined as a majority of nodes. In some versions of Paxos, weighting can be used to
+define quorums, however here I will use unweighted quorums.
 
 \subsubsection*{Messages}
 
-Paxos utilises several message types
+Paxos utilises several message types:
+
+\begin{itemize}
+\item {\bf Prepare(n)}, where $n$ is the proposal number of the message.
+\item {\bf Promise(n, v)}, where $n$ is the highest accepted proposal number by the recipient and
+	$v$ is the value of that proposal.
+\item {\bf AcceptRequest(n, v)}, where $n$ is the proposal number of the proposal and $v$ is the
+	value of that proposal.
+\item {\bf AcceptNotify(n, v)}, where $n$ is the proposal number of the proposal and $v$ is the value
+	of that proposal.
+\end{itemize}
 
 \subsection{How it works}
+
+A round of Paxos consists of two stages:
+
+\subsubsection*{Phase 1a}
+
+To initiate a round of Paxos, a node sends out a Prepare message to a quorum (or all? XXX) of
+acceptors with a unique proposal number, higher than any it has sent out before.
+
+\subsubsection*{Phase 1b}
+
+Upon receipt of a Prepare message with proposal number $n$, an Acceptor responds with a Promise
+message if it has not responded to any Prepare messages with a number greater than n. The Promise
+message contains the highest proposal number, if any, the Acceptor has accepted, and the value it
+has accepted.
+
+\subsubsection*{Phase 2a}
+
+In order for a Proposer to move from Phase 1a to Phase 2a, it must receive Promise messages from a
+quorum of acceptors.
+
+\subsubsection*{Phase 2b}
+
+If an Acceptor receives an AcceptRequest message from 
 
 \subsection{MultiPaxos}
 
@@ -312,15 +382,15 @@ left in a "halfway" state. This means that we do not need to worry about cleanin
 operation, if it does not succeed we can simply retry it, without needing to worry about the state
 it has left the database in. Atomicity also applies to transactions in the same way - if we have
 a transaction as an operation composed of smaller single operations (for example, INCR B, READ A
-$\rightarrow$ X, WRITE X+10 $\rightarrow$ A), we don't want some of the operations to complete
-and some not to. In this example, we may have the constraint $A = 10 * B$. If B was incremented but then
+$\rightarrow$ X, WRITE X + 10 $\rightarrow$ A), we don't want some of the operations to complete
+and some not to. In this example, we may have the constraint $A = 10\times B$. If B was incremented but then
 the transaction failed before A was updated, we would leave the database in an inconsistent state.
 
 \subsubsection*{Consistent}
 
 Consistency is very closely related to atomicity, as consistency refers to a property of the
 database, and atomicity refers to a property of operations performed on the database. In the
-example used for atomicity, we had a constraint on the database (that A=B*10). We want operations
+example used for atomicity, we had a constraint on the database (that $A = 10\times B$). We want operations
 (or transactions) to transform the database from one consistent state to another. This becomes
 more pertinent in distributed databases, as we may receive operations in one order at one node,
 and in a different order at another node. If we apply the operations in the order that we receive
@@ -329,7 +399,14 @@ distributed system.
 
 \subsubsection*{Isolated}
 
+Isolation is the property that ensures that if one transaction is in the process of completing,
+another transaction cannot see the intermediate state. It ensures that transactions that execute
+concurrently to each other are also invisible to each other - a transaction cannot tell, and does
+not need to worry about whether another transaction is executing or not.
+
 \subsubsection*{Durable}
+
+
 
 \section{Software Engineering}
 
@@ -342,8 +419,12 @@ approach.
 
 \subsection{Programming Language}
 
-There were several options for which programming language to use for this project. C - too
-verbose, erlang - too weird, python - just right?
+There were several options for which programming language to use for this project.  C compiles to
+very fast code, and gives a lot of control over the behaviour of the whole system.  However it is
+very verbose Another option was erlang. Erlang was designed for networking and exhibits a high
+degree of parallelism. However it is a very different paradigm and I have never used it before.
+In the end I went with Python, a language I am very familiar with, and which is very easy to
+prototype and do rapid development in.
 
 \section{Requirements Analysis}
 
@@ -353,8 +434,9 @@ ACID properties
 
 \subsection{Software Development Process}
 
-Considered using the waterfall model, but didn't fit my requirements (fast prototyping to
-understand Paxos). Decided on spiral because of xyz.
+I considered using the waterfall model, but it didn't fit in with my requirement to do fast
+prototyping (as I needed to gain a better understanding of Paxos). I settled on the spiral model
+because of XXX:
 
 \subsection{Version Control and Backup Strategy}
 

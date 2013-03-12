@@ -472,13 +472,79 @@ see simple change propagate across complex system
 \cleardoublepage
 \chapter{Implementation}
 
-\subsection{Paxos Design}
+\section{Paxos Design}
 
-\subsection{Database Design}
+My initial prototype was a synchronous model that sent messages internally. I quickly decided to
+change to Twisted, as I hoped the support it would give me would make writing the protocol easier.
 
-\subsection{Paxos Implementation}
+twisted asynchronous
+proposal class
+message class
 
-\subsection{Database Implementation}
+redesign
+message redesign
+
+\subsection{Protocol Design}
+
+On top of basic Paxos I added node discovery and heartbeat monitoring to the protocol. 
+Ping etc
+
+multipaxos
+instance ID
+
+
+\section{Database Design}
+
+\subsection{Design}
+
+\subsubsection{Basic Operations}
+
+The database is implemented as a datastructure that can have operations performed on it. These
+operations can be serialised and deserialised. The main problem for designing a distributed
+database then becomes deciding on an order for these operations that is consistent across every
+node.
+
+\subsubsection{The Operation Log}
+
+Deciding on a serialisation for operations is done by the operation log. This associates an
+"Operation ID" (OID) with a particular operation. In order to decide on an OID for an operation,
+the code picks the next highest instance ID it hasn't seen before and starts a new round of Paxos
+for that instance, trying to assert that $OID := <op>$. I tried a number of different
+techniques for retrying in the event that the OID was associated with another operation. This is
+always safe because of Paxos. In fact, this technique can even be used to learn all the database
+operations performed so far, albeit reasonably inefficiently, simply by performing a READ.
+
+XXX: check retry semantic divide between paxos/db
+
+
+\subsubsection{Reads}
+
+For a distributed database there is the concept of "fast reads" and "slow reads". A fast read is
+simply examining the state of the local copy of the database. This is fast, but may return out of
+date data. In order to actually perform an examination of the current state of the database, we
+must insert a READ operation, to ensure that if we have an out of date copy of the database, we
+obtain the more recent transactions before returning the result to the user.
+
+In fact, I chose to use a NOP operation rather than a READ operation, although they would
+semantically be the same (as other nodes do nothing on a READ), I felt it better represented the
+operation being sent (do nothing).
+
+% One optimisation we can perform that improves performance from the na\ddot{i}ve version is to
+% collapse reads together. If the last operation was a read, and we want to read, we do not need to
+% insert two entries in the transaction log. We still need to perform a round of Paxos to confirm
+% that 
+
+\subsubsection{Transactions}
+
+My first implementation of transactions was a very na\"ive global lock. In order to start a
+transaction, a node inserts the TRYLOCK operation. If, when the operation is inserted, the number
+of TRYLOCKs is well-bracketed (ie, there is an equal number of lock takes and releases), then the
+node was successful in taking the lock. While a node holds the lock, no other node can perform an
+operation (the operations are inserted in the transaction log but ignored).
+
+\section{Paxos Implementation}
+
+\section{Database Implementation}
 
 How I implemented Paxos
 "You and your project"

@@ -283,7 +283,7 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
 
     def do_ehlo(self):
         for host in self.hosts:
-            self.writeMessage(host, Msg({"msg_type": "ehlo", "instance_id": None}))
+            self.write_ehlo(host)
 
     def write_ehlo(self, uid):
         self.writeMessage(uid, Msg({"msg_type": "ehlo", "instance_id": None}))
@@ -349,9 +349,8 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
                 instance = None
             method = getattr(self, "recv_%s" % t)
             method(m, instance)
-        except InvalidMessageException, e:
+        except (InvalidMessageException, KeyError), e:
             dbprint("%s received invalid message %s (%s)" % (self, msg, e), level=4)
-            return
 
     def __repr__(self):
         u = getattr(self, "uid", None)

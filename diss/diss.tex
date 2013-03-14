@@ -17,7 +17,7 @@
 
 \renewcommand{\baselinestretch}{1.1}    % adjust line spacing to make
                                         % more readable
-
+\newcommand{\msg}[1] {{\bf #1}}
 \begin{document}
 
 \bibliographystyle{plain}
@@ -78,25 +78,12 @@ I aim to implement a distributed database. This will be based on the Paxos proto
 The first half of the project is to implement the Paxos protocol. This will be done in a module,
 providing an interface which the database can then use to 
 
-The project must correctly implement the Paxos protocol.
-The library must be capable of forming a running network,
-in particular dynamic leader election,
-as well as achieving consensus on a key/value store across the network.
+The project must correctly implement the Paxos protocol.  The library must be capable of forming a
+running network, in particular dynamic leader election, as well as achieving consensus on a
+key/value store across the network.
 
-\subsubsection*{Database}
-
-The database must implement a subset of SQL, specifically:
-\begin{enumerate}
-\item A single table with a static name
-\item SELECT/INSERT
-\item WHERE
-\item GROUP BY
-\item ORDER BY
-\item Aggregation
-\end{enumerate}
-
-The database must have all ACID properties, that is:
-
+The database must implement a subset of SQL, specifically. The database must have all ACID
+properties, that is.
 
 \section*{Work Completed}
 
@@ -190,10 +177,10 @@ Preparation chapter I will go into detail about the types of failure that my dat
 has two phases:
 
 \begin{enumerate}
-\item The co-ordinator (the node initiating the protocol) sends a {\bf PROPOSE} message to each
+\item The co-ordinator (the node initiating the protocol) sends a \msg{PROPOSE} message to each
 	node in a cohort of size $N$, asking them to accept the value proposed.
-\item If all nodes respond with a {\bf YES} message, send a {\bf CONFIRM} message. Otherwise, if
-	any node responds with a {\bf NO} message, send an {\bf ABORT} message to all nodes.
+\item If all nodes respond with a \msg{YES} message, send a \msg{CONFIRM} message. Otherwise, if
+	any node responds with a \msg{NO} message, send an \msg{ABORT} message to all nodes.
 \end{enumerate}
 
 2PC solves the consensus problem in a failure free network. However if we can have failures then
@@ -201,13 +188,13 @@ the protocol can suffer from a number of limitations. If the co-ordinator crashe
 any messages, we satisfy consensus trivially. However, if the co-ordinator crashes after sending
 $x$ messages, where $1 \le x < N$, the protocol cannot continue - it is blocked on the
 co-ordinator resuming, and if it never resumes then some members of the cohort are blocked
-permanently. In fact, once a node has sent a {\bf YES} message, it is blocked until it receives a
+permanently. In fact, once a node has sent a \msg{YES} message, it is blocked until it receives a
 response. This is a big disadvantage for a concurrent system. While there are extensions to
 resolve the problem of a crashing co-ordinator, these do not fix the fundamental problem of using
 a blocking protocol in an asynchronous network. (These extensions often involve a "watchdog" or
 "recovery node". This is still not a satisfactory solution as the simultaneous crash of the
 co-ordinator and a cohort member means the state of the network is not recoverable (ie, we cannot
-tell if the cohort member who crashed voted {\bf YES} or {\bf NO}.))
+tell if the cohort member who crashed voted \msg{YES} or \msg{NO}.))
 
 \subsection*{3 Phase Commit}
 
@@ -217,12 +204,17 @@ the state of the system at any point in time. The three phases are:
 
 \begin{enumerate}
 \item Prepare - the coordinator
+\item Pre-commit - 
+\item Finalise commit - 
 \end{enumerate}
 
 This fixes the problem of node failure, but still suffers from a significant problem. If there is
-a network partition, and all nodes who voted {\bf YES} are in one half and all nodes who voted
-{\bf NO} are in the other, both partitions will recover into different, inconsistent states. This
-is not what we want, and this is what Paxos provides.
+a network partition, and all nodes who voted \msg{YES} are in one half and all nodes who voted
+\msg{NO} are in the other, both partitions will recover into different, inconsistent states.
+The CAP theorem (XXX: cite?) says that we cannot achieve both consensus and availability
+during a network partition - we must choose one. 3PC opts for availability, but for a distributed
+database with ACID properties it is preferable to have consensus. Paxos guarantees consensus at
+the cost of lack of availability in a network partition.
 
 \subsection*{Paxos}
 
@@ -307,8 +299,8 @@ all, etc XXX.
 
 However Paxos cannot tolerate "rogue" processes, that is, processes deliberately sending malicious
 or incorrect messages. There is a variant of Paxos called Byzantine Paxos which can tolerate this,
-albeit at a failure tolerance of F for XXX nodes.
-
+albeit at a failure tolerance of $F$ for $3F + 1$ nodes. I will not go into this variant further
+in this dissertation.
 
 \subsection{Definitions}
 
@@ -474,24 +466,108 @@ see simple change propagate across complex system
 
 \section{Paxos Design}
 
+\subsection{Protocol Design}
+
+I started off with Paxos. I wanted to iterate quickly from prototype to prototype, adding features
+slowly as I understood the protocol more, as I found it confusing and wasn't sure how to implement
+in code various concepts outlined in the academic papers I read (mainly Paxos Made Simple).
+
 My initial prototype was a synchronous model that sent messages internally. I quickly decided to
 change to Twisted, as I hoped the support it would give me would make writing the protocol easier.
 
-twisted asynchronous
-proposal class
-message class
+\subsubsection*{Messages}
+I initially decided to use a class hierachy to define messages, and to use a simple
+serialization/deserialization technique, transmitting messages in the form
+\verb+"<message type>":<proposal serialization>+. I decided to send messages as simple strings
+over the network for a number of reasons - for a prototype implementation speed was not my primary
+concern, iterating towards the most complete and correct solution in a reasonable period of time
+was. Furthermore, even if my priority was speed, optimising the message format felt like a
+premature optimisation, and using a binary format would vastly hinder my debugging.
 
-redesign
-message redesign
+In hindsight restricting messages to only a combination of message type and proposal attributes
+was unnecessarily restrictive. An advantage of constructing them in this way was to prevent typos
+in creating messages (cf. \verb+send(Msg({"msg_type": "accept_requst", ...}))+
+and \verb+send(Msg({"msg_type": "accept_request", ...}))+).
 
-\subsection{Protocol Design}
+Although security was not a major concern for this project, I wanted to be able to serialize
+arbirtrary objects without allowing remote code execution on a host running my software - even
+though it was only running on local host this still seemed unnecessarily risky. Fortunately Python
+has a builtin function called \verb+literal_eval+ which only evaluates literals (strings, tuples,
+lists and dictionaries), and nothing unsafe (classes, functions) which could be used to run
+arbritrary code.
 
-On top of basic Paxos I added node discovery and heartbeat monitoring to the protocol. 
-Ping etc
+I eventually moved to sending a dictionary in plain string format over the network. This allowed
+me to specify arbitrary key/value pairs without having to add in extra support for them (a
+limitation I initially struggled with before moving to this format). This greatly simplified a lot
+of logic, at the cost of trusting that messages received are well formed. However, this is not too
+problematic for several reasons - a) byzantine b) exceptions / paxos dropping c)
+checksum/netstring.
 
-multipaxos
-instance ID
+\subsubsection*{Hosts}
 
+I first used a tuple of \verb+(IP Address, Port Num)+ to identify hosts. However there turned out
+to be a number of problems with this. Firstly as an identifying scheme it is not persistent across
+interfaces. Also there is a significant problem if a node needs to identify itself (a pertinent
+example is for the \op{TRYLOCK} operation). After I changed the message format to a generic
+dictionary format, I wanted to add an attribute specifying the sender. This is difficult to do
+using tuple format, as it is non-trivial for a host to obtain its own IP address, it may be on a
+local network or behind a NAT for example.
+
+I updated it to use a GUID. This is better for several reasons - the host knows its own address
+etc
+
+There is the problem of a node lying about its identity, for example forging a \op{TRYLOCK}
+request. This is a more pertinant problem because I am using UDP, which is easier to forge than
+TCP. Although a fully secure implementation is beyond the scope of this project, one potential
+solution would be to sign or authenticate messages, and include this signature or MAC with the
+message.
+
+\subsection{Protocol Extras}
+
+On top of the basic Paxos protocol I added some extra features to the protocol, in particular,
+node discovery and bootstrap; and heartbeat monitoring of nodes to detect them leaving the
+network.
+
+Keeping an accurate idea of network membership is a key requirement of Paxos. Each node in the
+network needs to have a good idea of the number of nodes in the network in order to have an
+accurate estimate of the quorum size. If a node underestimates the quorum size, the network may
+become inconsistent, as a node may "learn" a value erroneously. On the other hand, if we
+overestimate the quorum size, we may not make any progress, waiting for more responses than there
+are nodes in the network. In practice, the first problem is more problematic than the second,
+which is only temporary - as long as the node eventually accurately learns the quorum sizethe
+network will make progress, however if the network develops inconsistencies these are much harder
+to resolve.
+
+Consensus algorithms need a strong failure detector (paper reference?).
+
+\subsubsection{Bootstrap}
+
+A node connects to the network by connecting to a \emph{bootstrap node}. In my current
+architecture this can be any node, however in a different model it may be a specific node, see the
+Evaluation chapter for more details involving scaling. When a node $N$ connects to the bootstrap
+node $B$, it sends an \msg{EHLO} message. $B$ replies with a \msg{Notify} message containing all the
+hosts B is aware of. $N$ then sends each of these in turn \msg{EHLO} message, making each of them
+aware of its presence, and getting a \msg{Notify} message from each othem. This is repeated until
+there are no nodes it has not learned of. $N$ is then fully integrated into the network.
+
+\subsubsection{Heartbeat}
+
+In order to identify when a node leaves the network, when a node initialises it starts a timer on
+a configurable timeout and sends a \msg{PING} message to every node its aware of. As it receives a
+reply from a host it removes that host from the ... XXX.
+
+\subsection{MultiPaxos}
+
+The simple way MultiPaxos is implemented is multiple instances of Paxos operating in parallel.
+Paxos is implemented as a state machine, with the instance state as a Python dictionary and
+transitions as methods. A simple way to implement MultiPaxos is to have every transition method
+take an instance dictionary as an argument and operate on that. One problem with this approach is
+that if any initial messages (\msg{Prepare}, \msg{AcceptRequest}, etc) are not received, the
+initial state is not constructed.
+
+For certain messages that are not linked to any particular instance of Paxos, the message
+attribute \verb+"instance_id"+ is sent with value \verb+None+, for all other messages the instance
+id is a number referring to the instance of Paxos running.
 
 \section{Database Design}
 
@@ -509,7 +585,7 @@ node.
 Deciding on a serialisation for operations is done by the operation log. This associates an
 "Operation ID" (OID) with a particular operation. In order to decide on an OID for an operation,
 the code picks the next highest instance ID it hasn't seen before and starts a new round of Paxos
-for that instance, trying to assert that $OID := <op>$. I tried a number of different
+for that instance, trying to assert that \verb$OID := <op>$. I tried a number of different
 techniques for retrying in the event that the OID was associated with another operation. This is
 always safe because of Paxos. In fact, this technique can even be used to learn all the database
 operations performed so far, albeit reasonably inefficiently, simply by performing a READ.
@@ -526,13 +602,8 @@ must insert a READ operation, to ensure that if we have an out of date copy of t
 obtain the more recent transactions before returning the result to the user.
 
 In fact, I chose to use a NOP operation rather than a READ operation, although they would
-semantically be the same (as other nodes do nothing on a READ), I felt it better represented the
-operation being sent (do nothing).
-
-% One optimisation we can perform that improves performance from the na\ddot{i}ve version is to
-% collapse reads together. If the last operation was a read, and we want to read, we do not need to
-% insert two entries in the transaction log. We still need to perform a round of Paxos to confirm
-% that 
+semantically be the same (as other nodes do nothing on a READ), as I felt a NOP better represented
+the operation being sent (do nothing).
 
 \subsubsection{Transactions}
 
@@ -544,11 +615,31 @@ operation (the operations are inserted in the transaction log but ignored).
 
 \section{Paxos Implementation}
 
+\subsection{State Machine Architecture}
+
+In Paxos Made Simple, the actions of a node are split into three main roles - {\bf Proposer},
+{\bf Acceptor}, {\bf Learner}.
+
+Mixins
+getattr
+
+\begin{tabular}{ | c | c | p{7cm} | }
+  \hline
+  {\bf Message type} & {\bf Handler Class} & {\bf Message action} \\ \hline
+  AcceptRequest & Acceptor & Respond with AcceptNotify (if valid) and accept Proposal. \\ \hline
+  AcceptNotify & Learner & Record response and if a quorum has accepted that proposal, learn it. \\ \hline
+  EHLO & Node & Respond with notify. \\ \hline
+  Notify & Node & Add hosts to host list. \\ \hline
+  Ping & Node & Send pong.  \\ \hline
+  Pong & Node & Remove host from timeout list. \\ \hline
+  Prepare & Acceptor & Respond with Promise (if valid). \\ \hline
+  Promise & Proposer & Respond with AcceptRequest and deal with timeouts. \\ \hline
+\end{tabular}
+
+
+
 \section{Database Implementation}
 
-How I implemented Paxos
-"You and your project"
-DB
 SQL
 How tools affected things
 Optimisation - "what it is"
@@ -564,11 +655,21 @@ SQL parser
 
 Talk about laptop breaking
 
+\section{Testing}
+
+I started off implementing unit tests for the 
+
+\section{Commandline Tools}
+
+500 words
+
 
 \cleardoublepage
 \chapter{Evaluation}
 
 This is where the second most amount of marks are gained.
+
+Talk about scaling - different types of hierachy - DHT, supernodes etc
 
 \section{Testing}
 

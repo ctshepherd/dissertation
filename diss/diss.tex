@@ -139,18 +139,35 @@ Acknowledge various people
 
 \section{Overview}
 
-This project endeavours to build a distributed database with ACID properties
+I set out to build a distributed database with ACID properties, based on the Paxos protocol. Paxos
+was first described in Leslie Lamport's paper \emph{The Part Time Parliament} \cite{lamport98}.
 
 \section{Motivation}
 
-I set out to build a distributed database based on Paxos. Paxos was first described in Leslie
-Lamport's paper \emph{The Part Time Parliament} \cite{lamport98}.
-
-how it integrates with ecosystem (aka what's already out there).
 
 
-talk about distributed, p2p advantages
+If a users data resides on their synchronisation provider's system, then if that provider goes
+bust, suffers a natural or manmade disaster or their equipment breaks, the user may be deprived of
+their ability to use the service, and may in fact lose all their data completely. Network outages
+to the region where the data is stored (Uganda, AWS outage in US), may also deny the user access
+to their data, or to their service, even if they are in a different region or even country.
 
+Clearly distributed networks are far more resilient to failure, both hardware and network.
+
+
+
+- reliance on other backup solutions
+As there is a master central server, this contains all revision history, data etc and is a
+centralised backup source. The advantage of this is that it does provide a centralised location to
+backup from, however as this is in the cloud a user has far less control over the ability to
+backup. This could be mitigated by hosting the service on the users own service but a distributed
+approach is another solution to the problem, which has the advantage of placing the backup
+controller as merely another peer in the network, allowing separation of duties between servers
+and clearer failover characteristics.
+
+From this it is clear that using the cloud as a synchronisation backend has advantages but also
+some clear limitations. For this reason I am proposing to implement a filesystem for file
+synchronisation, that uses a peer to peer protocol.
 
 \section{Distributed Consensus Problem}
 
@@ -227,8 +244,7 @@ the cost of lack of availability in a network partition.
 
 \subsection*{Paxos}
 
-Paxos is a generalisation of 2PC and 3PC that handles more failure modes. I will go into a
-detailed explanation in the Preparation chapter, here I will just summarise it.
+Paxos is a generalisation of 2PC and 3PC that handles more failure modes. It can support multiple proposers, 
 
 
 
@@ -279,11 +295,14 @@ systems). In particular, distributed databases can be slow accessing non local d
 
 \subsection*{Existing Paxos databases}
 
-Paxos has recently become a very popular algorithm for ensuring distributed consensus. One good
-example is Google using Paxos for a distributed lock service called ``Chubby''. This underpins their
-BigTable distributed database which is used across Google.
+Paxos has recently become a very popular algorithm for ensuring distributed
+consensus. One good example is Google using Paxos for a distributed lock
+service called ``Chubby'' \cite{chandra07}. This underpins their BigTable
+distributed database which is used across Google.
 
-(XXX: Need some more examples.)
+Apache Zookeeper, a centralised service for providing distributed services such
+as synchronisation, naming and configuration management, also uses a Paxos
+based protocol called ZAB.
 
 \cleardoublepage
 

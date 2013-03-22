@@ -4,6 +4,9 @@
 
 \usepackage{a4}
 \usepackage{verbatim}
+\usepackage{natbib}
+\usepackage{graphicx}
+\usepackage{algorithm}
 
 \input{epsf}                            % to allow postscript inclusions
 
@@ -17,7 +20,11 @@
 
 \renewcommand{\baselinestretch}{1.1}    % adjust line spacing to make
                                         % more readable
-\newcommand{\msg}[1] {{\bf #1}}
+
+\newcommand{\msg}[1] {{\bf #1}}         % \msg command for formatting Paxos messages
+\newcommand{\op}[1]  {{\bf #1}}         % \op  command for formatting database operations
+
+
 \begin{document}
 
 \bibliographystyle{plain}
@@ -132,6 +139,8 @@ Acknowledge various people
 
 \section{Overview}
 
+This project endeavours to build a distributed database with ACID properties
+
 \section{Motivation}
 
 I set out to build a distributed database based on Paxos. Paxos was first described in Leslie
@@ -191,8 +200,8 @@ co-ordinator resuming, and if it never resumes then some members of the cohort a
 permanently. In fact, once a node has sent a \msg{YES} message, it is blocked until it receives a
 response. This is a big disadvantage for a concurrent system. While there are extensions to
 resolve the problem of a crashing co-ordinator, these do not fix the fundamental problem of using
-a blocking protocol in an asynchronous network. (These extensions often involve a "watchdog" or
-"recovery node". This is still not a satisfactory solution as the simultaneous crash of the
+a blocking protocol in an asynchronous network. (These extensions often involve a ``watchdog'' or
+``recovery node'' This is still not a satisfactory solution as the simultaneous crash of the
 co-ordinator and a cohort member means the state of the network is not recoverable (ie, we cannot
 tell if the cohort member who crashed voted \msg{YES} or \msg{NO}.))
 
@@ -211,7 +220,7 @@ the state of the system at any point in time. The three phases are:
 This fixes the problem of node failure, but still suffers from a significant problem. If there is
 a network partition, and all nodes who voted \msg{YES} are in one half and all nodes who voted
 \msg{NO} are in the other, both partitions will recover into different, inconsistent states.
-The CAP theorem (XXX: cite?) says that we cannot achieve both consensus and availability
+Brewer's CAP theorem \cite{gilbert2002} says that we cannot achieve both consensus and availability
 during a network partition - we must choose one. 3PC opts for availability, but for a distributed
 database with ACID properties it is preferable to have consensus. Paxos guarantees consensus at
 the cost of lack of availability in a network partition.
@@ -219,7 +228,11 @@ the cost of lack of availability in a network partition.
 \subsection*{Paxos}
 
 Paxos is a generalisation of 2PC and 3PC that handles more failure modes. I will go into a
-detailed explanation in the Preparation chapter, here I will just summarise it. 
+detailed explanation in the Preparation chapter, here I will just summarise it.
+
+
+
+
 
 \section{Databases}
 
@@ -232,7 +245,7 @@ Commonly all databases provide ACID properties. ACID stands for:
 \item Consistent - the database remains in a consistent state at all times.
 \item Isolated - one operation cannot see the intermediate state due to another operation occurring
 	at the same time.
-\item Durable - once an operation is "committed" it is permanently stored - the effects of it will
+\item Durable - once an operation is ``committed'' it is permanently stored - the effects of it will
 	not be lost.
 \end{itemize}
 
@@ -255,19 +268,19 @@ databases.
 Many general properties of centralised vs. distributed systems apply to centralised databases -
 they are easier to perform organise, to edit, to query and to backup. May slow down under load. It
 is easier to maintain the integrity of data on a centralised database, as there is only one
-"current" version of the data under consideration.
+``current'' version of the data under consideration.
 
 In contrast, distributed databases are more resilient and scalable than centralised databases.
 There is no longer a single point of failure, and they can be extended by adding nodes, although
 this will have a point of diminishing returns. Distributed databases are often more complex in
 design, as they have to ensure consistency between nodes (although there is a recent trend to
-relax this constraint in certain "NoSQL" databases. Here I will only consider traditional RDBMS
+relax this constraint in certain ``NoSQL'' databases. Here I will only consider traditional RDBMS
 systems). In particular, distributed databases can be slow accessing non local data.
 
 \subsection*{Existing Paxos databases}
 
 Paxos has recently become a very popular algorithm for ensuring distributed consensus. One good
-example is Google using Paxos for a distributed lock service called "Chubby". This underpins their
+example is Google using Paxos for a distributed lock service called ``Chubby''. This underpins their
 BigTable distributed database which is used across Google.
 
 (XXX: Need some more examples.)
@@ -297,8 +310,8 @@ three guarantees: safety, liveness and non-triviality:
 Paxos can tolerate certain kinds of failures. These are: messages being delivered late or not at
 all, etc XXX.
 
-However Paxos cannot tolerate "rogue" processes, that is, processes deliberately sending malicious
-or incorrect messages. There is a variant of Paxos called Byzantine Paxos which can tolerate this,
+However Paxos cannot tolerate ``rogue'' processes, that is, processes deliberately sending malicious
+or incorrect messages. There is a variant of Paxos called \emph{Byzantine Paxos} which can tolerate this,
 albeit at a failure tolerance of $F$ for $3F + 1$ nodes. I will not go into this variant further
 in this dissertation.
 
@@ -324,12 +337,12 @@ define quorums, however here I will use unweighted quorums.
 Paxos utilises several message types:
 
 \begin{itemize}
-\item {\bf Prepare(n)}, where $n$ is the proposal number of the message.
-\item {\bf Promise(n, v)}, where $n$ is the highest accepted proposal number by the recipient and
+\item \msg{Prepare(n)}, where $n$ is the proposal number of the message.
+\item \msg{Promise(n, v)}, where $n$ is the highest accepted proposal number by the recipient and
 	$v$ is the value of that proposal.
-\item {\bf AcceptRequest(n, v)}, where $n$ is the proposal number of the proposal and $v$ is the
+\item \msg{AcceptRequest(n, v)}, where $n$ is the proposal number of the proposal and $v$ is the
 	value of that proposal.
-\item {\bf AcceptNotify(n, v)}, where $n$ is the proposal number of the proposal and $v$ is the value
+\item \msg{AcceptNotify(n, v)}, where $n$ is the proposal number of the proposal and $v$ is the value
 	of that proposal.
 \end{itemize}
 
@@ -339,8 +352,9 @@ A round of Paxos consists of two stages:
 
 \subsubsection*{Phase 1a}
 
-To initiate a round of Paxos, a node sends out a Prepare message to a quorum (or all? XXX) of
-acceptors with a unique proposal number, higher than any it has sent out before.
+To initiate a round of Paxos, a node sends out a Prepare message to a quorum
+of acceptors with a unique proposal number, higher than any it has sent out
+before.
 
 \subsubsection*{Phase 1b}
 
@@ -361,16 +375,16 @@ If an Acceptor receives an AcceptRequest message from
 \subsection{MultiPaxos}
 
 MultiPaxos is multiple rounds of Paxos occuring at the same time. The way this is outlined in
-\emph{Paxos Made Simple} is by a form of leader election. I will outline this here but, for
+\emph{Paxos Made Simple} \cite{lamport01} is by a form of leader election. I will outline this here but, for
 simplicity, in my project I will simply use multiple Paxos rounds to form the basis of a
-distributed operation log. This will be explained in more detail in the Implementation chapter.
+\emph{distributed operation log}. This will be explained in more detail in the Implementation chapter.
 
 \section{ACID}
 
 \subsubsection*{Atomic}
 
 Atomicity means that either an operation completes, or it does not, ie, that the database is not
-left in a "halfway" state. This means that we do not need to worry about cleaning up after an
+left in a ``halfway'' state. This means that we do not need to worry about cleaning up after an
 operation, if it does not succeed we can simply retry it, without needing to worry about the state
 it has left the database in. Atomicity also applies to transactions in the same way - if we have
 a transaction as an operation composed of smaller single operations (for example, INCR B, READ A
@@ -470,7 +484,8 @@ see simple change propagate across complex system
 
 I started off with Paxos. I wanted to iterate quickly from prototype to prototype, adding features
 slowly as I understood the protocol more, as I found it confusing and wasn't sure how to implement
-in code various concepts outlined in the academic papers I read (mainly Paxos Made Simple).
+in code various concepts outlined in the academic papers I read (mainly \emph{Paxos Made Simple}
+\cite{lamport01}).
 
 My initial prototype was a synchronous model that sent messages internally. I quickly decided to
 change to Twisted, as I hoped the support it would give me would make writing the protocol easier.
@@ -499,9 +514,18 @@ arbritrary code.
 I eventually moved to sending a dictionary in plain string format over the network. This allowed
 me to specify arbitrary key/value pairs without having to add in extra support for them (a
 limitation I initially struggled with before moving to this format). This greatly simplified a lot
-of logic, at the cost of trusting that messages received are well formed. However, this is not too
-problematic for several reasons - a) byzantine b) exceptions / paxos dropping c)
-checksum/netstring.
+of logic, at the cost of trusting that messages received are well formed.  However, this is not
+too problematic for several reasons - firstly, if the message is not well formed, the code will
+throw an exception, which will be caught by the message handler and discarded. Paxos allows for
+any message to be ignored or dropped and still guarantees correctness (it must do this in order to
+work if a packet is dropped in the network or delayed indefinitely). If correctness of the message
+needed to be verified, it would be relatively easy to add a checksum of some kind, a very simple
+form of this is found in the \emph{netstring} format (defined by DJB at
+\verb+http://cr.yp.to/proto/netstrings.txt+). This is easily added to my classes by making them
+inherit from \verb+NetstringReceiver+ rather than \verb+DatagramProtocol+, and using
+the \verb+stringReceived+ callback rather than the \verb+datagramReceived+ callback. In any case,
+it is beyond the scope of this project to deal with malicious nodes, so I did not spend a
+significant amount of time considering this problem.
 
 \subsubsection*{Hosts}
 
@@ -531,14 +555,14 @@ network.
 Keeping an accurate idea of network membership is a key requirement of Paxos. Each node in the
 network needs to have a good idea of the number of nodes in the network in order to have an
 accurate estimate of the quorum size. If a node underestimates the quorum size, the network may
-become inconsistent, as a node may "learn" a value erroneously. On the other hand, if we
+become inconsistent, as a node may ``learn'' a value erroneously. On the other hand, if we
 overestimate the quorum size, we may not make any progress, waiting for more responses than there
 are nodes in the network. In practice, the first problem is more problematic than the second,
-which is only temporary - as long as the node eventually accurately learns the quorum sizethe
+which is only temporary - as long as the node eventually accurately learns the quorum size the
 network will make progress, however if the network develops inconsistencies these are much harder
 to resolve.
 
-Consensus algorithms need a strong failure detector (paper reference?).
+% Consensus algorithms need a strong failure detector \cite{chandra96}.
 
 \subsubsection{Bootstrap}
 
@@ -550,11 +574,19 @@ hosts B is aware of. $N$ then sends each of these in turn \msg{EHLO} message, ma
 aware of its presence, and getting a \msg{Notify} message from each othem. This is repeated until
 there are no nodes it has not learned of. $N$ is then fully integrated into the network.
 
+Note that this bootstrap method is $N^2$ in the number of messages sent. There are other ways to
+do bootstrap that are more efficient in the number of messages sent (for instance a DHT or a
+supernode hierachy). While this architecture is out of the scope of this project these options are
+discussed later on.
+
 \subsubsection{Heartbeat}
 
 In order to identify when a node leaves the network, when a node initialises it starts a timer on
-a configurable timeout and sends a \msg{PING} message to every node its aware of. As it receives a
-reply from a host it removes that host from the ... XXX.
+a configurable timeout and sends a \msg{Ping} message to every node in its \verb+hosts+ attribute.
+It then copies the \verb+hosts+ set to a \verb+timeout_hosts+ set. As it receives a reply from a
+host it removes that host from the \verb+timeout_hosts+ set. When the timeout fires, any nodes who
+have not sent a \msg{Pong} in reply are left in the \verb+timeout_hosts+ set, and are removed from
+the \verb+hosts+ set.
 
 \subsection{MultiPaxos}
 
@@ -567,7 +599,9 @@ initial state is not constructed.
 
 For certain messages that are not linked to any particular instance of Paxos, the message
 attribute \verb+"instance_id"+ is sent with value \verb+None+, for all other messages the instance
-id is a number referring to the instance of Paxos running.
+id is an integer referring to the OID of the instance of Paxos running. For example, all messages
+corresponding to OID 2 in the operation log would have the attribute \verb+"instance_id": 2+ set
+in their message dictionary.
 
 \section{Database Design}
 
@@ -576,49 +610,86 @@ id is a number referring to the instance of Paxos running.
 \subsubsection{Basic Operations}
 
 The database is implemented as a datastructure that can have operations performed on it. These
-operations can be serialised and deserialised. The main problem for designing a distributed
-database then becomes deciding on an order for these operations that is consistent across every
-node.
+operations can be \emph{serialised} and \emph{deserialised}. This involves converting the objects
+in memory into an \emph{on-the-wire} format that can be sent over the network and converted back
+into a Python object at the receiving node.
+
+The main problem for designing a distributed database then becomes deciding on an order for these
+operations that is consistent across every node.
+
+A basic operation is one that occupies a single slot of the operation log. 
+
+\begin{tabular}{ | c | c | p{7cm} | }
+  \hline
+  {\bf Operation} & {\bf Meaning} \\ \hline
+  NOP & Do nothing \\ \hline
+  ASSIGN(k, v) & Set \verb+k := v+ in the database. \\ \hline
+  ATTEMPTLOCK & Attempt to take the TX lock. \\ \hline
+  UNLOCK & Release the TX lock. \\ \hline
+\end{tabular}
 
 \subsubsection{The Operation Log}
 
+split this into at least a paragraph on the operation log and a paragraph on retries
+
 Deciding on a serialisation for operations is done by the operation log. This associates an
-"Operation ID" (OID) with a particular operation. In order to decide on an OID for an operation,
+``Operation ID'' (OID) with a particular operation. In order to decide on an OID for an operation,
 the code picks the next highest instance ID it hasn't seen before and starts a new round of Paxos
-for that instance, trying to assert that \verb$OID := <op>$. I tried a number of different
+for that instance, trying to assert that \verb$OID := <op>$.
+
+I tried a number of different
 techniques for retrying in the event that the OID was associated with another operation. This is
 always safe because of Paxos. In fact, this technique can even be used to learn all the database
-operations performed so far, albeit reasonably inefficiently, simply by performing a READ.
+operations performed so far, albeit reasonably inefficiently, simply by performing a \op{READ}.
+
+\begin{figure}[tbh]
+\centering
+\includegraphics[scale=0.5]{figs/op-table.eps}
+\caption{\label{fig:op-log}Operation Log}
+\end{figure}
 
 XXX: check retry semantic divide between paxos/db
 
 
 \subsubsection{Reads}
 
-For a distributed database there is the concept of "fast reads" and "slow reads". A fast read is
-simply examining the state of the local copy of the database. This is fast, but may return out of
-date data. In order to actually perform an examination of the current state of the database, we
-must insert a READ operation, to ensure that if we have an out of date copy of the database, we
-obtain the more recent transactions before returning the result to the user.
+For a distributed database there is the concept of \emph{fast reads} and \emph{slow reads}. A fast
+read is a read that only examines the state of the database locally, without sending anything over
+the network.  A slow read involves inserting an operation into the operation log in order to
+ensure that the local copy of the database is up to date, then reading from that state.
 
-In fact, I chose to use a NOP operation rather than a READ operation, although they would
-semantically be the same (as other nodes do nothing on a READ), as I felt a NOP better represented
-the operation being sent (do nothing).
+A fast read has very low latency, as it does not need to send messages to any other nodes, but it
+may return out of date data. A slow read forces us to actually examine the current state of the
+database by inserting a \op{READ} operation, to ensure we have obtained all transactions issued
+prior to our \op{READ}.
+
+explain
+
+In fact, I chose to use a \op{NOP} operation rather than a \op{READ} operation, although they
+would semantically be the same (as other nodes do nothing on a \op{READ}), as I felt a \op{NOP}
+better represented the operation being sent (do nothing).
+
+explain about using nops to build knowledge of db
 
 \subsubsection{Transactions}
 
 My first implementation of transactions was a very na\"ive global lock. In order to start a
-transaction, a node inserts the TRYLOCK operation. If, when the operation is inserted, the number
-of TRYLOCKs is well-bracketed (ie, there is an equal number of lock takes and releases), then the
-node was successful in taking the lock. While a node holds the lock, no other node can perform an
-operation (the operations are inserted in the transaction log but ignored).
+transaction, a node inserts the \op{TRYLOCK} operation. If, when the operation is inserted, the
+number of \op{TRYLOCK}s is well-bracketed (ie, there is an equal number of lock takes and
+releases), then the node was successful in taking the lock. While a node holds the lock, no other
+node can perform an operation (the operations are inserted in the transaction log but ignored).
+
+elaborate
+diagram
 
 \section{Paxos Implementation}
 
 \subsection{State Machine Architecture}
 
-In Paxos Made Simple, the actions of a node are split into three main roles - {\bf Proposer},
+In \emph{Paxos Made Simple} \cite{lamport01}, the actions of a node are split into three main roles - {\bf Proposer},
 {\bf Acceptor}, {\bf Learner}.
+
+Each of these acts like independant state machines.
 
 Mixins
 getattr
@@ -642,7 +713,7 @@ getattr
 
 SQL
 How tools affected things
-Optimisation - "what it is"
+Optimisation - ``what it is''
 Talk about iterations
 
 SQL parser
@@ -651,7 +722,7 @@ SQL parser
 -start up costs
   - ping time etc
   - inefficiencies
-  - cf. "supernodes" vs DHTs to organise nodes
+  - cf. ``supernodes'' vs DHTs to organise nodes
 
 Talk about laptop breaking
 
@@ -661,6 +732,8 @@ I started off implementing unit tests for the
 
 \section{Commandline Tools}
 
+bin/peval
+etc etc
 500 words
 
 

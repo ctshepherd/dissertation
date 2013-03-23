@@ -7,6 +7,7 @@
 \usepackage{natbib}
 \usepackage{graphicx}
 \usepackage{algorithm}
+\usepackage{bm}
 
 \input{epsf}                            % to allow postscript inclusions
 
@@ -92,7 +93,7 @@ I aim to implement a distributed database. This will be based on the Paxos proto
 \subsubsection*{Paxos}
 
 The first half of the project is to implement the Paxos protocol. This will be done in a module,
-providing an interface which the database can then use to 
+providing an interface which the database can then use to
 
 The project must correctly implement the Paxos protocol.  The library must be capable of forming a
 running network, in particular dynamic leader election, as well as achieving consensus on a
@@ -258,6 +259,29 @@ the cost of lack of availability in a network partition.
 
 \subsection*{Paxos}
 
+% The kernel of Paxos is that given a fixed number of processes, any majority of
+% them must have at least one process in common. For example given three
+% processes A, B and C the possible majorities are: AB, AC, or BC. If a decision
+% is made when one majority is present eg AB, then at any time in the future when
+% another majority is available at least one of the processes can remember what
+% the previous majority decided. If the majority is AB then both processes will
+% remember, if AC is present then A will remember and if BC is present then B
+% will remember.
+%
+% Paxos can tolerate lost messages, delayed messages, repeated messages, and
+% messages delivered out of order. It will reach consensus if there is a single
+% leader for long enough that the leader can talk to a majority of processes
+% twice. Any process, including leaders, can fail and restart; in fact all
+% processes can fail at the same time, the algorithm is still safe. There can be
+% more than one leader at a time.
+%
+% Paxos is an asynchronous algorithm; there are no explicit timeouts. However, it
+% only reaches consensus when the system is behaving in a synchronous way, ie
+% messages are delivered in a bounded period of time; otherwise it is safe. There
+% is a pathological case where Paxos will not reach consensus, in accordance to
+% FLP, but this scenario is relatively easy to avoid in practice.
+
+
 Paxos is a generalisation of 2PC and 3PC that handles more failure modes. While 3PC can handle
 failures, it only handles \emph{fail-stop} failures, not \emph{fail-recover} failures. This is
 unfortunate, as computer networks are asynchronous networks, and can therefore be modelled using a
@@ -332,7 +356,7 @@ based protocol called ZAB.
 
 \subsection{Introduction}
 
-Paxos is a distributed consensus protocol. It was developed by Leslie Lamport at Microsoft
+Paxos is a distributed consensus algorithm. It was developed by Leslie Lamport at Microsoft
 research when he was trying to disprove its existence. Paxos is failure tolerant for up to $F$
 simultaneous failures in a network of $2F + 1$ nodes.
 
@@ -340,6 +364,38 @@ Paxos is actually a family of protocols, based around the same main algorithm. T
 is an algorithm for agreeing on a single value across a network of processors. Paxos provides
 three guarantees: safety, liveness and non-triviality:
 
+%
+% Validity
+%     If all correct processes propose the same value v, then all correct processes decide v.
+% Integrity
+%     every correct process decides at most one value, and if it decides some value v, then v must have been proposed by some process.
+% Agreement
+%     Every correct process must agree on the same value.
+%
+%
+% SAFETY
+%
+% Non-triviality
+%     Only proposed values can be learned.[8]
+% Only a value that has been proposed can be chosen
+%
+% Consistency
+%     At most one value can be learned (i.e., two different learners cannot learn different values).[8][9]
+% Only a single value is chosen
+%
+% Liveness(C;L)
+%     If value C has been proposed, then eventually learner L will learn some value (if sufficient processors remain non-faulty).[9]
+%
+%
+% A process never learns that a value has been chosen unless it has been
+%
+% LIVENESS
+% Some proposed value is eventually chosen
+% If a value is chosen, a process eventually learns it
+%
+% Termination
+%     Every correct process decides some value.
+%
 \begin{enumerate}
 	\item Consistency: Only one value is chosen.
 % XXX: wtf, how can we guarantee liveness, yet liveness is impossible??
@@ -347,8 +403,9 @@ three guarantees: safety, liveness and non-triviality:
 	\item Non-triviality: only proposed values may be chosen.
 \end{enumerate}
 
+% XXX: check what these are exactly
 Paxos can tolerate certain kinds of failures. These are: messages being delivered late or not at
-all, etc XXX.
+all, etc.
 
 However Paxos cannot tolerate ``rogue'' processes, that is, processes deliberately sending malicious
 or incorrect messages. There is a variant of Paxos called \emph{Byzantine Paxos} which can tolerate this,
@@ -389,9 +446,8 @@ Paxos utilises several message types:
 \subsection{How it works}
 
 In \emph{Paxos Made Simple} \cite{lamport01}, the actions of a Paxos node are split into three
-main roles - Proposer, Acceptor and Learner. The main two roles are Proposer and Acceptor, I will
-go into the Learner role at the end of this section. There are two phases to Paxos, outlined
-below.
+roles - Proposer, Acceptor and Learner. Explaining it in terms of these roles is simpler, however
+in practise they are combined into one client.
 
 \subsubsection*{Proposer}
 
@@ -405,7 +461,7 @@ be higher than any proposal numbers it has sent for this instance of Paxos.
 
 If the Proposer receives replies from a quorum of acceptors, $Q$, (that is, a majority of
 acceptors) to its \msg{Prepare(n)} message, it sends the message \msg{AcceptRequest(n, v)} to all
-$q \in Q$, where 
+$q \in Q$, where
 % XXX: how do i say this in a formal way?? email stephen?
 $v := $ the value of the maximum \msg{Promise(n, v)} received.
 %$v \buildrel \text{d{}ef}\over = $
@@ -423,7 +479,7 @@ Acceptors need to store a few variables. An acceptor $A$ stores:
 \paragraph{Phase 1}
 
 If an acceptor $A$ receives a message \msg{Prepare(n)}, and $n > \rho$, then it replies with the
-message \msg{Promise(n, $\eta$, $\nu$)}, meaning that it will not accept any proposals numbered less
+message \msg{Promise(n, $\bm{\eta}$, $\bm{\nu}$)}, meaning that it will not accept any proposals numbered less
 than $n$.
 
 \paragraph{Phase 2}
@@ -446,7 +502,7 @@ the size of the set of distinguished Learners.
 \subsubsection*{Learner}
 
 % XXX: pseudo code?
-Learners must store a map of proposal numbers $\leftarrow$ acceptor IDs. When a Learner receives a
+Learners must store a map of proposal numbers $\rightarrow$ acceptor IDs. When a Learner receives a
 message \msg{AcceptNotify(n, v)} from an Acceptor $A$, it must add $A$ to the set of acceptors who
 have accepted proposal $n$. When this set becomes a quorum (ie, the size of the set $S$ becomes
 greater than $N / 2$, where $N$ is the size of the network), the Learner can ``learn'' the $v$ as
@@ -497,14 +553,13 @@ proposed value is learnt.
 
 \begin{enumerate}
 \item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors.
-\item \msg{Promise(n):} The Acceptors all accept the proposal, as they have not seen any
-	\msg{Prepare} requests yet (and therefore trivially cannot have promised to accept a
-	proposal higher than $n$).
-\item \msg{AcceptRequest(n, v):} The Proposer sends a value $v$, with the proposal number $n$, to
-the Acceptors.
-\item \msg{AcceptNotify(n, v):} The Acceptors have not promised to accept a proposal numbered
-	greater than $n$, so they accept $v$ as the value for the round of Paxos and notify the
-	Learner.
+\item Failure: Acceptor 3 fails.
+\item \msg{Promise(n):} Acceptors 1 and 2 still accept the proposal, for the same reason as
+	before.
+\item \msg{AcceptRequest(n, v):} The quorum size is 2, so a quorum of acceptors has responded, and
+	the Proposer can continue as normal.
+\item \msg{AcceptNotify(n, v):} The Learner receives \msg{AcceptNotify} messages from a quorum of
+	Acceptors, so also continues as normal, learning the value $v$.
 \end{enumerate}
 
 \subsubsection*{Partition}
@@ -515,53 +570,58 @@ the Acceptors.
 \caption{\label{fig:paxos-partition}Paxos Message Flow: Partition}
 \end{figure}
 
+% This is to get this figure on the next full page, ie *before* the duelling section rather than
+% on a random page after it...
 \begin{figure}[p]
 \centering
 \lwincludegraphics{figs/paxos-msg-flow-duelling.eps}
 \caption{\label{fig:paxos-duelling}Paxos Message Flow: Duelling Proposers}
 \end{figure}
 
-Figure~\ref{fig:paxos-partition} (page~\pageref{fig:paxos-partition}) shows the same
-scenario, but with a single Acceptor failing. In this case there is still a quorum of Acceptors
-available, so behaviour carries on as normal. There are still four message delays until the
-proposed value is learnt.
+Figure~\ref{fig:paxos-partition} (page~\pageref{fig:paxos-partition}) shows what happens in a
+network partition. A second Proposer is able to continue the instance of Paxos, and no
+inconsistencies are allowed to occur in the network, as the left half of the partition is unable
+to make progress until the partition is resolved, at which point it can learn the decisions made
+by the half of the partition that was able to make progress.
 
 \begin{enumerate}
-\item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors.
-\item \msg{Promise(n):} The Acceptors all accept the proposal, as they have not seen any
-	\msg{Prepare} requests yet (and therefore trivially cannot have promised to accept a
-	proposal higher than $n$).
-\item \msg{AcceptRequest(n, v):} The Proposer sends a value $v$, with the proposal number $n$, to
-the Acceptors.
-\item \msg{AcceptNotify(n, v):} The Acceptors have not promised to accept a proposal numbered
-	greater than $n$, so they accept $v$ as the value for the round of Paxos and notify the
-	Learner.
+\item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors, but is only
+	able to successfully message one of them.
+\item \msg{Prepare(n):} A second Proposer simulataneously sends a \msg{Prepare} message to the
+	Acceptors, and is able to reach a quorum.
+\item \msg{Promise(n):} The Acceptor on the left side of the split replies with a \msg{Promise},
+	but does not make up a quorum so...
+\item the first Proposer times out. It could restart with a higher proposal number, but in this
+	case it will be unable to make any progress until the partition is resolved.
+\item \msg{AcceptNotify(n, v):} The Acceptors make up a quorum so are able to proceed through to
+	completion.
 \end{enumerate}
 
 \subsubsection*{Duelling Proposers}
 
 Figure~\ref{fig:paxos-duelling} (page~\pageref{fig:paxos-duelling}) shows the worst case scenario
-for Paxos - duelling Proposers. Paxos chooses 
+for Paxos - duelling Proposers. Paxos chooses ...
 
 \begin{enumerate}
-\item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors.
-\item \msg{Promise(n):} The Acceptors all accept the proposal, as they have not seen any
-	\msg{Prepare} requests yet (and therefore trivially cannot have promised to accept a
-	proposal higher than $n$).
-\item \msg{AcceptRequest(n, v):} The Proposer sends a value $v$, with the proposal number $n$, to
-the Acceptors.
-\item \msg{AcceptNotify(n, v):} The Acceptors have not promised to accept a proposal numbered
-	greater than $n$, so they accept $v$ as the value for the round of Paxos and notify the
-	Learner.
+\item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors, but is only
+	able to successfully message one of them.
+\item \msg{Prepare(n):} A second Proposer simulataneously sends a \msg{Prepare} message to the
+	Acceptors, and is able to reach a quorum.
+\item \msg{Promise(n):} The Acceptor on the left side of the split replies with a \msg{Promise},
+	but does not make up a quorum so...
+\item the first Proposer times out. It could restart with a higher proposal number, but in this
+	case it will be unable to make any progress until the partition is resolved.
+\item \msg{AcceptNotify(n, v):} The Acceptors make up a quorum so are able to proceed through to
+	completion.
 \end{enumerate}
-
 
 \subsection{MultiPaxos}
 
 MultiPaxos is multiple rounds of Paxos occuring at the same time. The way this is outlined in
-\emph{Paxos Made Simple} \cite{lamport01} is by a form of leader election. I will outline this here but, for
-simplicity, in my project I will simply use multiple Paxos rounds to form the basis of a
-\emph{distributed operation log}. This will be explained in more detail in the Implementation chapter.
+\emph{Paxos Made Simple} \cite{lamport01} is by a form of leader election. I will outline this
+here but, for simplicity, in my project I will simply use multiple Paxos rounds to form the basis
+of a \emph{distributed operation log}. This will be explained in more detail in the Implementation
+chapter.
 
 
 \section{ACID}
@@ -571,11 +631,12 @@ simplicity, in my project I will simply use multiple Paxos rounds to form the ba
 Atomicity means that either an operation completes, or it does not, ie, that the database is not
 left in a ``halfway'' state. This means that we do not need to worry about cleaning up after an
 operation, if it does not succeed we can simply retry it, without needing to worry about the state
-it has left the database in. Atomicity also applies to transactions in the same way - if we have
-a transaction as an operation composed of smaller single operations (for example, INCR B, READ A
+it has left the database in. Atomicity also applies to transactions in the same way - if we have a
+transaction as an operation composed of smaller single operations (for example, INCR B, READ A
 $\rightarrow$ X, WRITE X + 10 $\rightarrow$ A), we don't want some of the operations to complete
-and some not to. In this example, we may have the constraint $A = 10\times B$. If B was incremented but then
-the transaction failed before A was updated, we would leave the database in an inconsistent state.
+and some not to. In this example, we may have the constraint $A = 10\times B$. If B was
+incremented but then the transaction failed before A was updated, we would leave the database in
+an inconsistent state.
 
 \subsubsection*{Consistent}
 
@@ -755,7 +816,7 @@ A node connects to the network by connecting to a \emph{bootstrap node}. In my c
 architecture this can be any node, however in a different model it may be a specific node, see the
 Evaluation chapter for more details involving scaling. When a node $N$ connects to the bootstrap
 node $B$, it sends an \msg{EHLO} message. $B$ replies with a \msg{Notify} message containing all the
-hosts B is aware of. $N$ then sends each of these in turn \msg{EHLO} message, making each of them
+hosts $B$ is aware of. $N$ then sends each of these in turn \msg{EHLO} message, making each of them
 aware of its presence, and getting a \msg{Notify} message from each othem. This is repeated until
 there are no nodes it has not learned of. $N$ is then fully integrated into the network.
 
@@ -802,7 +863,7 @@ into a Python object at the receiving node.
 The main problem for designing a distributed database then becomes deciding on an order for these
 operations that is consistent across every node.
 
-A basic operation is one that occupies a single slot of the operation log. 
+A basic operation is one that occupies a single slot of the operation log.
 
 \begin{tabular}{ | c | c | p{7cm} | }
   \hline
@@ -827,7 +888,7 @@ techniques for retrying in the event that the OID was associated with another op
 always safe because of Paxos. In fact, this technique can even be used to learn all the database
 operations performed so far, albeit reasonably inefficiently, simply by performing a \op{READ}.
 
-\begin{figure}[tbh]
+\begin{figure}[htb]
 \centering
 \includegraphics[scale=0.5]{figs/op-table.eps}
 \caption{\label{fig:op-log}Operation Log}
@@ -911,7 +972,7 @@ Talk about laptop breaking
 
 \section{Testing}
 
-I started off implementing unit tests for the 
+I started off implementing unit tests for the
 
 \section{Commandline Tools}
 

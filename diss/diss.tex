@@ -153,30 +153,7 @@ was first described in Leslie Lamport's paper \emph{The Part Time Parliament} \c
 
 \section{Motivation}
 
-
-
-If a users data resides on their synchronisation provider's system, then if that provider goes
-bust, suffers a natural or manmade disaster or their equipment breaks, the user may be deprived of
-their ability to use the service, and may in fact lose all their data completely. Network outages
-to the region where the data is stored (Uganda, AWS outage in US), may also deny the user access
-to their data, or to their service, even if they are in a different region or even country.
-
-Clearly distributed networks are far more resilient to failure, both hardware and network.
-
-
-
-- reliance on other backup solutions
-As there is a master central server, this contains all revision history, data etc and is a
-centralised backup source. The advantage of this is that it does provide a centralised location to
-backup from, however as this is in the cloud a user has far less control over the ability to
-backup. This could be mitigated by hosting the service on the users own service but a distributed
-approach is another solution to the problem, which has the advantage of placing the backup
-controller as merely another peer in the network, allowing separation of duties between servers
-and clearer failover characteristics.
-
-From this it is clear that using the cloud as a synchronisation backend has advantages but also
-some clear limitations. For this reason I am proposing to implement a filesystem for file
-synchronisation, that uses a peer to peer protocol.
+% XXX: finish!
 
 \section{Distributed Consensus Problem}
 
@@ -208,14 +185,23 @@ Preparation chapter I will go into detail about the types of failure that my dat
 
 \subsection*{2 Phase Commit}
 
-2 Phase Commit (2PC) is one of the simplest consensus protocol, and one of the most brittle. It
-has two phases:
+\begin{figure}[h!]
+\centering
+\includegraphics[scale=0.5]{figs/two-pc.eps}
+\caption{\label{fig:two-pc}Two Phase Commit}
+\end{figure}
+
+2 Phase Commit (2PC) is one of the simplest consensus protocol, and one of the most brittle. The
+basic message flow is shown in figure~\ref{fig:two-pc}. It has two phases:
 
 \begin{enumerate}
 \item The co-ordinator (the node initiating the protocol) sends a \msg{PROPOSE} message to each
 	node in a cohort of size $N$, asking them to accept the value proposed.
-\item If all nodes respond with a \msg{YES} message, send a \msg{CONFIRM} message. Otherwise, if
-	any node responds with a \msg{NO} message, send an \msg{ABORT} message to all nodes.
+\item The nodes reply with a \msg{YES} or \msg{NO} reply.
+\item If all nodes respond with a \msg{YES} message, the co-ordinator sends a \msg{CONFIRM} message. Otherwise, if
+	any node responds with a \msg{NO} message, it sends an \msg{ABORT} message to all nodes.
+\item Nodes reply with an \msg{ACK} message, and the co-ordinator marks the transaction as
+	complete when all nodes have acknowledged it.
 \end{enumerate}
 
 2PC solves the consensus problem in a failure free network. However if we can have failures then
@@ -233,14 +219,33 @@ tell if the cohort member who crashed voted \msg{YES} or \msg{NO}.))
 
 \subsection*{3 Phase Commit}
 
+\begin{figure}[h!]
+\centering
+\includegraphics[scale=0.5]{figs/three-pc.eps}
+\caption{\label{fig:three-pc}Three Phase Commit}
+\end{figure}
+
 3 Phase Commit (3PC) is a modification of 2PC that turns it from a synchronous protocol into an
 asynchronous protocol. This is done by adding a third phase, so that we can use timeouts to assert
-the state of the system at any point in time. The three phases are:
+the state of the system at any point in time. Again the basic message flow is shown in
+figure~\ref{fig:three-pc}. The three phases are:
 
 \begin{enumerate}
-\item Prepare - the coordinator
-\item Pre-commit - 
-\item Finalise commit - 
+\item \msg{Prepare}: the co-ordinator asks the cohort members if they can perform the operation. At
+	this stage if there is a failure or timeout, the co-ordinator aborts the transaction.
+\item The cohort respond with a \msg{YES} or \msg{NO}. Again, if there is a failure or timeout the cohort
+	member considers the transaction aborted.
+\item \msg{Pre-commit}: If the co-ordinator receives \msg{YES} messages from every member of the
+	cohort, it sends a \msg{Pre-commit} message to them all, otherwise it aborts the
+	transaction. It also aborts in the case of a failure or timeout.
+\item \msg{Acknowledge}: If the cohort member recieves a \msg{Pre-commit} message, it replies with
+	an \msg{Acknowledge} message. If the co-ordinator aborts, or there is a failure or
+	timeout, the cohort member aborts.
+\item \msg{Finalise}: If the co-ordinator times out, it aborts the transaction. Otherwise, when it
+	has received \msg{Acknowledge} messages from every cohort member it sends a \msg{Finalise}
+	message to them all.
+\item \msg{Confirm}: Once a cohort member has received a \msg{Finalise} message, it commits the
+	transaction, even if the co-ordinator fails. It can reply with a \msg{Confirm} message.
 \end{enumerate}
 
 This fixes the problem of node failure, but still suffers from a significant problem. If there is
@@ -253,11 +258,17 @@ the cost of lack of availability in a network partition.
 
 \subsection*{Paxos}
 
-Paxos is a generalisation of 2PC and 3PC that handles more failure modes. It can support multiple proposers, 
+Paxos is a generalisation of 2PC and 3PC that handles more failure modes. While 3PC can handle
+failures, it only handles \emph{fail-stop} failures, not \emph{fail-recover} failures. This is
+unfortunate, as computer networks are asynchronous networks, and can therefore be modelled using a
+fail-recover model to account for arbitrary delays from messages being sent to being received
+(fail-stop would mean messages can only be dropped, not delayed for an arbitrary length of time).
 
-
-
-
+Another key advantage of Paxos is that it can guarantee consistency during network partitions,
+unlike 3PC which gives availability instead. However, one potential drawback of Paxos is that it
+sacrifices \emph{liveness}, that is, the guarantee that it will make progress. This means that
+there is no upper bound on the time it will take Paxos to achieve consensus (ie, it may never
+terminate). This is due to the FLP impossibility proof \cite{fischer85}, and in practise is not a serious concern.
 
 \section{Databases}
 
@@ -331,6 +342,7 @@ three guarantees: safety, liveness and non-triviality:
 
 \begin{enumerate}
 	\item Consistency: Only one value is chosen.
+% XXX: wtf, how can we guarantee liveness, yet liveness is impossible??
 	\item Liveness: If a value is proposed, eventually some value is chosen.
 	\item Non-triviality: only proposed values may be chosen.
 \end{enumerate}
@@ -376,42 +388,87 @@ Paxos utilises several message types:
 
 \subsection{How it works}
 
-A round of Paxos consists of two stages:
+In \emph{Paxos Made Simple} \cite{lamport01}, the actions of a Paxos node are split into three
+main roles - Proposer, Acceptor and Learner. The main two roles are Proposer and Acceptor, I will
+go into the Learner role at the end of this section. There are two phases to Paxos, outlined
+below.
 
-\subsubsection*{Phase 1a}
+\subsubsection*{Proposer}
 
-To initiate a round of Paxos, a node sends out a Prepare message to a quorum
-of acceptors with a unique proposal number, higher than any it has sent out
-before.
+\paragraph{Phase 1}
 
-\subsubsection*{Phase 1b}
+To start a round of Paxos, the Proposer sends out a \msg{Prepare(n)} message to the acceptors in
+the network, with a unique proposal number, $n$, as outlined before. This proposal number $n$ must
+be higher than any proposal numbers it has sent for this instance of Paxos.
 
-Upon receipt of a Prepare message with proposal number $n$, an Acceptor responds with a Promise
-message if it has not responded to any Prepare messages with a number greater than n. The Promise
-message contains the highest proposal number, if any, the Acceptor has accepted, and the value it
-has accepted.
+\paragraph{Phase 2}
 
-\subsubsection*{Phase 2a}
+If the Proposer receives replies from a quorum of acceptors, $Q$, (that is, a majority of
+acceptors) to its \msg{Prepare(n)} message, it sends the message \msg{AcceptRequest(n, v)} to all
+$q \in Q$, where 
+% XXX: how do i say this in a formal way?? email stephen?
+$v := $ the value of the maximum \msg{Promise(n, v)} received.
+%$v \buildrel \text{d{}ef}\over = $
 
-In order for a Proposer to move from Phase 1a to Phase 2a, it must receive Promise messages from a
-quorum of acceptors.
+\subsubsection*{Acceptor}
 
-\subsubsection*{Phase 2b}
+Acceptors need to store a few variables. An acceptor $A$ stores:
+\begin{itemize}
+\item $\rho$ - the greatest proposal number that $A$ has received in a \msg{Prepare} message and
+	responded to with a \msg{Promise} message.
+\item $\eta$ - the highest-numbered proposal $A$ has accepted (initialised to $0$).
+\item $\nu$ - the value of proposal $\eta$ (initialised to \verb+null+).
+\end{itemize}
 
-If an Acceptor receives an AcceptRequest message from 
+\paragraph{Phase 1}
+
+If an acceptor $A$ receives a message \msg{Prepare(n)}, and $n > \rho$, then it replies with the
+message \msg{Promise(n, $\eta$, $\nu$)}, meaning that it will not accept any proposals numbered less
+than $n$.
+
+\paragraph{Phase 2}
+
+If an acceptor receives a message \msg{AcceptRequest(n, v)}, if $n > \rho$ it accepts the
+proposal, settings $\eta := n$ and $\nu := v$. It also notifies Learners in the network of its
+decision by sending an \msg{AcceptNotify(n, v)} message to them.
+
+% XXX: is this PMS or PTP??
+\emph{Paxos Made Simple} \cite{lamport01} describes several different ways of notifying Learners
+of accepted proposals - we can specify a \emph{distinguished Learner}, who then notifies
+other Learners when a quorum of Acceptors has accepted a proposal, we can specify several
+distinguished Learners, or we can broadcast all \msg{AcceptRequest} messages to all Learners.
+While this method generates $L\times A$ messages (where $L$ is the number of Learners in the
+network and $A$ is the number of Acceptors in the network), it is the simplest and the most
+resilient to failures, and therefore the one I have chosen to implement. By contrast, the first
+method generates $A + L$ messages, and the second generates $D\times A + L$ messages, where $D$ is
+the size of the set of distinguished Learners.
+
+\subsubsection*{Learner}
+
+% XXX: pseudo code?
+Learners must store a map of proposal numbers $\leftarrow$ acceptor IDs. When a Learner receives a
+message \msg{AcceptNotify(n, v)} from an Acceptor $A$, it must add $A$ to the set of acceptors who
+have accepted proposal $n$. When this set becomes a quorum (ie, the size of the set $S$ becomes
+greater than $N / 2$, where $N$ is the size of the network), the Learner can ``learn'' the $v$ as
+% XXX: ooh, preposition?
+the value decided on for that instance of Paxos. Because of the properties of Paxos, once a quorum
+% XXX: do i need to explain this?
+of acceptors has accepted $v$, the value of that instance will never change.
 
 \subsection*{Examples}
 
 \subsubsection*{Normal Behaviour}
 
-\begin{figure}[htb]
+\begin{figure}[h!]
 \centering
 \lwincludegraphics{figs/paxos-msg-flow-usual.eps}
 \caption{\label{fig:paxos-usual}Paxos Message Flow: Usual Behaviour}
 \end{figure}
 
-If there are no failures, then the behaviour is reasonably straightforward to
-follow. There are four message delays until the proposed value is learnt.
+Figure~\ref{fig:paxos-usual} (page~\pageref{fig:paxos-usual}) shows the message flow for a
+complete round of Paxos if there are no failures and everything proceeds as expected. In this
+case, then the behaviour is reasonably straightforward to follow. There are four message delays
+until the proposed value is learnt.
 
 \begin{enumerate}
 \item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors.
@@ -425,17 +482,79 @@ the Acceptors.
 	Learner.
 \end{enumerate}
 
-\begin{figure}[htb]
+\subsubsection*{Acceptor Failure}
+
+\begin{figure}[h!]
+\centering
+\lwincludegraphics{figs/paxos-msg-flow-one-acceptor-fail.eps}
+\caption{\label{fig:paxos-acceptor-fail}Paxos Message Flow: Acceptor Failure}
+\end{figure}
+
+Figure~\ref{fig:paxos-acceptor-fail} (page~\pageref{fig:paxos-acceptor-fail}) shows the same
+scenario, but with a single Acceptor failing. In this case there is still a quorum of Acceptors
+available, so behaviour carries on as normal. There are still four message delays until the
+proposed value is learnt.
+
+\begin{enumerate}
+\item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors.
+\item \msg{Promise(n):} The Acceptors all accept the proposal, as they have not seen any
+	\msg{Prepare} requests yet (and therefore trivially cannot have promised to accept a
+	proposal higher than $n$).
+\item \msg{AcceptRequest(n, v):} The Proposer sends a value $v$, with the proposal number $n$, to
+the Acceptors.
+\item \msg{AcceptNotify(n, v):} The Acceptors have not promised to accept a proposal numbered
+	greater than $n$, so they accept $v$ as the value for the round of Paxos and notify the
+	Learner.
+\end{enumerate}
+
+\subsubsection*{Partition}
+
+\begin{figure}[h!]
+\centering
+\lwincludegraphics{figs/paxos-msg-flow-partition.eps}
+\caption{\label{fig:paxos-partition}Paxos Message Flow: Partition}
+\end{figure}
+
+\begin{figure}[p]
 \centering
 \lwincludegraphics{figs/paxos-msg-flow-duelling.eps}
 \caption{\label{fig:paxos-duelling}Paxos Message Flow: Duelling Proposers}
 \end{figure}
 
-\begin{figure}[htb]
-\centering
-\lwincludegraphics{figs/paxos-msg-flow-one-acceptor-fail.eps}
-\caption{\label{fig:paxos-acceptor-fail}Paxos Message Flow: Acceptor Failure}
-\end{figure}
+Figure~\ref{fig:paxos-partition} (page~\pageref{fig:paxos-partition}) shows the same
+scenario, but with a single Acceptor failing. In this case there is still a quorum of Acceptors
+available, so behaviour carries on as normal. There are still four message delays until the
+proposed value is learnt.
+
+\begin{enumerate}
+\item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors.
+\item \msg{Promise(n):} The Acceptors all accept the proposal, as they have not seen any
+	\msg{Prepare} requests yet (and therefore trivially cannot have promised to accept a
+	proposal higher than $n$).
+\item \msg{AcceptRequest(n, v):} The Proposer sends a value $v$, with the proposal number $n$, to
+the Acceptors.
+\item \msg{AcceptNotify(n, v):} The Acceptors have not promised to accept a proposal numbered
+	greater than $n$, so they accept $v$ as the value for the round of Paxos and notify the
+	Learner.
+\end{enumerate}
+
+\subsubsection*{Duelling Proposers}
+
+Figure~\ref{fig:paxos-duelling} (page~\pageref{fig:paxos-duelling}) shows the worst case scenario
+for Paxos - duelling Proposers. Paxos chooses 
+
+\begin{enumerate}
+\item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors.
+\item \msg{Promise(n):} The Acceptors all accept the proposal, as they have not seen any
+	\msg{Prepare} requests yet (and therefore trivially cannot have promised to accept a
+	proposal higher than $n$).
+\item \msg{AcceptRequest(n, v):} The Proposer sends a value $v$, with the proposal number $n$, to
+the Acceptors.
+\item \msg{AcceptNotify(n, v):} The Acceptors have not promised to accept a proposal numbered
+	greater than $n$, so they accept $v$ as the value for the round of Paxos and notify the
+	Learner.
+\end{enumerate}
+
 
 \subsection{MultiPaxos}
 
@@ -752,8 +871,6 @@ diagram
 
 \subsection{State Machine Architecture}
 
-In \emph{Paxos Made Simple} \cite{lamport01}, the actions of a node are split into three main roles - {\bf Proposer},
-{\bf Acceptor}, {\bf Learner}.
 
 Each of these acts like independant state machines.
 

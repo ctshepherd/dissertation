@@ -4,7 +4,7 @@
 # Note that continuation lines require '\'
 # and that TAB is used after ':' and before unix commands.
 
-DISS = diss.tex refs.bib propbody.tex figs/diagram.eps
+DISS = diss.tex refs.bib propbody.tex figs/op-table.eps figs/paxos-msg-flow-duelling.eps figs/paxos-msg-flow-one-acceptor-fail.eps figs/paxos-msg-flow-usual.eps
 
 PROP = proposal.tex propbody.tex
 

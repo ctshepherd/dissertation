@@ -21,6 +21,15 @@
 \renewcommand{\baselinestretch}{1.1}    % adjust line spacing to make
                                         % more readable
 
+% Resize over-large graphics ( http://tex.stackexchange.com/questions/27083/can-i-conditionally-scale-an-image-with-graphicx )
+\newcommand{\lwincludegraphics}[2][]{%
+  \sbox{0}{\includegraphics[#1]{#2}}%
+  \ifdim\wd0>\linewidth
+    \resizebox{\linewidth}{!}{\box0 }%
+  \else
+    \leavevmode\box0
+  \fi}
+
 \newcommand{\msg}[1] {{\bf #1}}         % \msg command for formatting Paxos messages
 \newcommand{\op}[1]  {{\bf #1}}         % \op  command for formatting database operations
 
@@ -391,12 +400,50 @@ quorum of acceptors.
 
 If an Acceptor receives an AcceptRequest message from 
 
+\subsection*{Examples}
+
+\subsubsection*{Normal Behaviour}
+
+\begin{figure}[htb]
+\centering
+\lwincludegraphics{figs/paxos-msg-flow-usual.eps}
+\caption{\label{fig:paxos-usual}Paxos Message Flow: Usual Behaviour}
+\end{figure}
+
+If there are no failures, then the behaviour is reasonably straightforward to
+follow. There are four message delays until the proposed value is learnt.
+
+\begin{enumerate}
+\item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors.
+\item \msg{Promise(n):} The Acceptors all accept the proposal, as they have not seen any
+	\msg{Prepare} requests yet (and therefore trivially cannot have promised to accept a
+	proposal higher than $n$).
+\item \msg{AcceptRequest(n, v):} The Proposer sends a value $v$, with the proposal number $n$, to
+the Acceptors.
+\item \msg{AcceptNotify(n, v):} The Acceptors have not promised to accept a proposal numbered
+	greater than $n$, so they accept $v$ as the value for the round of Paxos and notify the
+	Learner.
+\end{enumerate}
+
+\begin{figure}[htb]
+\centering
+\lwincludegraphics{figs/paxos-msg-flow-duelling.eps}
+\caption{\label{fig:paxos-duelling}Paxos Message Flow: Duelling Proposers}
+\end{figure}
+
+\begin{figure}[htb]
+\centering
+\lwincludegraphics{figs/paxos-msg-flow-one-acceptor-fail.eps}
+\caption{\label{fig:paxos-acceptor-fail}Paxos Message Flow: Acceptor Failure}
+\end{figure}
+
 \subsection{MultiPaxos}
 
 MultiPaxos is multiple rounds of Paxos occuring at the same time. The way this is outlined in
 \emph{Paxos Made Simple} \cite{lamport01} is by a form of leader election. I will outline this here but, for
 simplicity, in my project I will simply use multiple Paxos rounds to form the basis of a
 \emph{distributed operation log}. This will be explained in more detail in the Implementation chapter.
+
 
 \section{ACID}
 

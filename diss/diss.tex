@@ -259,6 +259,7 @@ the cost of lack of availability in a network partition.
 
 \subsection*{Paxos}
 
+% http://betathoughts.blogspot.co.uk/2007/06/brief-history-of-consensus-2pc-and.html
 % The kernel of Paxos is that given a fixed number of processes, any majority of
 % them must have at least one process in common. For example given three
 % processes A, B and C the possible majorities are: AB, AC, or BC. If a decision
@@ -281,18 +282,25 @@ the cost of lack of availability in a network partition.
 % is a pathological case where Paxos will not reach consensus, in accordance to
 % FLP, but this scenario is relatively easy to avoid in practice.
 
-
 Paxos is a generalisation of 2PC and 3PC that handles more failure modes. While 3PC can handle
 failures, it only handles \emph{fail-stop} failures, not \emph{fail-recover} failures. This is
 unfortunate, as computer networks are asynchronous networks, and can therefore be modelled using a
 fail-recover model to account for arbitrary delays from messages being sent to being received
 (fail-stop would mean messages can only be dropped, not delayed for an arbitrary length of time).
 
-Another key advantage of Paxos is that it can guarantee consistency during network partitions,
-unlike 3PC which gives availability instead. However, one potential drawback of Paxos is that it
-sacrifices \emph{liveness}, that is, the guarantee that it will make progress. This means that
-there is no upper bound on the time it will take Paxos to achieve consensus (ie, it may never
-terminate). This is due to the FLP impossibility proof \cite{fischer85}, and in practise is not a serious concern.
+Paxos relies on the fact that any majority $M$ has at least one member in common. Therefore if we
+enforce the constraint that any decision must be made by a majority, then once a decision is made,
+in any subsequent decision there will be at least one member who was present in the previous
+decision. This is the central tenet of Paxos, where a majority is known as a \emph{quorum}.
+
+A key advantage of Paxos is that it can guarantee consistency during network partitions,
+unlike 3PC which gives availability instead.
+
+However, a potential drawback is that Paxos has a pathological case where it will not make
+progress, ie, there is no upper bound on the time it will take to achieve consensus (it may never
+terminate). This is due to the FLP impossibility proof \cite{fischer85}, which states that it is
+impossible to guarantee liveness in an asynchronous network where there is at least one failure.
+In practise it is a situation that is relatively easy to avoid, and is not a serious concern.
 
 \section{Databases}
 
@@ -361,24 +369,18 @@ research when he was trying to disprove its existence. Paxos is failure tolerant
 simultaneous failures in a network of $2F + 1$ nodes.
 
 Paxos is actually a family of protocols, based around the same main algorithm. The Paxos algorithm
-is an algorithm for agreeing on a single value across a network of processors. Paxos provides
-three guarantees: safety, liveness and non-triviality:
+is an algorithm for agreeing on a single value across a network of processors. Paxos has several
+safety and liveness properties:
 
-%
-% Validity
-%     If all correct processes propose the same value v, then all correct processes decide v.
-% Integrity
-%     every correct process decides at most one value, and if it decides some value v, then v must have been proposed by some process.
-% Agreement
-%     Every correct process must agree on the same value.
-%
-%
-% SAFETY
-%
-% Non-triviality
-%     Only proposed values can be learned.[8]
-% Only a value that has been proposed can be chosen
-%
+\paragraph{Safety Guarantees}
+
+\begin{itemize}
+\item Integrity - every correct process decides at most one value, and if it decides some value v,
+	then v must have been proposed by some process.
+\item Agreement - Every correct process must agree on the same value.
+\item Non-triviality - Only a value that has been proposed can be chosen.
+\end{itemize}
+
 % Consistency
 %     At most one value can be learned (i.e., two different learners cannot learn different values).[8][9]
 % Only a single value is chosen
@@ -388,29 +390,43 @@ three guarantees: safety, liveness and non-triviality:
 %
 %
 % A process never learns that a value has been chosen unless it has been
-%
-% LIVENESS
-% Some proposed value is eventually chosen
-% If a value is chosen, a process eventually learns it
-%
-% Termination
-%     Every correct process decides some value.
-%
-\begin{enumerate}
-	\item Consistency: Only one value is chosen.
-% XXX: wtf, how can we guarantee liveness, yet liveness is impossible??
-	\item Liveness: If a value is proposed, eventually some value is chosen.
-	\item Non-triviality: only proposed values may be chosen.
-\end{enumerate}
 
-% XXX: check what these are exactly
-Paxos can tolerate certain kinds of failures. These are: messages being delivered late or not at
-all, etc.
+\paragraph{Liveness Properties}
 
-However Paxos cannot tolerate ``rogue'' processes, that is, processes deliberately sending malicious
-or incorrect messages. There is a variant of Paxos called \emph{Byzantine Paxos} which can tolerate this,
-albeit at a failure tolerance of $F$ for $3F + 1$ nodes. I will not go into this variant further
-in this dissertation.
+\begin{itemize}
+\item Some proposed value is eventually chosen
+\item If a value is chosen, a process eventually learns it
+\item Termination - Every correct process decides some value.
+\end{itemize}
+
+% \begin{enumerate}
+% 	\item Consistency: Only one value is chosen.
+% % XXX: wtf, how can we guarantee liveness, yet liveness is impossible??
+% 	\item Liveness: If a value is proposed, eventually some value is chosen.
+% 	\item Non-triviality: only proposed values may be chosen.
+% \end{enumerate}
+
+Paxos can tolerate certain kinds of failures. These are: messages being lost, delayed, repeated or
+delivered out of order. It is correct even with multiple leaders, and will reach consensus if
+there is a single leader that talks to a majority of processes twice.
+
+% Paxos can tolerate lost messages, delayed messages, repeated messages, and
+% messages delivered out of order. It will reach consensus if there is a single
+% leader for long enough that the leader can talk to a majority of processes
+% twice. Any process, including leaders, can fail and restart; in fact all
+% processes can fail at the same time, the algorithm is still safe. There can be
+% more than one leader at a time.
+%
+% Paxos is an asynchronous algorithm; there are no explicit timeouts. However, it
+% only reaches consensus when the system is behaving in a synchronous way, ie
+% messages are delivered in a bounded period of time; otherwise it is safe. There
+% is a pathological case where Paxos will not reach consensus, in accordance to
+% FLP, but this scenario is relatively easy to avoid in practice.
+
+However Paxos cannot tolerate ``rogue'' processes, that is, processes deliberately sending
+malicious or incorrect messages. There is a variant of Paxos called \emph{Byzantine Paxos} which
+can tolerate this, albeit at a failure tolerance of $F$ for $3F + 1$ nodes. I will not go into
+this variant further in this dissertation.
 
 \subsection{Definitions}
 
@@ -600,7 +616,11 @@ by the half of the partition that was able to make progress.
 \subsubsection*{Duelling Proposers}
 
 Figure~\ref{fig:paxos-duelling} (page~\pageref{fig:paxos-duelling}) shows the worst case scenario
-for Paxos - duelling Proposers. Paxos chooses ...
+for Paxos - duelling Proposers. This is the pathological case for Paxos where it is possible for
+it to never make progress - this eventuality is unlikely because the messages from the proposers
+must interleave so that there is no contiguous sequence of \msg{Prepare} and \msg{AcceptRequest}
+messages, if any single Proposer manages to send a \msg{Prepare} message followed by a
+subsequent \msg{AcceptRequest} message to a quorum of Acceptors, consensus will be achieved.
 
 \begin{enumerate}
 \item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors, but is only
@@ -622,7 +642,6 @@ MultiPaxos is multiple rounds of Paxos occuring at the same time. The way this i
 here but, for simplicity, in my project I will simply use multiple Paxos rounds to form the basis
 of a \emph{distributed operation log}. This will be explained in more detail in the Implementation
 chapter.
-
 
 \section{ACID}
 
@@ -658,7 +677,12 @@ not need to worry about whether another transaction is executing or not.
 
 \subsubsection*{Durable}
 
-
+The durable property refers to the permanance of a transaction. Once a database reports that a
+transaction has been commited, it should persist in the database even in the face of power loss or
+crashes. This is typically achieved by using a write-ahead log that is append only, so that in the
+event of a crash, the database can reconstruct the state of all transactions reported as
+``committed''. Distributed systems have an added complication of co-ordinating this property
+across the network before the transaction can be reported as ``committed''.
 
 \section{Software Engineering}
 
@@ -673,7 +697,7 @@ approach.
 
 There were several options for which programming language to use for this project.  C compiles to
 very fast code, and gives a lot of control over the behaviour of the whole system.  However it is
-very verbose Another option was erlang. Erlang was designed for networking and exhibits a high
+very verbose. Another option was erlang. Erlang was designed for networking and exhibits a high
 degree of parallelism. However it is a very different paradigm and I have never used it before.
 In the end I went with Python, a language I am very familiar with, and which is very easy to
 prototype and do rapid development in.
@@ -876,26 +900,24 @@ A basic operation is one that occupies a single slot of the operation log.
 
 \subsubsection{The Operation Log}
 
-split this into at least a paragraph on the operation log and a paragraph on retries
+\begin{figure}[htb]
+\centering
+\includegraphics[scale=0.5]{figs/op-log.eps}
+\caption{\label{fig:op-log}Operation Log}
+\end{figure}
 
 Deciding on a serialisation for operations is done by the operation log. This associates an
 ``Operation ID'' (OID) with a particular operation. In order to decide on an OID for an operation,
 the code picks the next highest instance ID it hasn't seen before and starts a new round of Paxos
-for that instance, trying to assert that \verb$OID := <op>$.
+for that instance, trying to assert that \verb$OID := <op>$. OIDs are integers and refer to
+indexes into an ordered table - the operation log.
 
-I tried a number of different
-techniques for retrying in the event that the OID was associated with another operation. This is
-always safe because of Paxos. In fact, this technique can even be used to learn all the database
-operations performed so far, albeit reasonably inefficiently, simply by performing a \op{READ}.
+I tried a number of different techniques for retrying in the event that the OID was associated
+with another operation. This is always safe because of Paxos. In fact, this technique can even be
+used to learn all the database operations performed so far, albeit reasonably inefficiently,
+simply by performing a \op{READ}.
 
-\begin{figure}[htb]
-\centering
-\includegraphics[scale=0.5]{figs/op-table.eps}
-\caption{\label{fig:op-log}Operation Log}
-\end{figure}
-
-XXX: check retry semantic divide between paxos/db
-
+% XXX: check retry semantic divide between paxos/db
 
 \subsubsection{Reads}
 
@@ -919,6 +941,12 @@ explain about using nops to build knowledge of db
 
 \subsubsection{Transactions}
 
+\begin{figure}[htb]
+\centering
+\includegraphics[scale=0.5]{figs/op-log-trylock.eps}
+\caption{\label{fig:op-log-trylock}Transactions in the Operation Log}
+\end{figure}
+
 My first implementation of transactions was a very na\"ive global lock. In order to start a
 transaction, a node inserts the \op{TRYLOCK} operation. If, when the operation is inserted, the
 number of \op{TRYLOCK}s is well-bracketed (ie, there is an equal number of lock takes and
@@ -926,7 +954,8 @@ releases), then the node was successful in taking the lock. While a node holds t
 node can perform an operation (the operations are inserted in the transaction log but ignored).
 
 elaborate
-diagram
+
+
 
 \section{Paxos Implementation}
 

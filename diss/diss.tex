@@ -461,6 +461,7 @@ Paxos utilises several message types:
 
 \subsection{How it works}
 
+\label{sec:how-paxos-works}
 In \emph{Paxos Made Simple} \cite{lamport01}, the actions of a Paxos node are split into three
 roles - Proposer, Acceptor and Learner. Explaining it in terms of these roles is simpler, however
 in practise they are combined into one client.
@@ -472,6 +473,9 @@ in practise they are combined into one client.
 To start a round of Paxos, the Proposer sends out a \msg{Prepare(n)} message to the acceptors in
 the network, with a unique proposal number, $n$, as outlined before. This proposal number $n$ must
 be higher than any proposal numbers it has sent for this instance of Paxos.
+
+% XXX: should i use a mathematical symbol for the highest proposal number? might help explanation
+% of NACKS later on?
 
 \paragraph{Phase 2}
 
@@ -495,8 +499,8 @@ Acceptors need to store a few variables. An acceptor $A$ stores:
 \paragraph{Phase 1}
 
 If an acceptor $A$ receives a message \msg{Prepare(n)}, and $n > \rho$, then it replies with the
-message \msg{Promise(n, $\bm{\eta}$, $\bm{\nu}$)}, meaning that it will not accept any proposals numbered less
-than $n$.
+message \msg{Promise(n, $\bm{\eta}$, $\bm{\nu}$)}, meaning that it will not accept any proposals
+numbered less than $n$.
 
 \paragraph{Phase 2}
 
@@ -688,16 +692,31 @@ across the network before the transaction can be reported as ``committed''.
 
 \subsection{Module Dependencies}
 
-I chose Twisted in order to make implementing the protocol easier. Twisted provides a lot of
-support for implementing protocols and helper classes etc. Also as I am using a state machine
+Twisted is a large Python framework used for event driven network programming. It contains support
+for many different protocols, making writing efficient networking code a lot easier by writing
+short callbacks, which are called when network events happen. However it is still single threaded,
+saving the headache of me having to worry about concurrency issues. Twisted is licensed under the
+MIT license, meaning there are no license issues in using it for my project.
+
+I chose Twisted in order to make implementing the network code a lot simpler. Twisted is based on
+the event driven paradigm and this means that I can construct my code in terms of network events,
+rather than having to focus on handling provides a
+lot of support for implementing protocols and helper classes etc. Also as I am using a state
+machine
 approach to implementing DBP and Paxos, twisted's asynchronous system works very well with this
 approach.
 
+The other module I decided to use is PyParsing, a Python module for programmatically creating a
+parser in Python. I decided to use this for parsing input SQL, as it will make the task
+substantially simpler. I have already used PyParsing briefly, so I have a small amount of
+familiarity with it.
+
 \subsection{Programming Language}
 
-There were several options for which programming language to use for this project.  C compiles to
-very fast code, and gives a lot of control over the behaviour of the whole system.  However it is
-very verbose. Another option was erlang. Erlang was designed for networking and exhibits a high
+There were several options for which programming language to use for this project. C compiles to
+very fast code, and gives a lot of control over the behaviour of the whole system. As a systems
+programming language, it has a lot of potential as for a distributed system. However it is
+very verbose, and as I need to iterate . Another option was erlang. Erlang was designed for networking and exhibits a high
 degree of parallelism. However it is a very different paradigm and I have never used it before.
 In the end I went with Python, a language I am very familiar with, and which is very easy to
 prototype and do rapid development in.
@@ -723,7 +742,8 @@ backed up my project both to bitbucket, an online repository service which provi
 repository hosting, and to my own server.
 
 For backups I use the PWF to develop my project on. As it is stored in Git I can back it up simply
-by pushing the repo to other hosts. I currently have it backed up to two other hosts.
+by pushing the repo to other hosts. I currently have it backed up to bitbucket and to my own
+server.
 
 \subsection{Testing}
 
@@ -748,19 +768,28 @@ see simple change propagate across complex system
 \cleardoublepage
 \chapter{Implementation}
 
+\section{Event Driven Programming}
+
+callbacks - deferred
+
+diagram of semantic divide between paxos/db
+
 \section{Paxos Design}
 
 \subsection{Protocol Design}
 
-I started off with Paxos. I wanted to iterate quickly from prototype to prototype, adding features
-slowly as I understood the protocol more, as I found it confusing and wasn't sure how to implement
-in code various concepts outlined in the academic papers I read (mainly \emph{Paxos Made Simple}
-\cite{lamport01}).
+As I found initially found the concept of Paxos and how it works reasonably confusing, and wasn't
+sure how to implement in code various concepts outlined in the academic papers I read (mainly
+\emph{Paxos Made Simple} \cite{lamport01}), I wanted to iterate from one prototype of the protocol
+to another quickly, adding features as I began to understood how the protocol worked better.
 
 My initial prototype was a synchronous model that sent messages internally. I quickly decided to
 change to Twisted, as I hoped the support it would give me would make writing the protocol easier.
 
 \subsubsection*{Messages}
+
+\label{sec:message-serialization}
+
 I initially decided to use a class hierachy to define messages, and to use a simple
 serialization/deserialization technique, transmitting messages in the form
 \verb+"<message type>":<proposal serialization>+. I decided to send messages as simple strings
@@ -802,19 +831,22 @@ significant amount of time considering this problem.
 I first used a tuple of \verb+(IP Address, Port Num)+ to identify hosts. However there turned out
 to be a number of problems with this. Firstly as an identifying scheme it is not persistent across
 interfaces. Also there is a significant problem if a node needs to identify itself (a pertinent
-example is for the \op{TRYLOCK} operation). After I changed the message format to a generic
+example is for the \op{ATTEMPTLOCK} operation). After I changed the message format to a generic
 dictionary format, I wanted to add an attribute specifying the sender. This is difficult to do
 using tuple format, as it is non-trivial for a host to obtain its own IP address, it may be on a
 local network or behind a NAT for example.
 
-I updated it to use a GUID. This is better for several reasons - the host knows its own address
-etc
+For this reason, I updated the code to use a \emph{globally unique identifier} (GUID). This is
+better than using a tuple for the reasons identified above - the host is now aware of its own
+address and is able to include it in messages, and there are no problems in potentially ambiguous
+adapter situations, where different parts of the network think a node has different addresses.
 
-There is the problem of a node lying about its identity, for example forging a \op{TRYLOCK}
+There is the problem of a node lying about its identity, for example forging a \op{ATTEMPTLOCK}
 request. This is a more pertinant problem because I am using UDP, which is easier to forge than
 TCP. Although a fully secure implementation is beyond the scope of this project, one potential
 solution would be to sign or authenticate messages, and include this signature or MAC with the
 message.
+
 
 \subsection{Protocol Extras}
 
@@ -873,11 +905,135 @@ id is an integer referring to the OID of the instance of Paxos running. For exam
 corresponding to OID 2 in the operation log would have the attribute \verb+"instance_id": 2+ set
 in their message dictionary.
 
+\subsection{Implementing NACKS}
+
+Paxos is designed to be preserve its safety and liveness properties even when messages are dropped
+or lost. In order to account for messages being lost, the algorithm must retry when there is a
+timeout (see explanation of Proposer mixin). This is done with timeouts. In fact, the simplest
+implementation of Paxos uses ignored packets to communicate between nodes - if a message doesn't
+\emph{require} a response it just ignores it.
+
+An example where this happens in cases such as if an Acceptor $A$ has accepted a proposal
+$\mathcal{P}_1$ from Proposer $p_1$, with a proposal number of $\varphi_1$. $A$ then receives a
+\msg{Prepare} message $M$ from Proposer $p_2$. $M$ has proposal $\mathcal{P}_2$, such that
+$\mathcal{P}_2$ has proposal number $\varphi_2$ and $\varphi_1 > \varphi_2$. In my original
+implementation of Paxos, $A$ would simply drop the message $M$, and leave it until the timeout $t$
+for $p_2$ to resend $M$ with a higher proposal number. This has the significant disadvantage that
+if $p_1$ has crashed, $p_2$ must go through $\varphi_2 - \varphi_1$ messages, and $t\times
+(\varphi_2 - \varphi_1)$ seconds before it gets a response ($p_2$ will know $A$ still exists
+because it will still respond to \msg{PING} messages).
+
+% XXX split this into NACK, and NACK + p_2
+
+A faster method is to introduce a new message type \msg{NACK}. If $A$ sends $p_2$ a \msg{NACK}
+message containing the $\varphi_2$, $p_2$ can update its current proposal number to $\varphi_2 + 1$, and
+not even have to wait for one timeout period before receiving a \msg{Promise} message. A
+disadvantage of this extension to the protocol is that it can increase the probability of duelling
+proposers, and therefore increase the latency of the protocol. I shall discuss this in my
+evaluation.
+
+With this extension, the protocol still has protection from dropped or lost messages (the safety
+and liveness properties are still preserved), but in the case of a crashed Proposer, the recovery
+should be far quicker.
+
+% ping pong etc
+% can speed up even further by adding information (correct answer)
+
+\section{Paxos Implementation}
+
+\subsection{Node}
+
+The \verb+Node+ class is the manager class for a Paxos node, and co-ordinates between the three
+role mixins. It handles message dispatch and instance handling as explained below, as well as
+managing the quorum size, which needs to be managed accurately for decisions made by both the
+Proposer and Learner roles, through heartbeat and network discovery.
+
+\subsubsection{Message Dispatch}
+
+As mentioned in Section~\ref{sec:how-paxos-works}, the actions of a node can be split into three
+roles. I implemented Paxos by splitting the responsibilities into the three roles. I then made a
+handler class for each role that only implemented the functionality required for that role
+(\verb+Proposer+, \verb+Acceptor+, \verb+Learner+). Each class implements methods to handle a
+message type. The \verb+Node+ class then inherits from all three mixin classes, and delegates to
+each of them as appropriate. It does this by checking the \verb+msg_type+ attribute on a message,
+and then looking up a method called \verb+recv_<msg_type>+ on itself.
+
+For example, the \verb+Proposer+ class implements the \verb+recv_prepare+ method. When a node
+receives a \msg{Prepare} message, the \verb+msg_type+ attribute is set to \verb+"prepare"+. The
+\verb+datagramReceived+ callback is called by Twisted with the datagram as a string. The method
+parses the string serialization into a dictionary (as described in
+Section~\ref{sec:message-serialization}), checks the \verb+msg_type+ attribute, which is
+\verb+prepare+. It then looks up the \verb+"recv_prepare"+ method on itself, which is implemented
+by the \verb+Proposer+ subclass. It then calls \verb+self.recv_prepare+, passing in the message,
+and also the Paxos instance dictionary (described in section~\ref{sec:paxos-instance}). If an
+message is received with an unknown message type it is dropped, and a message is logged.
+
+Below is a table outlining which message types are delegated to which mixin classes. \\
+
+\begin{tabular}{ | c | c | p{7cm} | }
+  \hline
+  {\bf Message type} & {\bf Handler Class} & {\bf Message action} \\ \hline
+  AcceptRequest & Acceptor & Respond with AcceptNotify (if valid) and accept Proposal. \\ \hline
+  AcceptNotify & Learner & Record response and if a quorum has accepted that proposal, learn it. \\ \hline
+  EHLO & Node & Respond with notify. \\ \hline
+  Notify & Node & Add hosts to host list. \\ \hline
+  Ping & Node & Send pong.  \\ \hline
+  Pong & Node & Remove host from timeout list. \\ \hline
+  Prepare & Acceptor & Respond with Promise (if valid). \\ \hline
+  Promise & Proposer & Respond with AcceptRequest and deal with timeouts. \\ \hline
+\end{tabular}
+
+\subsubsection{Instance Handling}
+
+\label{sec:paxos-instance}
+
+As noted in the previous section, message handlers are called with the message to be handled, but
+also with an instance dictionary with state information of the current instance of Paxos running.
+If the node running initiated the instance of Paxos, then when it initiated the instance it will
+have created an instance dictionary, but otherwise the first the node knows about the instance is
+when it receives the first message about it (likely to be a \msg{Prepare} message, but may not be
+due to dropped messages or not being include in the quorum of Acceptors).
+
+When this happens, the datagram callback detects that the node has not encountered any instances
+with that instance ID before, and creates a new instance, storing it in the instance dictionary.
+To create a new instance state dictionary, it calls the \verb+create_instance+ method, which
+creates a new instance state. This contains a callback to be fired when a value is learnt for that
+instance of Paxos, and then calls a method from each of the three mixin classes, so they can add
+any variables that class uses to the instance state. This keeps knowledge of how each role is
+implemented encapsulated in the mixin class.
+
+\subsection{Role Mixins}
+
+\subsubsection{Proposer}
+
+Proposer mixin is the most complicated
+state machine, 3 states
+starts in idle
+goes to trying, sends prepare messages
+schedules timeout check
+when received majority promises - set status to polling
+checks whether anyone already requested value
+if yes - restart instance (can also not care, and just want to find out - NOP if no-one did but
+don't bother restarting if they did)
+if no - request our value
+
+\subsubsection{Acceptor}
+
+acceptor is a fairly simple (not even state machine?)
+just records variables and sends messages
+
+\subsubsection{Learner}
+
+learner is simple
+records a set for each prop num seen (per instance).
+when set size > quorum size:
+  sets status := complete
+  sets value
+  calls callback with instance data (why is this useful?)
+
 \section{Database Design}
 
-\subsection{Design}
-
-\subsubsection{Basic Operations}
+\subsection{Basic Operations}
 
 The database is implemented as a datastructure that can have operations performed on it. These
 operations can be \emph{serialised} and \emph{deserialised}. This involves converting the objects
@@ -889,7 +1045,9 @@ operations that is consistent across every node.
 
 A basic operation is one that occupies a single slot of the operation log.
 
-\begin{tabular}{ | c | c | p{7cm} | }
+% XXX: this will all be wrong - what do we do?
+
+\begin{tabular}{ | c | p{7cm} | }
   \hline
   {\bf Operation} & {\bf Meaning} \\ \hline
   NOP & Do nothing \\ \hline
@@ -898,7 +1056,7 @@ A basic operation is one that occupies a single slot of the operation log.
   UNLOCK & Release the TX lock. \\ \hline
 \end{tabular}
 
-\subsubsection{The Operation Log}
+\subsection{The Operation Log}
 
 \begin{figure}[htb]
 \centering
@@ -913,13 +1071,16 @@ for that instance, trying to assert that \verb$OID := <op>$. OIDs are integers a
 indexes into an ordered table - the operation log.
 
 I tried a number of different techniques for retrying in the event that the OID was associated
-with another operation. This is always safe because of Paxos. In fact, this technique can even be
-used to learn all the database operations performed so far, albeit reasonably inefficiently,
-simply by performing a \op{READ}.
+with another operation. Initially I put the retry logic in the database, however it became clear
+that it made more sense to create the specification such that once a statement was submitted to
+Paxos, it would be entered into the operation log, but at submit time the code could make no
+guarantee about the OID the statement would have. This made for a cleaner abstraction interface
+between the database and Paxos. The database code now only needed to pass the Paxos layer a
+statement/op, and it would receive a callback when that statement was finally entered into the
+transaction log, along with the OID it was entered as (which would be the instance ID, as there is
+a one-to-one correspondance of OIDs-instance IDs).
 
-% XXX: check retry semantic divide between paxos/db
-
-\subsubsection{Reads}
+\subsection{Reads}
 
 For a distributed database there is the concept of \emph{fast reads} and \emph{slow reads}. A fast
 read is a read that only examines the state of the database locally, without sending anything over
@@ -937,9 +1098,13 @@ In fact, I chose to use a \op{NOP} operation rather than a \op{READ} operation, 
 would semantically be the same (as other nodes do nothing on a \op{READ}), as I felt a \op{NOP}
 better represented the operation being sent (do nothing).
 
-explain about using nops to build knowledge of db
+explain about using reads/nops to build knowledge of db
 
-\subsubsection{Transactions}
+% XXX: diagram of read showing updated op log
+
+\subsection{Transactions}
+
+\subsubsection{Global Lock}
 
 \begin{figure}[htb]
 \centering
@@ -947,40 +1112,35 @@ explain about using nops to build knowledge of db
 \caption{\label{fig:op-log-trylock}Transactions in the Operation Log}
 \end{figure}
 
+% XXX: add brackets to diagram indicating lock holding
+
 My first implementation of transactions was a very na\"ive global lock. In order to start a
-transaction, a node inserts the \op{TRYLOCK} operation. If, when the operation is inserted, the
-number of \op{TRYLOCK}s is well-bracketed (ie, there is an equal number of lock takes and
+transaction, a node inserts the \op{ATTEMPTLOCK} operation. If, when the operation is inserted, the
+number of \op{ATTEMPTLOCK}s is well-bracketed (ie, there is an equal number of lock takes and
 releases), then the node was successful in taking the lock. While a node holds the lock, no other
 node can perform an operation (the operations are inserted in the transaction log but ignored).
 
-elaborate
+As an example, in figure~\ref{fig:op-log-trylock} we can see an operation log with two nodes
+performing operations, nodes $A$ and $B$. In OIDs 1 and 2 neither node owns the global lock, so both
+nodes are able to freely perform operations. Both try to take the lock and $A$ gets it operation
+inserted first as OID 3, so now owns the lock. $B$'s operation is inserted as OID 4, so it has the
+semantic meaning of a \op{NOP}. $A$ now performs an assignment under the lock (in reality this
+would be a series of operations) as OID 5. As $A$ is the lock holder, the operation is performed.
+$B$ tries to perform a different assignment, but as it does not hold the lock, the operation is
+not performed. $A$ now releases the lock with an \op{UNLOCK} operation (OID 7). Finally, $B$
+retries its assignment, which can finally be performed as no-one now holds the lock.
 
+\subsubsection{Two Phase Locking}
 
+I improved 
 
-\section{Paxos Implementation}
+used two phase locking
+take locks in schema order to avoid deadlock and livelock
+restart transaction if locks taken out of order
 
-\subsection{State Machine Architecture}
+use strict 2PL to avoid cascading aborts
 
-
-Each of these acts like independant state machines.
-
-Mixins
-getattr
-
-\begin{tabular}{ | c | c | p{7cm} | }
-  \hline
-  {\bf Message type} & {\bf Handler Class} & {\bf Message action} \\ \hline
-  AcceptRequest & Acceptor & Respond with AcceptNotify (if valid) and accept Proposal. \\ \hline
-  AcceptNotify & Learner & Record response and if a quorum has accepted that proposal, learn it. \\ \hline
-  EHLO & Node & Respond with notify. \\ \hline
-  Notify & Node & Add hosts to host list. \\ \hline
-  Ping & Node & Send pong.  \\ \hline
-  Pong & Node & Remove host from timeout list. \\ \hline
-  Prepare & Acceptor & Respond with Promise (if valid). \\ \hline
-  Promise & Proposer & Respond with AcceptRequest and deal with timeouts. \\ \hline
-\end{tabular}
-
-
+potential further locking schemes?
 
 \section{Database Implementation}
 

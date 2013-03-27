@@ -4,32 +4,27 @@ from pyparsing import Literal, CaselessLiteral, Word, Upcase, delimitedList, Opt
 
 # Example syntax
 # (SELECT, DELETE, UPDATE) (values) WHERE (column operator value)
+# INSERT (values)
+# INSERT (values) SELECT ? probs not.
 
-operators = ("SELECT", "DELETE", "UPDATE")
-combinators = ("AND", "OR")
+_operators = ("SELECT", "DELETE", "UPDATE")
+operators = Or(CaselessLiteral(o) for o in _operators)
+_combinators = ("AND", "OR")
+combinators = Or(CaselessLiteral(c) for c in _combinators)
 
 w = Word(alphas)
 c = Suppress(",")
 values = w + ZeroOrMore(c + w)
 
-#operators = (Literal(x) for x in ("<", ">", "==", "!="))
 stringLit = Group('"' + w + '"').setResultsName("strrhs")
 intLit = Word(nums).setResultsName("intrhs")
 condition = w.setResultsName("fieldname") + oneOf("< > == !=").setResultsName("cmp") + (stringLit | intLit).setResultsName("rhs")
-boolean = condition
-#boolean = condition + ZeroOrMore(c + w)
+boolean = condition + ZeroOrMore(combinators + condition)
 
 values = (Group(Suppress("(") + values + Suppress(")")) | '*').setResultsName("columns")
 
 where_clause = CaselessLiteral("WHERE") + "(" + boolean + ")"
 where = Optional(where_clause, "").setResultsName("where")
 
-op = Or(CaselessLiteral(o) for o in operators).setResultsName("op")
+op = operators.setResultsName("op")
 stmt = op + values + where + StringEnd()
-
-# selectStmt << ( selectToken +
-#               ( '*' | columnNameList ).setResultsName( "columns" ) +
-#               fromToken +
-#               tableNameList.setResultsName( "tables" ) +
-#               Optional( Group( CaselessLiteral("where") + whereExpression ),
-#                                                    "" ).setResultsName("where") )

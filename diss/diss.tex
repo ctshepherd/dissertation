@@ -665,11 +665,11 @@ an inconsistent state.
 
 Consistency is very closely related to atomicity, as consistency refers to a property of the
 database, and atomicity refers to a property of operations performed on the database. In the
-example used for atomicity, we had a constraint on the database (that $A = 10\times B$). We want operations
-(or transactions) to transform the database from one consistent state to another. This becomes
-more pertinent in distributed databases, as we may receive operations in one order at one node,
-and in a different order at another node. If we apply the operations in the order that we receive
-them, the two nodes are likely to be in inconsistent states. XXX: define consistency in a
+example used for atomicity, we had a constraint on the database (that $A = 10\times B$). We want
+operations (or transactions) to transform the database from one consistent state to another. This
+becomes more pertinent in distributed databases, as we may receive operations in one order at one
+node, and in a different order at another node. If we apply the operations in the order that we
+receive them, the two nodes are likely to be in inconsistent states. XXX: define consistency in a
 distributed system.
 
 \subsubsection*{Isolated}
@@ -700,9 +700,8 @@ MIT license, meaning there are no license issues in using it for my project.
 
 I chose Twisted in order to make implementing the network code a lot simpler. Twisted is based on
 the event driven paradigm and this means that I can construct my code in terms of network events,
-rather than having to focus on handling provides a
-lot of support for implementing protocols and helper classes etc. Also as I am using a state
-machine
+rather than having to focus on writing network handling code. Twisted provides a lot of built in
+support for implementing protocols and helper classes etc. Also as I am using a state machine
 approach to implementing DBP and Paxos, twisted's asynchronous system works very well with this
 approach.
 
@@ -714,12 +713,12 @@ familiarity with it.
 \subsection{Programming Language}
 
 There were several options for which programming language to use for this project. C compiles to
-very fast code, and gives a lot of control over the behaviour of the whole system. As a systems
-programming language, it has a lot of potential as for a distributed system. However it is
-very verbose, and as I need to iterate . Another option was erlang. Erlang was designed for networking and exhibits a high
-degree of parallelism. However it is a very different paradigm and I have never used it before.
-In the end I went with Python, a language I am very familiar with, and which is very easy to
-prototype and do rapid development in.
+fast machine code and gives a lot of control over the behaviour of the whole system. As a systems
+programming language, it has a lot of potential for use in a distributed system. However it is very
+verbose, and I didn't feel it was appropriate for a development style which involved iterating
+from prototype to prototype, as the level of code churn would be too high, and development would
+take a lot longer than I had allocated. In the end I went with Python, a language I am very
+familiar with, and which it is very easy to prototype and do rapid development in.
 
 \section{Requirements Analysis}
 
@@ -1006,11 +1005,47 @@ implemented encapsulated in the mixin class.
 
 \subsubsection{Proposer}
 
-Proposer mixin is the most complicated
-state machine, 3 states
-starts in idle
-goes to trying, sends prepare messages
-schedules timeout check
+% XXX: Should this be psuedo code?
+% XXX: state diagram
+% XXX: variables saved in instance state?
+
+\begin{tabular}{ | c | p{7cm} | }
+  \hline
+  {\bf Variable} & {\bf Usage} \\ \hline
+  \verb+quorum+ & set of GUIDs of Acceptors accepting the current proposal \\ \hline
+  \verb+status+ & current state of the state machine \\ \hline
+  \verb+last_tried+ & last proposal number \\ \hline
+  \verb+restart+ & restart boolean \\ \hline
+\end{tabular}
+
+The Proposer mixin is the most complicated out of the the three roles. It is a simple state
+machine with 3 states: ``idle'', ``trying'' and ``polling''. The Proposer initialises the state to
+the ``idle'' state. It then transitions to the ``trying'' state and sends \msg{Prepare} messages
+with a proposal number \verb+(p, <GUID>)+, where $p$ is normally 1, but may be different if we
+have reached the ``trying'' state from the timeout handler (described below). The \msg{Prepare}
+messages are sent to the Acceptors in the network which in my design is any node, as any node in
+the network can act as an Acceptor because the network is homogenous. It also stores the proposal
+number in the instance dictionary. It then schedules a timer to fire after the timeout period,
+which is specified in a configuration module.
+
+When the timer fires, Twisted will call the timeout function, \verb+handle_proposer_timeout+. We
+can specify the arguments we want Twisted to call \verb+handle_proposer_timeout+ with when we
+schedule the timer. \verb+handle_proposer_timeout+ is called with the instance state and the
+current state of the state machine. \verb+handle_proposer_timeout+ first checks if the Proposer is
+in this state, and if not, it does nothing. So if the Proposer has not transitioned into another
+state by the time the timeout fires, the timeout handler will retry the ``trying'' stage, with a
+higher proposal number. If the proposal number stored in the instance dictionary is of the form
+\verb+(p, <GUID>)+, the handler will retry with proposal number \verb$(p+1, <GUID>)$. It does this
+by calling \verb+proposer_start+ with the new proposal number.
+
+When the Proposer is in the ``trying'' state, it receives \msg{Promise} messages. If the proposal
+number is not the same as the proposal sent out most recently, this means the Acceptor has
+promised to accept a proposal we are no longer interested in. We can check the proposal number of
+the message against the \verb+last_tried+ state variable and if they are not the same then the
+message is dropped.
+
+
+
 when received majority promises - set status to polling
 checks whether anyone already requested value
 if yes - restart instance (can also not care, and just want to find out - NOP if no-one did but
@@ -1144,7 +1179,10 @@ potential further locking schemes?
 
 \section{Database Implementation}
 
-SQL
+\subsection{SQL}
+
+
+
 How tools affected things
 Optimisation - ``what it is''
 Talk about iterations

@@ -5,11 +5,14 @@ the moment it only supports get and set operations but will support more later.
 """
 
 from dbp.util import dbprint
+from dbp.config import SCHEMA
 
 
 class InvalidOp(Exception):
     """Invalid serialization of an Op"""
 
+class InvalidSchemaException(Exception):
+    """Invalid Schema specified"""
 
 class Op(object):
     """Database operation"""
@@ -42,49 +45,37 @@ class Op(object):
 class NOP(Op):
     """NOP operation - does nothing."""
     op_name = "nop"
-    num_args = 0
-
-    def __init__(self, s, args):
-        super(NOP, self).__init__(s, args)
 
     def perform_op(self, db):
         pass
 
 
-class Get(Op):
-    """Get operation - get an attribute from a DB"""
-    op_name = "get"
-    num_args = 1
-
-    def __init__(self, s, args):
-        super(Get, self).__init__(s, args)
-        self.key = self.args[0]
+class Update(Op):
+    """Change some rows in the database"""
+    op_name = "update"
 
     def perform_op(self, db):
-        return db.get(self.key)
+        for x in bar: pass
 
-
-class Set(Op):
-    """Set operation - set an attribute on a DB"""
-    op_name = "set"
-    num_args = 2
-
-    def __init__(self, s, args):
-        super(Set, self).__init__(s, args)
-        self.key, self.value = self.args
+class Insert(Op):
+    """Insert some rows in the database"""
+    op_name = "insert"
 
     def perform_op(self, db):
-        return db.set(self.key, self.value)
+        db.insert(self.values)
+
+class Delete(Op):
+    op_name = "delete"
+    def perform_op(self, db):
+
 
 
 ops = {
     NOP.op_name: NOP,
-    Get.op_name: Get,
-    Set.op_name: Set,
 }
 
 
-def parse_op(s):
+def parse_op(d):
     """Parse a string containing an op serialization and return an Op class.
 
     Raises InvalidOp if s is not a valid op.
@@ -109,15 +100,46 @@ def parse_op(s):
 
 class DB(object):
     """Database backing store class"""
-    def __init__(self, start=()):
-        self._db = dict(start)
+    def __init__(self, schema):
+        """Initialise DB object.
 
-    def set(self, key, val):
-        """Set a key in the database to equal val."""
-        dbprint("setting %s to %s" % (key, val), level=1)
-        self._db[key] = val
+        schema - database schema, taken from db.config.SCHEMA if none is specified
+        """
+        self.rows = {} # integer pk : row values
+        if schema is None:
+            schema = SCHEMA
+        if not schema:
+            raise InvalidSchemaException("Need to specify a valid schema!")
+        self.schema = schema
 
-    def get(self, key):
-        """Return the value of key in the database. Raises a KeyError if key does not exist."""
-        dbprint("getting key %s" % key, level=1)
-        return self._db[key]
+    def insert(self, values):
+        if not check_schema(values):
+            raise InvalidOp(values)
+        if len(values) == len(self.schema)+1:
+            pk = values[0]
+            values = values[1:]
+        else:
+            pk = self.auto_pk()
+        self.rows[pk] = values
+
+
+    def check_schema(self, values):
+        if len(values) != len(self.schema):
+            # We can specify the primary key too
+            if len(values) != len(self.schema) + 1:
+                return False
+
+            # First val should be an int
+            try:
+                pk = int(values[0])
+            except ValueError:
+                return False
+            # And should be unique
+            if pk in self.rows:
+                return False
+
+        # That's all the constraints
+        return True
+
+    def auto_pk(self):
+        return max(self.rows)+1

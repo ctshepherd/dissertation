@@ -149,6 +149,8 @@ Acknowledge various people
 
 \section{Overview}
 
+% S comment: Discuss paper a little, short quote?
+
 I set out to build a distributed database with ACID properties, based on the Paxos protocol. Paxos
 was first described in Leslie Lamport's paper \emph{The Part Time Parliament} \cite{lamport98}.
 
@@ -186,6 +188,9 @@ Preparation chapter I will go into detail about the types of failure that my dat
 
 \subsection*{2 Phase Commit}
 
+% S comment: too detailed, move to preparation and discuss what 2pc tries to achieve and its flaws
+% rather than details
+
 \begin{figure}[h!]
 \centering
 \includegraphics[scale=0.5]{figs/two-pc.eps}
@@ -204,6 +209,8 @@ basic message flow is shown in figure~\ref{fig:two-pc}. It has two phases:
 \item Nodes reply with an \msg{ACK} message, and the co-ordinator marks the transaction as
 	complete when all nodes have acknowledged it.
 \end{enumerate}
+
+% S comment: split into 2 paragraphs and use footnotes
 
 2PC solves the consensus problem in a failure free network. However if we can have failures then
 the protocol can suffer from a number of limitations. If the co-ordinator crashes before sending
@@ -309,8 +316,9 @@ In practise it is a situation that is relatively easy to avoid, and is not a ser
 Commonly all databases provide ACID properties. ACID stands for:
 
 \begin{itemize}
-\item Atomic - an operation is either performed or is not performed.
-\item Consistent - the database remains in a consistent state at all times.
+\item Atomic - an operation is either performed in its entirety or is not performed at all.
+\item Consistent - the database remains in a \emph{consistent} state at all times, where being
+	consistent is defined as being valid according to rules that ensure database integrity.
 \item Isolated - one operation cannot see the intermediate state due to another operation occurring
 	at the same time.
 \item Durable - once an operation is ``committed'' it is permanently stored - the effects of it will
@@ -331,6 +339,7 @@ Databases are generally found in one of two topologies - centralised or distribu
 different topologies are used in different situations and to different ends.
 
 A centralised database is a single node in a single location.
+% S comment: reasons? citation? (for sentence below)
 In general, centralised databases are simpler in design and on the whole faster than distributed
 databases.
 Many general properties of centralised vs. distributed systems apply to centralised databases -
@@ -341,9 +350,11 @@ is easier to maintain the integrity of data on a centralised database, as there 
 In contrast, distributed databases are more resilient and scalable than centralised databases.
 There is no longer a single point of failure, and they can be extended by adding nodes, although
 this will have a point of diminishing returns. Distributed databases are often more complex in
-design, as they have to ensure consistency between nodes (although there is a recent trend to
+design, as they have to ensure consistency between nodes \footnote{although there is a recent trend to
 relax this constraint in certain ``NoSQL'' databases. Here I will only consider traditional RDBMS
-systems). In particular, distributed databases can be slow accessing non local data.
+systems.} In particular, distributed databases can be slow accessing non local data.
+
+% S comment: in particular distributed is a generalisation of centralised
 
 \subsection*{Existing Paxos databases}
 
@@ -356,9 +367,13 @@ Apache Zookeeper, a centralised service for providing distributed services such
 as synchronisation, naming and configuration management, also uses a Paxos
 based protocol called ZAB.
 
+% S comment: try to expand this section, giving more details about the implementation
+
 \cleardoublepage
 
 \chapter{Preparation}
+
+% S says start off with software engineering stuff
 
 \section{Paxos}
 
@@ -367,6 +382,7 @@ based protocol called ZAB.
 Paxos is a distributed consensus algorithm. It was developed by Leslie Lamport at Microsoft
 research when he was trying to disprove its existence. Paxos is failure tolerant for up to $F$
 simultaneous failures in a network of $2F + 1$ nodes.
+% S comment: Explain why this is true (ie, showing some working)
 
 Paxos is actually a family of protocols, based around the same main algorithm. The Paxos algorithm
 is an algorithm for agreeing on a single value across a network of processors. Paxos has several
@@ -451,7 +467,8 @@ Paxos utilises several message types:
 
 \begin{itemize}
 \item \msg{Prepare(n)}, where $n$ is the proposal number of the message.
-\item \msg{Promise(n, v)}, where $n$ is the highest accepted proposal number by the recipient and
+% XXX
+\item \msg{Promise(n, m, v)}, promising to only accept proposals numbered where $m$ is the highest accepted proposal number by the recipient and
 	$v$ is the value of that proposal.
 \item \msg{AcceptRequest(n, v)}, where $n$ is the proposal number of the proposal and $v$ is the
 	value of that proposal.
@@ -464,7 +481,7 @@ Paxos utilises several message types:
 \label{sec:how-paxos-works}
 In \emph{Paxos Made Simple} \cite{lamport01}, the actions of a Paxos node are split into three
 roles - Proposer, Acceptor and Learner. Explaining it in terms of these roles is simpler, however
-in practise they are combined into one client.
+in practice they are combined into one client.
 
 \subsubsection*{Proposer}
 
@@ -479,7 +496,7 @@ be higher than any proposal numbers it has sent for this instance of Paxos.
 
 \paragraph{Phase 2}
 
-If the Proposer receives replies from a quorum of acceptors, $Q$, (that is, a majority of
+If the Proposer receives \msg{Promise} replies from a quorum of acceptors, $Q$, (that is, a majority of
 acceptors) to its \msg{Prepare(n)} message, it sends the message \msg{AcceptRequest(n, v)} to all
 $q \in Q$, where
 % XXX: how do i say this in a formal way?? email stephen?
@@ -728,8 +745,12 @@ ACID properties
 
 \subsection{Software Development Process}
 
-I considered using the waterfall model, but it didn't fit in with my requirement to do fast
-prototyping (as I needed to gain a better understanding of Paxos). I settled on the spiral model
+There are several different software development models. Initially I considered using the
+waterfall model, but it has several drawbacks. The waterfall models is very rigid, and doesn't
+allow for any changes in requirements. However I 
+
+didn't fit in with my requirement to do fast prototyping (as I needed to
+gain a better understanding of Paxos). I settled on the spiral model
 because of XXX:
 
 \subsection{Version Control and Backup Strategy}
@@ -925,8 +946,8 @@ because it will still respond to \msg{PING} messages).
 % XXX split this into NACK, and NACK + p_2
 
 A faster method is to introduce a new message type \msg{NACK}. If $A$ sends $p_2$ a \msg{NACK}
-message containing the $\varphi_2$, $p_2$ can update its current proposal number to $\varphi_2 + 1$, and
-not even have to wait for one timeout period before receiving a \msg{Promise} message. A
+message containing the $\varphi_2$, $p_2$ can update its current proposal number to $\varphi_2 +
+1$, and not even have to wait for one timeout period before receiving a \msg{Promise} message. A
 disadvantage of this extension to the protocol is that it can increase the probability of duelling
 proposers, and therefore increase the latency of the protocol. I shall discuss this in my
 evaluation.
@@ -1016,7 +1037,10 @@ implemented encapsulated in the mixin class.
   \verb+status+ & current state of the state machine \\ \hline
   \verb+last_tried+ & last proposal number \\ \hline
   \verb+restart+ & restart boolean \\ \hline
+  \verb+proposer_prev_prop_num+ & highest proposal number accepted by any acceptor in \verb+quorum+ \\ \hline
+  \verb+proposer_prev_prop_value+  & value corresponding to \verb+proposer_prev_prop_num+ \\ \hline
 \end{tabular}
+
 
 The Proposer mixin is the most complicated out of the the three roles. It is a simple state
 machine with 3 states: ``idle'', ``trying'' and ``polling''. The Proposer initialises the state to
@@ -1044,13 +1068,26 @@ promised to accept a proposal we are no longer interested in. We can check the p
 the message against the \verb+last_tried+ state variable and if they are not the same then the
 message is dropped.
 
+As the Proposer receives \msg{Promise} messages, it keeps track of the \verb+prev_prop_num+ and
+\verb+prev_prop_value+ attributes of messages it has received. If \verb+prev_prop_num+ is larger
+than \verb+proposer_prev_prop_num+, then it updates \verb+proposer_prev_prop_num+
+and \verb+proposer_prev_prop_value+ to \verb+prev_prop_num+ and \verb+prev_prop_value+
+respectively.
 
+Once a Proposer in the ``trying'' state has received \msg{Promise} messages from a majority of
+Acceptors in the network, it moves to the ``polling'' state. 
 
 when received majority promises - set status to polling
 checks whether anyone already requested value
 if yes - restart instance (can also not care, and just want to find out - NOP if no-one did but
 don't bother restarting if they did)
 if no - request our value
+
+\begin{figure}[htb]
+\centering
+\lwincludegraphics[scale=0.5]{figs/proposer-state-machine.eps}
+\caption{\label{fig:proposer-state-machine}Proposer State Machine}
+\end{figure}
 
 \subsubsection{Acceptor}
 
@@ -1124,8 +1161,8 @@ ensure that the local copy of the database is up to date, then reading from that
 
 A fast read has very low latency, as it does not need to send messages to any other nodes, but it
 may return out of date data. A slow read forces us to actually examine the current state of the
-database by inserting a \op{READ} operation, to ensure we have obtained all transactions issued
-prior to our \op{READ}.
+database by inserting an operation, to ensure we have obtained all transactions issued
+prior to the slow read.
 
 explain
 

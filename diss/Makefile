@@ -8,6 +8,7 @@ DISS = diss.tex \
        refs.bib \
        propbody.tex \
        figs/op-log.eps \
+       figs/proposer-state-machine.eps \
        figs/op-log-trylock.eps \
        figs/paxos-msg-flow-duelling.eps \
        figs/paxos-msg-flow-one-acceptor-fail.eps \

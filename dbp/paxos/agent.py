@@ -1,8 +1,6 @@
-import sys
-from pprint import pformat
 from uuid import uuid4
 from dbp.util import dbprint
-from dbp.config import NODE_TIMEOUT, PROPOSER_TIMEOUT
+from dbp.config import NODE_TIMEOUT, PROPOSER_TIMEOUT, NACKS_ENABLED
 from dbp.paxos.message import Msg, parse_message, InvalidMessageException
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet import reactor, defer
@@ -36,7 +34,16 @@ class Acceptor(object):
                                   }))
             instance['acceptor_prepare_prop_num'] = msg.prop_num
         else:
-            pass  # Can NACK here
+            if NACKS_ENABLED:
+                d = {
+                    'msg_type': 'nack_promise',
+                    'prop_num': msg['prop_num'],
+                    'instance_id': instance['instance_id'],
+                }
+                if NACKS_ENABLED == 2:
+                    d['prev_prop_num'] = instance['acceptor_cur_prop_num']
+                    d['prev_prop_value'] = instance['acceptor_cur_prop_value']
+                self.writeMessage(msg['uid'], Msg(d))
 
     def recv_acceptrequest(self, msg, instance):
         """Update instance state appropriately based upon msg.
@@ -46,8 +53,11 @@ class Acceptor(object):
         having a number greater than n.
         """
         if msg['prop_num'] >= instance['acceptor_prepare_prop_num']:
-            dbprint("Instance %d: accepting prop %s (current is %s)" % (instance['instance_id'],
-                msg['prop_num'], instance['acceptor_cur_prop_num']), level=4)
+            dbprint("Instance %d: accepting prop %s (current is %s)"
+                    % (instance['instance_id'],
+                       msg['prop_num'],
+                       instance['acceptor_cur_prop_num']),
+                    level=4)
             instance['acceptor_cur_prop_num'] = msg.prop_num
             instance['acceptor_cur_prop_value'] = msg.prop_value
             self.writeAll(Msg({
@@ -57,7 +67,16 @@ class Acceptor(object):
                 "instance_id": instance['instance_id']
             }))
         else:
-            pass  # Can NACK here
+            if NACKS_ENABLED:
+                d = {
+                    'msg_type': 'nack_acceptrequest',
+                    'prop_num': msg['prop_num'],
+                    'instance_id': instance['instance_id'],
+                }
+                if NACKS_ENABLED == 2:
+                    d['prev_prop_num'] = instance['acceptor_cur_prop_num']
+                    d['prev_prop_value'] = instance['acceptor_cur_prop_value']
+                self.writeMessage(msg['uid'], Msg(d))
 
 
 class Learner(object):
@@ -82,8 +101,11 @@ class Learner(object):
         s = instance['learner_accepted'].setdefault(msg['prop_num'], set())
         s.add(msg['uid'])
         if len(s) >= self.quorum_size:
-            dbprint("Instance %d: learnt value %s (prop %s)" % (instance['instance_id'],
-                msg['prop_value'], msg['prop_num']), level=4)
+            dbprint("Instance %d: learnt value %s (prop %s)"
+                    % (instance['instance_id'],
+                       msg['prop_value'],
+                       msg['prop_num']),
+                    level=4)
             instance['status'] = "completed"
             instance['value'] = msg['prop_value']
             instance['callback'].callback(instance)
@@ -116,56 +138,72 @@ class Proposer(object):
         """
         # If this is an old message or we're in the wrong state, ignore
         if msg['prop_num'] != instance['last_tried']:# or instance['status'] != "trying":
-            dbprint("proposer ignoring msg %s, not appropriate (%s)" % (msg, instance), level=1)
+            dbprint("proposer ignoring msg %s, not appropriate (%s)"
+                    % (msg, instance),
+                    level=1)
             return
 
         instance['quorum'].add(msg['uid'])
 
         if msg['prev_prop_value'] is not None:
             if msg['prev_prop_num'] > instance['proposer_prev_prop_num']:
-                dbprint("loading old prop value of %s (num %s)" % (msg['prev_prop_value'], msg['prev_prop_num']), level=2)
+                dbprint("loading old prop value of %s (num %s)"
+                        % (msg['prev_prop_value'], msg['prev_prop_num']),
+                        level=2)
                 instance['proposer_prev_prop_num'] = msg['prev_prop_num']
                 instance['proposer_prev_prop_value'] = msg['prev_prop_value']
             else:
-                dbprint("ignoring old prop value of %s (num %s) for prop %s" % (msg['prev_prop_value'], msg['prev_prop_num'], instance['proposer_prev_prop_value']), level=2)
+                dbprint("ignoring old prop value of %s (num %s) for prop %s"
+                        % (msg['prev_prop_value'],
+                           msg['prev_prop_num'],
+                           instance['proposer_prev_prop_value']),
+                        level=2)
 
         if len(instance['quorum']) >= self.quorum_size:
             # If this is the message that tips us over the edge and we
             # finally accept the proposal, deal with it appropriately.
+            if instance['status'] == 'trying':
+                self.poll(instance, msg['prop_num'])
+            # XXX: this is new code, test before committing!
+            # # Otherwise just reply
+            # else:
+            #     self.send_acceptrequest(msg['uid'], msg['prop_num'], value, instance)
 
-            # Set our status from trying to polling
-            instance['status'] = "polling"
+    def poll(self, instance, prop_num):
+        instance['status'] = "polling"
 
-            # Decide what value to use
-            if instance['proposer_prev_prop_value'] is None:
-                # if no-one else asserted a value, we can set ours
-                if 'our_val' in instance:
-                    value = instance['our_val']
-                else:
-                    # if 'our_val' isn't in instance, we didn't try and
-                    # initiate this Paxos round
-                    raise Exception("error!")
-            else:
-                value = instance['proposer_prev_prop_value']
-                # if we wanted to set a value, try again
-                if 'our_val' in instance and instance['restart']:
-                    self.run(instance['our_val'])
-                    # delete our_val so we don't try and restart too often
-                    del instance['our_val']
-                    instance['restart'] = None
-                    instance['restarted'] = True
+        # Decide what value to use
+        # if no-one else asserted a value, we can set ours
+        if instance['proposer_prev_prop_value'] is None:
+            assert('our_val' in instance) # if 'our_val' isn't in instance, we
+                                          # didn't try and initiate this Paxos
+                                          # round, so we have no idea what to
+                                          # do? (Maybe could just nop here?)
+            value = instance['our_val']
+        else:
+            # otherwise we have to use the already asserted one and restart
+            value = instance['proposer_prev_prop_value']
+            # if we wanted to set a value, try again
+            if 'our_val' in instance and instance['restart']:
+                self.run(instance['our_val'])
+                # delete our_val so we don't try and restart too often
+                del instance['our_val']
+                instance['restart'] = None
+                #instance['restarted'] = True
 
-            # Send our AcceptRequests
-            for uid in instance['quorum']:
-                self.writeMessage(uid,
-                                  Msg({
-                                      "msg_type": "acceptrequest",
-                                      "prop_num": msg.prop_num,
-                                      "prop_value": value,
-                                      "instance_id": instance['instance_id']
-                                  }))
-            self.reactor.callLater(self.proposer_timeout, self.handle_proposer_timeout, instance, "polling")
+        for uid in instance['quorum']:
+            self.send_acceptrequest(uid, prop_num, value, instance)
 
+        self.reactor.callLater(self.proposer_timeout, self.handle_proposer_timeout, instance, "polling")
+
+    def send_acceptrequest(self, uid, prop_num, value, instance):
+        d = {
+            "msg_type": "acceptrequest",
+            "prop_num": prop_num,
+            "prop_value": value,
+            "instance_id": instance['instance_id']
+        }
+        self.writeMessage(uid, Msg(d))
 
     def proposer_start(self, instance, value, prop_num=1, restart=True):
         """Start an instance of Paxos!
@@ -198,9 +236,9 @@ class Proposer(object):
         # If we're still waiting to hear back from enough people, try a higher
         # proposal number
         if instance['status'] == expected_status:
-            if 'restarted' in instance:
-                dbprint("restarted instance %d" % instance['instance_id'], level=2)
-                return
+            # if 'restarted' in instance:
+            #     dbprint("restarted instance %d" % instance['instance_id'], level=2)
+            #     return
             v = instance['our_val']
             l = instance['last_tried'][0]
             r = instance['restart']

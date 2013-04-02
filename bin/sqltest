@@ -1,0 +1,10 @@
+#!/usr/bin/env python
+
+from dbp.sql import parse_sql, ParseException
+
+while True:
+    i = raw_input('Enter some SQL:')
+    try:
+        print parse_sql(i)
+    except ParseException, e:
+        print "Error %s" % e

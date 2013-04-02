@@ -1,7 +1,7 @@
 from pyparsing import CaselessLiteral, Word, Optional, Group, nums, alphanums, oneOf, \
-        ZeroOrMore, StringEnd, Or, Suppress, Forward
+        ZeroOrMore, StringEnd, Or, Suppress, Forward, ParseException as pyPE
 from dbp.db import Update, Insert, Delete
-from dbp.where import _combinators, _ops, _operators
+from dbp.where import _combinators, _ops, _operators, ParseException
 
 # Example syntax
 # (SELECT, DELETE, UPDATE) (values) WHERE (column operator value)
@@ -41,13 +41,16 @@ stmt = sgram | insert
 
 def parse_sql(s):
     d = {'stmt': s}
-    r = stmt.parseString(s)
+    try:
+        r = stmt.parseString(s)
+    except pyPE, e:
+        raise ParseException(e)
     o = r.op.lower()
     if o == "insert":
-        d['values'] = r.ivalues
+        d['values'] = list(r.ivalues)
         return Insert(d)
     elif o == "select":
-        pass
+        raise NotImplemented()
     elif o == "update":
         # XXX: doesn't work
         d['where_clause'] = r.where

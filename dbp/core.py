@@ -53,6 +53,7 @@ class DBP(object):
         dbprint("processing op %r, tx id %d" % (d, tx_id), level=4)
         assert tx_id == self.tx_version+1, "process: tx_id %d != tx_version+1: %d" % (tx_id, self.tx_version+1)
         self.history.append((tx_id, d))
+        assert isinstance(d, dict)
         op = d['type']
         if op == "nop":
             pass
@@ -61,7 +62,7 @@ class DBP(object):
         elif op == "unlock":
             self.process_unlock(d)
         elif op == "db_op":
-            self.process_assign(d)
+            self.process_op(d)
         self.tx_version = tx_id
 
     def execute(self, d):

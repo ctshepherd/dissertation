@@ -169,6 +169,9 @@ class Proposer(object):
             # else:
             #     self.send_acceptrequest(msg['uid'], msg['prop_num'], value, instance)
 
+    def recv_nack_promise(self, msg, instance):
+        self.handle_reject(instance)
+
     def poll(self, instance, prop_num):
         instance['status'] = "polling"
 
@@ -239,6 +242,9 @@ class Proposer(object):
             # if 'restarted' in instance:
             #     dbprint("restarted instance %d" % instance['instance_id'], level=2)
             #     return
+            self.handle_reject(instance)
+
+    def handle_reject(self, instance):
             v = instance['our_val']
             l = instance['last_tried'][0]
             r = instance['restart']

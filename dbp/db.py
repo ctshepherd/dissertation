@@ -43,7 +43,8 @@ class Op(object):
         return not self == other
 
     def serialize(self):
-        d = dict(args)
+        d = dict(self.args)
+        d['type'] = "db_op"
         d['op_name'] = self.op_name
         return d
 
@@ -172,4 +173,6 @@ class DB(object):
 
     def auto_pk(self):
         """Return a new primary key that is unique"""
+        if not self.rows:
+            return 1
         return max(self.rows)+1

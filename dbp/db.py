@@ -11,8 +11,10 @@ from dbp.config import SCHEMA
 class InvalidOp(Exception):
     """Invalid serialization of an Op"""
 
+
 class InvalidSchemaException(Exception):
     """Invalid Schema specified"""
+
 
 class Op(object):
     """Database operation"""
@@ -55,7 +57,14 @@ class Update(Op):
     op_name = "update"
 
     def perform_op(self, db):
-        for x in bar: pass
+        # Store changes in update, then apply them after (because we don't want
+        # to modify the dict while we iterate over it)
+        update = {}
+        for key, row in db.rows.iteritems():
+            if self.where_clause.match(row):
+                update[key] = self.change(row)
+        db.rows.update(update)
+
 
 class Insert(Op):
     """Insert some rows in the database"""
@@ -64,14 +73,26 @@ class Insert(Op):
     def perform_op(self, db):
         db.insert(self.values)
 
+
 class Delete(Op):
     op_name = "delete"
-    def perform_op(self, db):
 
+    def perform_op(self, db):
+        # Store rows to be deleted in delete, then apply them after (because we
+        # don't want to modify the dict while we iterate over it)
+        delete = []
+        for key, row in db.rows.iteritems():
+            if self.where_clause.match(row):
+                delete.append(key)
+        for key in delete:
+            del row[key]
 
 
 ops = {
     NOP.op_name: NOP,
+    Update.op_name: Update,
+    Insert.op_name: Insert,
+    Delete.op_name: Delete,
 }
 
 
@@ -113,6 +134,11 @@ class DB(object):
         self.schema = schema
 
     def insert(self, values):
+        """Insert a new row, values, into the DB.
+
+        Raises InvalidOp if values doesn't conform to self.schema and inserts
+        an automatic primary key if necessary.
+        """
         if not check_schema(values):
             raise InvalidOp(values)
         if len(values) == len(self.schema)+1:
@@ -124,6 +150,10 @@ class DB(object):
 
 
     def check_schema(self, values):
+        """Check whether values conforms to self.schema.
+
+        Returns True if values is conforming, False if not.
+        """
         if len(values) != len(self.schema):
             # We can specify the primary key too
             if len(values) != len(self.schema) + 1:
@@ -142,4 +172,5 @@ class DB(object):
         return True
 
     def auto_pk(self):
+        """Return a new primary key that is unique"""
         return max(self.rows)+1

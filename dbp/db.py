@@ -6,6 +6,7 @@ the moment it only supports get and set operations but will support more later.
 
 from dbp.util import dbprint
 from dbp.config import DB_SCHEMA as SCHEMA
+from dbp.where import parse_where
 
 
 class InvalidOp(Exception):
@@ -19,12 +20,9 @@ class InvalidSchemaException(Exception):
 class Op(object):
     """Database operation"""
     op_name = "op"
-    args = None
 
-    def __init__(self, s, **args):
-        self.statement = s
-        for k, v in args.iteritems():
-            setattr(self, k, v)
+    def __init__(self, args):
+        self.args = args
 
     def perform_op(self, db):
         raise NotImplementedError("perform_op: %s" % self)
@@ -44,6 +42,11 @@ class Op(object):
     def __ne__(self, other):
         return not self == other
 
+    def serialize(self):
+        d = dict(args)
+        d['op_name'] = self.op_name
+        return d
+
 
 class NOP(Op):
     """NOP operation - does nothing."""
@@ -58,11 +61,12 @@ class Update(Op):
     op_name = "update"
 
     def perform_op(self, db):
+        w = parse_where(self.args['where_clause'])
         # Store changes in update, then apply them after (because we don't want
         # to modify the dict while we iterate over it)
         update = {}
         for key, row in db.rows.iteritems():
-            if self.where_clause.match(row):
+            if w.match(row):
                 update[key] = self.change(row)
         db.rows.update(update)
 
@@ -72,7 +76,7 @@ class Insert(Op):
     op_name = "insert"
 
     def perform_op(self, db):
-        db.insert(self.values)
+        db.insert(self.args['values'])
 
 
 class Delete(Op):
@@ -103,12 +107,13 @@ def parse_op(d):
     Raises InvalidOp if s is not a valid op.
     """
     try:
+        args = {}
         op_name = d['op_name']
         kls = ops[op_name]
-        stmt = d['stmt']
-        where_clause = d.get('where')
-        values = d.get('values')
-        return kls(s, stmt=stmt, where_clause=where_clause, values=values)
+        args['stmt'] = d['stmt']
+        args['where'] = d.get('where')
+        args['values'] = d.get('values')
+        return kls(args)
     except KeyError:
         raise InvalidOp(d)
 
@@ -133,7 +138,7 @@ class DB(object):
         Raises InvalidOp if values doesn't conform to self.schema and inserts
         an automatic primary key if necessary.
         """
-        if not check_schema(values):
+        if not self.check_schema(values):
             raise InvalidOp(values)
         if len(values) == len(self.schema)+1:
             pk = values[0]

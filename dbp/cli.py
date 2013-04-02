@@ -1,4 +1,5 @@
 from dbp.core import DBP
+from dbp.sql import parse_sql
 from twisted.protocols import basic
 from twisted.internet.error import ConnectionLost
 from twisted.internet import reactor
@@ -31,7 +32,7 @@ class DBPProtocol(basic.LineReceiver):
         try:
             method = getattr(self, 'do_' + command)
         except AttributeError, e:
-            self.sendLine('Error: no such command.')
+            self.sendLine('Error: no such command "%r".' % e)
         else:
             try:
                 method(*args)
@@ -57,13 +58,15 @@ class DBPProtocol(basic.LineReceiver):
 
     def do_list(self):
         """list: Output the contents of the database"""
-        self.sendLine(pformat(self.dbp.db._db))
+        self.sendLine(pformat(self.dbp.db.rows))
 
-    def do_assign(self, s):
-        """assign key=val: Set key to val in the database"""
+    def do_sql(self, s):
+        """Perform an SQL statement"""
         if self.dbp.lock_holder is not None and not self.dbp.owns_lock():
             self.sendLine("Unable to assign: lock held by %s" % self.dbp.lock_holder)
-        self.dbp.execute(s).addCallback(
+        op = parse_sql(s)
+        d = op.serialize()
+        self.dbp.execute(d).addCallback(
             self.__checkSuccess).addErrback(
             self.__checkFailure)
 

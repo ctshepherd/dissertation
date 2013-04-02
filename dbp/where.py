@@ -3,7 +3,6 @@ from ast import literal_eval
 
 
 _ops = "< > == != <= >=".split()
-_operators = ("SELECT", "DELETE", "UPDATE")
 _combinators = ("AND", "OR")
 
 
@@ -35,7 +34,7 @@ class FieldCmpTest(FieldTest):
         self.op_str = op
         self.rhs_is_field, self.rhs = self.field_transform(rhs)
 
-    def test_row(self, schema, row):
+    def match(self, schema, row):
         if self.lhs_is_field:
             lhs = self.fetch_field(schema, row, self.lhs)
         else:
@@ -77,8 +76,8 @@ class FieldCombine(FieldTest):
         self.a = a
         self.b = b
 
-    def test_row(self, schema, row):
-        return self.combine(self.a.test_row(schema, row), self.a.test_row(schema, row))
+    def match(self, schema, row):
+        return self.combine(self.a.match(schema, row), self.a.match(schema, row))
 
     def combine(self, a, b):
         raise NotImplementedError()

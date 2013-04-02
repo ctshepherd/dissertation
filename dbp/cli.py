@@ -79,7 +79,7 @@ class DBPProtocol(basic.LineReceiver):
             self.__checkFailure)
 
     def do_read(self):
-        self.dbp.execute("nop")
+        self.dbp.execute({"type": "nop"})
 
     def do_hosts(self):
         self.sendLine(pformat(self.dbp.manager.node.hosts))

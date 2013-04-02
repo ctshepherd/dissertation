@@ -1,16 +1,19 @@
 from pyparsing import CaselessLiteral, Word, Optional, Group, nums, alphanums, oneOf, \
         ZeroOrMore, StringEnd, Or, Suppress, Forward, ParseException as pyPE
 from dbp.db import Update, Insert, Delete
-from dbp.where import _combinators, _ops, _operators, ParseException
+from dbp.where import _combinators, _ops, ParseException
 
 # Example syntax
-# (SELECT, DELETE, UPDATE) (values) WHERE (column operator value)
+# (SELECT, UPDATE) (values) WHERE (column operator value)
 # INSERT (values)
+# DELETE WHERE ...
 # INSERT (values) SELECT ? probs not.
 
+_operators = ("SELECT", "UPDATE")
 operators = Or(CaselessLiteral(o) for o in _operators)
 combinators = Or(CaselessLiteral(c) for c in _combinators)
 
+# comma separated values
 w = Word(alphanums)
 c = Suppress(",")
 values = w + ZeroOrMore(c + w)
@@ -36,7 +39,8 @@ where = Optional(where_clause, "").setResultsName("where")
 op = operators.setResultsName("op")
 sgram = op + svalues + where + StringEnd()
 insert = CaselessLiteral("INSERT").setResultsName("op") + bvalues.setResultsName('ivalues') + StringEnd()
-stmt = sgram | insert
+delete = CaselessLiteral("DELETE").setResultsName("op") + where + StringEnd()
+stmt = sgram | insert | delete
 
 
 def parse_sql(s):

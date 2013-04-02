@@ -87,11 +87,13 @@ class Delete(Op):
         # Store rows to be deleted in delete, then apply them after (because we
         # don't want to modify the dict while we iterate over it)
         delete = []
+        if 'where_clause' not in self.args:
+            db.rows = {}
         for key, row in db.rows.iteritems():
-            if self.where_clause.match(row):
+            if self.args['where_clause'].match(row):
                 delete.append(key)
         for key in delete:
-            del row[key]
+            del db.rows[key]
 
 
 ops = {

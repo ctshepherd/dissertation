@@ -53,7 +53,7 @@ class DBP(object):
         dbprint("processing op %r, tx id %d" % (d, tx_id), level=4)
         assert tx_id == self.tx_version+1, "process: tx_id %d != tx_version+1: %d" % (tx_id, self.tx_version+1)
         self.history.append((tx_id, d))
-        assert isinstance(d, dict)
+        assert isinstance(d, dict), "process: %s is not a dict" % (d,)
         op = d['type']
         if op == "nop":
             pass

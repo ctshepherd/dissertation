@@ -5,7 +5,7 @@ the moment it only supports get and set operations but will support more later.
 """
 
 from dbp.util import dbprint
-from dbp.config import SCHEMA
+from dbp.config import DB_SCHEMA as SCHEMA
 
 
 class InvalidOp(Exception):
@@ -21,9 +21,10 @@ class Op(object):
     op_name = "op"
     args = None
 
-    def __init__(self, s, args):
+    def __init__(self, s, **args):
         self.statement = s
-        self.args = args
+        for k, v in args.iteritems():
+            setattr(self, k, v)
 
     def perform_op(self, db):
         raise NotImplementedError("perform_op: %s" % self)
@@ -102,26 +103,19 @@ def parse_op(d):
     Raises InvalidOp if s is not a valid op.
     """
     try:
-        op_name = s[:3]
+        op_name = d['op_name']
         kls = ops[op_name]
-        paran = s[3:]
-        if paran[0] != '(' or paran[-1] != ')':
-            raise InvalidOp(s)
-        p_args = paran[1:-1]
-        if not p_args:
-            args = []
-        else:
-            args = p_args.split(',')
-        if len(args) != kls.num_args:
-            raise InvalidOp(s)
-        return kls(s, args)
-    except (KeyError, IndexError):
-        raise InvalidOp(s)
+        stmt = d['stmt']
+        where_clause = d.get('where')
+        values = d.get('values')
+        return kls(s, stmt=stmt, where_clause=where_clause, values=values)
+    except KeyError:
+        raise InvalidOp(d)
 
 
 class DB(object):
     """Database backing store class"""
-    def __init__(self, schema):
+    def __init__(self, schema=None):
         """Initialise DB object.
 
         schema - database schema, taken from db.config.SCHEMA if none is specified

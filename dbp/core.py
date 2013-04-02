@@ -1,4 +1,4 @@
-from dbp.db import DB
+from dbp.db import DB, parse_op, InvalidOp
 from dbp.manager import TXManager
 from dbp.util import dbprint
 
@@ -14,24 +14,25 @@ class DBP(object):
         self.lock_holder = None
         self.history = []
 
-    def process_assign(self, s):
-        k, v = s.split('=')
-        k = k.strip(' ')
-        v = v.strip(' ')
-        self.db.set(k, v)
+    def process_op(self, d):
+        try:
+            op = parse_op(d)
+        except InvalidOp, e:
+            dbprint("Invalid op (%s)" % e)
+        op.perform_op(self.db)
 
-    def process_lock(self, s):
+    def process_lock(self, d):
         """Handle someone requesting to take the global lock"""
-        op, guid = s.split(':', 1)
+        guid = d['uid']
         if self.lock_holder is None:
             dbprint("lock: taken by %s" % guid, level=3)
             self.lock_holder = guid
         else:
             dbprint("lock: not taken by %s" % guid, level=3)
 
-    def process_unlock(self, s):
+    def process_unlock(self, d):
         """Handle someone requesting to take the global lock"""
-        op, guid = s.split(':', 1)
+        guid = d['uid']
         if self.lock_holder == guid:
             dbprint("unlock: released by %s" % guid, level=3)
             self.lock_holder = None
@@ -42,29 +43,30 @@ class DBP(object):
         return self.lock_holder == self.uid
 
     def take_lock(self):
-        return self.execute("attemptlock:%s" % self.uid)
+        return self.execute({"type": "attemptlock", "uid": self.uid})
 
     def release_lock(self):
-        return self.execute("unlock:%s" % self.uid)
+        return self.execute({"type": "unlock", "uid": self.uid})
 
-    def process(self, tx_id, s):
+    def process(self, tx_id, d):
         """Process an operation that's been passed up through Paxos."""
-        dbprint("processing op %r, tx id %d" % (s, tx_id), level=4)
+        dbprint("processing op %r, tx id %d" % (d, tx_id), level=4)
         assert tx_id == self.tx_version+1, "process: tx_id %d != tx_version+1: %d" % (tx_id, self.tx_version+1)
-        self.history.append((tx_id, s))
-        if s == "nop":
+        self.history.append((tx_id, d))
+        op = d['type']
+        if op == "nop":
             pass
-        elif s.startswith("attemptlock"):
-            self.process_lock(s)
-        elif s.startswith("unlock"):
-            self.process_unlock(s)
-        else:
-            self.process_assign(s)
+        elif op == "attemptlock":
+            self.process_lock(d)
+        elif op == "unlock":
+            self.process_unlock(d)
+        elif op == "db_op":
+            self.process_assign(d)
         self.tx_version = tx_id
 
-    def execute(self, s):
-        """Execute statement s, by passing down to Paxos.
+    def execute(self, d):
+        """Execute op d, by passing down to Paxos.
 
         Return a Deferred that fires when a statement is executed.
         """
-        return self.manager.execute(s)
+        return self.manager.execute(d)

@@ -337,7 +337,7 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
             if m['uid'] not in self.hosts and m['uid'] != self.uid:
                 self.addHost(m['uid'], host)
             t = m['msg_type']
-            dbprint("Got %s message from %s\n%s\n" % (m['msg_type'], host, m), level=2)
+            dbprint("Got %s message from %s\n%s\n" % (m['msg_type'], host, m), level=1)
             if m['instance_id'] is not None:
                 i = m['instance_id']
                 if i not in self.instances:

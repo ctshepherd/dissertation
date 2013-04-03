@@ -344,6 +344,8 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
                     if i > self.current_instance_number:
                         self.current_instance_number = i+1
                     self.instances[i] = self.create_instance(i)
+                else:
+                    assert i < self.current_instance_number, "known but oddly large instance number %s (%s)" % (i, self.current_instance_number)
                 instance = self.instances[i]
             else:
                 instance = None
@@ -362,6 +364,8 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
         i_num = self.current_instance_number
         self.current_instance_number += 1
         i = self.create_instance(i_num)
+        assert i_num not in self.instances, "internal error: %s should not be in instances (%s)" % (
+            i_num, self.current_instance_number)
         self.instances[i_num] = i
         self.proposer_start(i, operation)
         return i['callback']

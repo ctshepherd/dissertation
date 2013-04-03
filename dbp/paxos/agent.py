@@ -1,5 +1,3 @@
-import sys
-from pprint import pformat
 from uuid import uuid4
 from dbp.util import dbprint
 from dbp.config import NODE_TIMEOUT, PROPOSER_TIMEOUT

@@ -1,12 +1,5 @@
 Paxos:
 - finish tests
-- Implement NACKs
-
-DBP:
-short:
-- fix up comments
-long:
-- simple SQL parsing
 
 General:
 - use log instead of dbprint

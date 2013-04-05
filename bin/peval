@@ -125,7 +125,7 @@ class LatencyMetric(NodeManager):
         with open(file, 'wb') as csvfile:
             c = csv.writer(csvfile)
             for n, t in enumerate(self.timings):
-                c.writerow([n, t.start, t.end])
+                c.writerow([n, t.start - t.end])
 
 
 

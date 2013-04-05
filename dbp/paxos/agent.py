@@ -351,6 +351,7 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
             method(m, instance)
         except (InvalidMessageException, KeyError), e:
             dbprint("%s received invalid message %s (%s)" % (self, msg, e), level=4)
+            raise
 
     def __repr__(self):
         u = getattr(self, "uid", None)

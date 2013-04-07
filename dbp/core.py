@@ -69,7 +69,8 @@ class DBP(object):
                 a = attempts - 1
             else:
                 a = attempts
-            self.take_lock(restart, a).addCallback(d.callback)
+            self.wait(tx_id+1).addCallback(lambda r:
+                self.take_lock(restart, a).addCallback(d.callback))
 
         op_d = self.execute("attemptlock:%s" % self.uid)
         op_d.addCallback(wait_for).addCallback(check_and_retry)

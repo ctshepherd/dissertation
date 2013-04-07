@@ -343,7 +343,8 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
                         self.current_instance_number = i+1
                     self.instances[i] = self.create_instance(i)
                 else:
-                    assert i < self.current_instance_number, "known but oddly large instance number %s (%s)" % (i, self.current_instance_number)
+                    if i > self.current_instance_number:
+                        assert i < self.current_instance_number, "known but oddly large instance number %s (%s)" % (i, self.current_instance_number)
                 instance = self.instances[i]
             else:
                 instance = None

@@ -339,12 +339,11 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
             if m['instance_id'] is not None:
                 i = m['instance_id']
                 if i not in self.instances:
-                    if i > self.current_instance_number:
+                    if i >= self.current_instance_number:
                         self.current_instance_number = i+1
                     self.instances[i] = self.create_instance(i)
                 else:
-                    if i > self.current_instance_number:
-                        assert i < self.current_instance_number, "known but oddly large instance number %s (%s)" % (i, self.current_instance_number)
+                    assert i < self.current_instance_number, "known but oddly large instance number %s (%s)" % (i, self.current_instance_number)
                 instance = self.instances[i]
             else:
                 instance = None

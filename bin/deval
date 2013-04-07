@@ -1,11 +1,8 @@
 #!/usr/bin/env python
 
-import sys
 import csv
 from itertools import count, izip
 from optparse import OptionParser
-from dbp.util import dbprint
-from dbp.paxos.agent import NodeProtocol
 from dbp import config, util
 from twisted.internet import reactor
 from collections import namedtuple
@@ -87,7 +84,7 @@ class NodeManager(object):
         return db.take_lock().addCallback(p).addCallback(c).addErrback(log.err)
 
     @staticmethod
-    def schedule_tx(db, val):
+    def schedule_mul(db, val):
         def n(res):
             return db.execute("nop")
         def p(res):
@@ -130,6 +127,7 @@ class ThroughputMetric(NodeManager):
         #print self.transport.dropped_count
         print "%s seconds" % (self.end-self.start)
 
+
 class LatencyMetric(NodeManager):
 
     def start_run(self, amount, values):
@@ -137,11 +135,10 @@ class LatencyMetric(NodeManager):
         self.num = amount
         self.timings = []
 
-        node = self.master
         for n, v in izip(xrange(amount), values):
             c = clock()
             d = self.schedule_op(self.master, "assign %s=%s" % (n, v))
-            d.addCallback(lambda r:self.end_run(c))
+            d.addCallback(lambda r: self.end_run(c))
             d.addErrback(log.err)
 
     def end_run(self, start):
@@ -160,8 +157,6 @@ class LatencyMetric(NodeManager):
             c = csv.writer(csvfile)
             for n, t in enumerate(self.timings):
                 c.writerow([n, t.start - t.end])
-
-
 
 
 def main():

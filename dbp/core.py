@@ -64,11 +64,12 @@ class DBP(object):
                 return
             if attempts == 0 or not restart:
                 d.errback("couldn't take lock")
+                return
             if attempts > 0:
                 a = attempts - 1
             else:
                 a = attempts
-            self.take_lock(restart, a)
+            self.take_lock(restart, a).addCallback(d.callback)
 
         op_d = self.execute("attemptlock:%s" % self.uid)
         op_d.addCallback(wait_for).addCallback(check_and_retry)

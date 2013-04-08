@@ -84,6 +84,7 @@ class Learner(object):
                 msg['prop_value'], msg['prop_num']), level=4)
             instance['status'] = "completed"
             instance['value'] = msg['prop_value']
+            assert not instance['callback'].called, "completion error 1: %s: %s" % (msg, instance)
             instance['callback'].callback(instance)
 
 
@@ -95,6 +96,7 @@ class Proposer(object):
     @staticmethod
     def proposer_init_instance(instance):
         # Global
+        assert not instance['callback'].called, "completion error 2: %s" % instance
         instance['quorum'] = set()
         instance['status'] = "idle"
         instance['last_tried'] = 0
@@ -345,6 +347,9 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
                 else:
                     assert i < self.current_instance_number, "known but oddly large instance number %s (%s)" % (i, self.current_instance_number)
                 instance = self.instances[i]
+                if instance['status'] == 'completed':
+                    dbprint("dropping msg as instance %s is already completed" % i, level=2)
+                    return
             else:
                 instance = None
             method = getattr(self, "recv_%s" % t)

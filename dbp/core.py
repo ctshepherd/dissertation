@@ -43,10 +43,10 @@ class DBP(object):
         return self.lock_holder == self.uid
 
     def take_lock(self):
-        return self.execute({"type": "attemptlock", "uid": self.uid})
+        return self.execute({"type": "attemptlock"})
 
     def release_lock(self):
-        return self.execute({"type": "unlock", "uid": self.uid})
+        return self.execute({"type": "unlock"})
 
     def process(self, tx_id, d):
         """Process an operation that's been passed up through Paxos."""
@@ -70,4 +70,5 @@ class DBP(object):
 
         Return a Deferred that fires when a statement is executed.
         """
+        d.setdefault("uid", self.uid)
         return self.manager.execute(d)

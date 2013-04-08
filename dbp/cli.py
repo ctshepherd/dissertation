@@ -68,6 +68,7 @@ class DBPProtocol(basic.LineReceiver):
         """Perform an SQL statement"""
         if self.dbp.lock_holder is not None and not self.dbp.owns_lock():
             self.sendLine("Unable to assign: lock held by %s" % self.dbp.lock_holder)
+            return
         try:
             op = parse_sql(s)
         except ParseException, e:

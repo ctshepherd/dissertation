@@ -1,0 +1,281 @@
+#!/usr/bin/env python
+
+from __future__ import division
+
+import csv
+from itertools import count, izip
+from optparse import OptionParser
+from twisted.internet import reactor
+from collections import namedtuple
+from timeit import default_timer as clock
+from math import ceil
+
+from twisted.python import log
+from twisted.internet import defer
+
+from dbp import config, util
+from dbp.core import DBP
+from dbp.paxos.agent import NodeProtocol
+
+
+Timing = namedtuple('Timing', ('start', 'end'))
+
+
+class LimitedTransport(object):
+
+    limit = 12500000  # 1 megabit == 125,000 bytes
+    #div = 10
+    div = 1
+
+    def __init__(self, transport, clock=None, debug=False):
+        if clock is None:
+            self.clock = reactor
+        self.transport = transport
+        self.dropped_count = 0
+        self.debug = debug
+        self.reset_quota()
+
+    def reset_quota(self):
+        self.quota = self.limit//self.div
+        self.clock.callLater(1.0/self.div, self.reset_quota)
+
+    def write(self, data, host=None):
+        """Wrapper around TStringTransport.write"""
+        # drop packet if we don't have room for it
+        if len(data) > self.quota:
+            self.dropped_count += 1
+            # if self.debug:
+            #     print >>sys.stderr, "dropped %d'th packet (%s)" % (self.dropped_count, data)
+            # return
+        self.quota -= len(data)
+        self.transport.write(data, host)
+
+
+class PaxosBackend(object):
+    def __init__(self, mode):
+        pass
+
+    def schedule_op(self, node, v):
+        return node.run(v)
+
+    @staticmethod
+    def make_val(n, v):
+        return v
+
+    @staticmethod
+    def make_lmt_node(port, args=None):
+        if args is None:
+            a = []
+        else:
+            a = [args]
+        n = NodeProtocol(*a)
+        t = reactor.listenUDP(port, n)
+        n.transport = LimitedTransport(t)
+        return n
+
+
+class DBBackend(object):
+    def __init__(self, mode):
+        self.mode = mode
+
+    @staticmethod
+    def make_val(n, v):
+        return "assign %s=%s" % (n, v)
+
+    @staticmethod
+    def make_lmt_node(port, bootstrap=None):
+        db = DBP(port, bootstrap)
+        # t = reactor.listenUDP(port, n)
+        # n.transport = LimitedTransport(t)
+        return db
+
+    def schedule_op(self, db, val):
+        if self.mode == "op":
+            return self.schedule_op2(db, val)
+        elif self.mode == "tx":
+            return self.schedule_tx(db, val)
+        elif self.mode == "mul":
+            return self.schedule_mul(db, val)
+
+    @staticmethod
+    def schedule_op2(db, val):
+        return db.execute(val).addErrback(log.err)
+
+    @staticmethod
+    def schedule_tx(db, val):
+        def p(res):
+            return db.execute(val)
+        def c(res):
+            return db.release_lock()
+        return db.take_lock().addCallback(p).addCallback(c).addErrback(log.err)
+
+    @staticmethod
+    def schedule_mul(db, val):
+        def n(res):
+            return db.execute("nop")
+        def p(res):
+            return db.execute(val)
+        def c(res):
+            return db.release_lock()
+        return db.take_lock().addCallback(n).addCallback(p).addCallback(n).addCallback(c).addErrback(log.err)
+
+
+class NodeManager(object):
+    start_port = 10000
+
+    def __init__(self, backend, node_num, write_num):
+        self.backend = backend
+        self.master = self.backend.make_lmt_node(self.start_port)
+        self.writers = [self.master]
+        for x in xrange(1, write_num):
+            n = self.backend.make_lmt_node(self.start_port + x,
+                                   ("localhost", self.start_port))
+            self.writers.append(n)
+        self.nodes = list(self.writers)
+        for x in xrange(write_num, node_num):
+            n = self.backend.make_lmt_node(self.start_port + x,
+                                   ("localhost", self.start_port))
+            self.nodes.append(n)
+        #print "%s writers, %s nodes" % (len(self.writers), len(self.nodes))
+
+    def finish(self):
+        for n in self.nodes:
+            pass
+            #n.dropped_count = n.transport.dropped_count
+
+
+class ThroughputMetric(NodeManager):
+
+    def start_run(self, amount, values):
+        """Start run: measure throughput of master node, queuing TXs immediately"""
+        self.start = clock()
+        self.num = len(self.writers)
+
+        for node in self.writers:
+            # print "Scheduling %s" % node
+            i = izip(xrange(amount), values)
+            self.schedule_next(None, node, i)
+
+    def schedule_next(self, res, node, i):
+        if res is None: res = {'instance_id': None}
+        try:
+            n, v = i.next()
+            # print "Transaction %s done, scheduling next for node %s (%s, %s)" % (res['instance_id'], node, n, v)
+            d = self.backend.schedule_op(self.master, self.backend.make_val(n, v))
+            d.addCallback(self.schedule_next, node, i)
+            d.addErrback(log.err)
+        except StopIteration:
+            # print "Transaction %s done, ending %s" % (res['instance_id'], node)
+            self.end_run()
+
+    def end_run(self):
+        self.num -= 1
+        if not self.num:
+            self.finish()
+
+    def finish(self):
+        super(ThroughputMetric, self).finish()
+        self.end = clock()
+        reactor.stop()
+
+    def output(self, file):
+        #print self.transport.dropped_count
+        print "%s" % (self.end-self.start)
+
+
+class LatencyMetric(NodeManager):
+
+    @defer.deferredGenerator
+    def start_run(self, amount, values):
+        """Start run: measure latency of master node, queuing TXs immediately"""
+        self.num = amount
+        self.timings = []
+
+        for n, v in izip(xrange(amount), values):
+            c = clock()
+            d = self.backend.schedule_op(self.master, self.backend.make_val(n, v))
+            d.addCallback(lambda r: self.end_run(c))
+            d.addErrback(log.err)
+            wfd = defer.waitForDeferred(d)
+            yield wfd
+
+    def end_run(self, start):
+        self.num -= 1
+        t = Timing(start, clock())
+        self.timings.append(t)
+        if not self.num:
+            self.finish()
+
+    def finish(self):
+        super(LatencyMetric, self).finish()
+        reactor.stop()
+
+    def output(self, file):
+        with open(file, 'wb') as csvfile:
+            c = csv.writer(csvfile)
+            for n, t in enumerate(self.timings):
+                c.writerow([n, t.end - t.start])
+
+
+def main():
+    usage = "usage: %prog [options]"
+    parser = OptionParser(usage=usage)
+    parser.add_option("-m", "--metric", action="store", default="lat",
+                      help="type of metric to measure [valid options are lat,thru]")
+    parser.add_option("-o", "--ops", action="store", type="int",
+                      help="number of operations to run per node")
+    parser.add_option("-n", "--nodes", action="store", type="int",
+                      help="number of nodes to run")
+    parser.add_option("-f", "--file", action="store", default="eval.csv",
+                      help="csv file to use")
+    parser.add_option("-D", "--debug", action="store", type="int", default=config.DEBUG,
+                      help="debug level to run at")
+    parser.add_option("-M", "--mode", action="store", default="op",
+                      help="which mode to use (valid is [op, tx, mul])")
+    parser.add_option("-B", "--backend", action="store", default="paxos",
+                      help="which backend to use (valid is [paxos, db])")
+    parser.add_option("-w", "--writers", action="store", type="int", default=0,
+                      help="number of nodes which are writers")
+
+    (options, args) = parser.parse_args()
+    if options.nodes is None:
+        parser.error("Need to specify number of nodes")
+    if options.ops is None:
+        parser.error("Need to specify number of ops")
+    if options.file is None:
+        parser.error("Need to specify csv file to use")
+    if options.backend is None:
+        parser.error("Need to specify which backend to use")
+    i = (x+1 for x in count())
+
+    if options.metric == "lat":
+        kls = LatencyMetric
+    elif options.metric == "thru":
+        kls = ThroughputMetric
+    else:
+        parser.error("Unknown metric %s" % options.metric)
+
+    if options.backend == "paxos":
+        backend = PaxosBackend(options.mode)
+    elif options.backend == "db":
+        backend = DBBackend(options.mode)
+    else:
+        parser.error("Unknown backend %s" % options.backend)
+
+    if options.writers > options.nodes:
+        parser.error("Writer percentage must be less than or equal to number of nodes")
+
+
+    util.DEBUG = options.debug
+
+    m = kls(backend, options.nodes, options.writers)
+
+    reactor.callLater(7, m.start_run, options.ops, i)
+    reactor.run()
+
+    m.output(options.file)
+    #print m.master.dropped_count
+
+
+if __name__ == "__main__":
+    main()

@@ -108,6 +108,7 @@ class Learner(object):
                     level=4)
             instance['status'] = "completed"
             instance['value'] = msg['prop_value']
+            assert not instance['callback'].called, "completion error 1: %s: %s" % (msg, instance)
             instance['callback'].callback(instance)
 
 
@@ -119,6 +120,7 @@ class Proposer(object):
     @staticmethod
     def proposer_init_instance(instance):
         # Global
+        assert not instance['callback'].called, "completion error 2: %s" % instance
         instance['quorum'] = set()
         instance['status'] = "idle"
         instance['last_tried'] = 0
@@ -375,20 +377,26 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
             if m['uid'] not in self.hosts and m['uid'] != self.uid:
                 self.addHost(m['uid'], host)
             t = m['msg_type']
-            dbprint("Got %s message from %s\n%s\n" % (m['msg_type'], host, m), level=2)
+            dbprint("Got %s message from %s\n%s\n" % (m['msg_type'], host, m), level=1)
             if m['instance_id'] is not None:
                 i = m['instance_id']
                 if i not in self.instances:
-                    if i > self.current_instance_number:
+                    if i >= self.current_instance_number:
                         self.current_instance_number = i+1
                     self.instances[i] = self.create_instance(i)
+                else:
+                    assert i < self.current_instance_number, "known but oddly large instance number %s (%s)" % (i, self.current_instance_number)
                 instance = self.instances[i]
+                if instance['status'] == 'completed':
+                    dbprint("dropping msg as instance %s is already completed" % i, level=2)
+                    return
             else:
                 instance = None
             method = getattr(self, "recv_%s" % t)
             method(m, instance)
         except (InvalidMessageException, KeyError), e:
             dbprint("%s received invalid message %s (%s)" % (self, msg, e), level=4)
+            raise
 
     def __repr__(self):
         u = getattr(self, "uid", None)
@@ -400,6 +408,8 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
         i_num = self.current_instance_number
         self.current_instance_number += 1
         i = self.create_instance(i_num)
+        assert i_num not in self.instances, "internal error: %s should not be in instances (%s)" % (
+            i_num, self.current_instance_number)
         self.instances[i_num] = i
         self.proposer_start(i, operation)
         return i['callback']

@@ -1,17 +1,16 @@
 export PYTHONPATH="/home/cs648/dissertation"
 
-#for transaction_number in 50 500 5000; do
-for transaction_number in 50; do
-	for run_number in `seq 1 10`; do
-		prefix="${transaction_number}:${run_number}:"
-		log_prefix="${transaction_number}_${run_number}"
-		echo $prefix
-		date >logs/peval_${log_prefix}.log
-		date >logs/pserv_${log_prefix}.log
-		bin/pserv &>>logs/pserv_${log_prefix}.log &
-		bin/peval --amount ${transaction_number} -b 10000 -p 10001 -D 3 &>>logs/peval_${log_prefix}.log
-		kill $!
-		sleep 1
-		echo
+mkdir -p csv/
+
+for metric in lat thru; do
+	for node_num in 2 3 4 5 10 15 20 25 30 40 50 60 70 80 90 100; do
+		for op_num in `seq 1 10`; do
+			for run_number in `seq 1 10`; do
+				echo "Nodes: $node_num Ops: $op_num Run: $run_number"
+				END=${metric}_n${node_num}_o${op_num}_r${run_number}
+				time bin/peval -m $metric -n $node_num -o $op_num -D 5 -f csv/peval_$END.csv
+				echo
+			done
+		done
 	done
 done

@@ -1,6 +1,8 @@
 from dbp.db import DB
 from dbp.manager import TXManager
 from dbp.util import dbprint
+from collections import defaultdict
+from twisted.internet.defer import Deferred
 
 
 class DBP(object):
@@ -13,6 +15,15 @@ class DBP(object):
         self.tx_version = 0
         self.lock_holder = None
         self.history = []
+        self.waiters = defaultdict(list)
+
+    def wait(self, tx_id):
+        d = Deferred()
+        if tx_id <= self.tx_version:
+            d.callback(tx_id)
+        else:
+            self.waiters[tx_id].append(d)
+        return d
 
     def process_assign(self, s):
         k, v = s.split('=')
@@ -41,8 +52,29 @@ class DBP(object):
     def owns_lock(self):
         return self.lock_holder == self.uid
 
-    def take_lock(self):
-        return self.execute("attemptlock:%s" % self.uid)
+    def take_lock(self, restart=True, attempts=-1):
+        d = Deferred()
+
+        def wait_for(i):
+            return self.wait(i['instance_id'])
+
+        def check_and_retry(tx_id):
+            if self.owns_lock():
+                d.callback(tx_id)
+                return
+            if attempts == 0 or not restart:
+                d.errback("couldn't take lock")
+                return
+            if attempts > 0:
+                a = attempts - 1
+            else:
+                a = attempts
+            self.wait(tx_id+1).addCallback(lambda r:
+                self.take_lock(restart, a).addCallback(d.callback))
+
+        op_d = self.execute("attemptlock:%s" % self.uid)
+        op_d.addCallback(wait_for).addCallback(check_and_retry)
+        return d
 
     def release_lock(self):
         return self.execute("unlock:%s" % self.uid)
@@ -60,6 +92,10 @@ class DBP(object):
             self.process_unlock(s)
         else:
             self.process_assign(s)
+        if tx_id in self.waiters:
+            for d in self.waiters[tx_id]:
+                d.callback(tx_id)
+            del self.waiters[tx_id]
         self.tx_version = tx_id
 
     def execute(self, s):

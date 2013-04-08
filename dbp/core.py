@@ -82,8 +82,8 @@ class DBP(object):
         assert isinstance(d, dict), "process: %s is not a dict" % (d,)
 
         if self.lock_holder is not None:
-            if self.lock_holder != uid:
-                dbprint("ignoring op '%s', lock held by %s" % (s, self.lock_holder), level=3)
+            if self.lock_holder != d['uid']:
+                dbprint("ignoring op '%s', lock held by %s" % (d, self.lock_holder), level=3)
                 self.tx_version = tx_id
                 return
 

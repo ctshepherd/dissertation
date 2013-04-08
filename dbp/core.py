@@ -17,9 +17,9 @@ class DBP(object):
     def process_op(self, d):
         try:
             op = parse_op(d)
+            op.perform_op(self.db)
         except InvalidOp, e:
             dbprint("Invalid op (%s)" % e)
-        op.perform_op(self.db)
 
     def process_lock(self, d):
         """Handle someone requesting to take the global lock"""

@@ -23,6 +23,8 @@ class Op(object):
 
     def __init__(self, args):
         self.args = args
+        if 'where' in args:
+            self.where_clause = parse_where(args['where'])
 
     def perform_op(self, db):
         raise NotImplementedError("perform_op: %s" % self)
@@ -62,7 +64,7 @@ class Update(Op):
     op_name = "update"
 
     def perform_op(self, db):
-        w = parse_where(self.args['where_clause'])
+        w = self.where_clause
         # Store changes in update, then apply them after (because we don't want
         # to modify the dict while we iterate over it)
         update = {}
@@ -87,10 +89,10 @@ class Delete(Op):
         # Store rows to be deleted in delete, then apply them after (because we
         # don't want to modify the dict while we iterate over it)
         delete = []
-        if 'where_clause' not in self.args:
+        if 'where' not in self.args:
             db.rows = {}
         for key, row in db.rows.iteritems():
-            if self.args['where_clause'].match(row):
+            if self.where_clause.match(row):
                 delete.append(key)
         for key in delete:
             del db.rows[key]

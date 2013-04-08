@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 
+from __future__ import division
+
 import csv
 from itertools import count, izip
 from optparse import OptionParser
 from twisted.internet import reactor
 from collections import namedtuple
 from timeit import default_timer as clock
+from math import ceil
 
 from twisted.python import log
 from twisted.internet import defer
@@ -120,14 +123,20 @@ class DBBackend(object):
 class NodeManager(object):
     start_port = 10000
 
-    def __init__(self, backend, node_num):
+    def __init__(self, backend, node_num, write_num):
         self.backend = backend
         self.master = self.backend.make_lmt_node(self.start_port)
-        self.nodes = [self.master]
-        for x in xrange(1, node_num):
+        self.writers = [self.master]
+        for x in xrange(1, write_num):
+            n = self.backend.make_lmt_node(self.start_port + x,
+                                   ("localhost", self.start_port))
+            self.writers.append(n)
+        self.nodes = list(self.writers)
+        for x in xrange(write_num, node_num):
             n = self.backend.make_lmt_node(self.start_port + x,
                                    ("localhost", self.start_port))
             self.nodes.append(n)
+        #print "%s writers, %s nodes" % (len(self.writers), len(self.nodes))
 
     def finish(self):
         for n in self.nodes:
@@ -140,16 +149,26 @@ class ThroughputMetric(NodeManager):
     def start_run(self, amount, values):
         """Start run: measure throughput of master node, queuing TXs immediately"""
         self.start = clock()
-        self.num = amount
+        self.num = len(self.writers)
 
-        node = self.master
-        for n, v in izip(xrange(amount), values):
-            self.dbp.execute("nop")
-            d = node.run(v)
-            d.addCallback(self.end_run)
+        for node in self.writers:
+            # print "Scheduling %s" % node
+            i = izip(xrange(amount), values)
+            self.schedule_next(None, node, i)
+
+    def schedule_next(self, res, node, i):
+        if res is None: res = {'instance_id': None}
+        try:
+            n, v = i.next()
+            # print "Transaction %s done, scheduling next for node %s (%s, %s)" % (res['instance_id'], node, n, v)
+            d = self.backend.schedule_op(self.master, self.backend.make_val(n, v))
+            d.addCallback(self.schedule_next, node, i)
             d.addErrback(log.err)
+        except StopIteration:
+            # print "Transaction %s done, ending %s" % (res['instance_id'], node)
+            self.end_run()
 
-    def end_run(self, _):
+    def end_run(self):
         self.num -= 1
         if not self.num:
             self.finish()
@@ -161,7 +180,7 @@ class ThroughputMetric(NodeManager):
 
     def output(self, file):
         #print self.transport.dropped_count
-        print "%s seconds" % (self.end-self.start)
+        print "%s" % (self.end-self.start)
 
 
 class LatencyMetric(NodeManager):
@@ -215,6 +234,8 @@ def main():
                       help="which mode to use (valid is [op, tx, mul])")
     parser.add_option("-B", "--backend", action="store", default="paxos",
                       help="which backend to use (valid is [paxos, db])")
+    parser.add_option("-w", "--writers", action="store", type="int", default=0,
+                      help="number of nodes which are writers")
 
     (options, args) = parser.parse_args()
     if options.nodes is None:
@@ -241,9 +262,13 @@ def main():
     else:
         parser.error("Unknown backend %s" % options.backend)
 
+    if options.writers > options.nodes:
+        parser.error("Writer percentage must be less than or equal to number of nodes")
+
+
     util.DEBUG = options.debug
 
-    m = kls(backend, options.nodes)
+    m = kls(backend, options.nodes, options.writers)
 
     reactor.callLater(7, m.start_run, options.ops, i)
     reactor.run()

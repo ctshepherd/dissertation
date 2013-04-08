@@ -24,20 +24,14 @@ class DBP(object):
     def process_lock(self, d):
         """Handle someone requesting to take the global lock"""
         guid = d['uid']
-        if self.lock_holder is None:
-            dbprint("lock: taken by %s" % guid, level=3)
-            self.lock_holder = guid
-        else:
-            dbprint("lock: not taken by %s" % guid, level=3)
+        dbprint("lock: taken by %s" % guid, level=3)
+        self.lock_holder = guid
 
     def process_unlock(self, d):
         """Handle someone requesting to take the global lock"""
         guid = d['uid']
-        if self.lock_holder == guid:
-            dbprint("unlock: released by %s" % guid, level=3)
-            self.lock_holder = None
-        else:
-            dbprint("unlock: %s tried to unlock but didn't own the lock (%s did)" % (guid, self.lock_holder), level=3)
+        dbprint("unlock: released by %s" % guid, level=3)
+        self.lock_holder = None
 
     def owns_lock(self):
         return self.lock_holder == self.uid
@@ -54,6 +48,13 @@ class DBP(object):
         assert tx_id == self.tx_version+1, "process: tx_id %d != tx_version+1: %d" % (tx_id, self.tx_version+1)
         self.history.append((tx_id, d))
         assert isinstance(d, dict), "process: %s is not a dict" % (d,)
+
+        if self.lock_holder is not None:
+            if self.lock_holder != uid:
+                dbprint("ignoring op '%s', lock held by %s" % (s, self.lock_holder), level=3)
+                self.tx_version = tx_id
+                return
+
         op = d['type']
         if op == "nop":
             pass

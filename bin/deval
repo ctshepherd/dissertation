@@ -8,6 +8,7 @@ from twisted.internet import reactor
 from collections import namedtuple
 from timeit import default_timer as clock
 from twisted.python import log
+from twisted.internet import defer
 from dbp.core import DBP
 
 
@@ -130,6 +131,7 @@ class ThroughputMetric(NodeManager):
 
 class LatencyMetric(NodeManager):
 
+    @defer.deferredGenerator
     def start_run(self, amount, values):
         """Start run: measure latency of master node, queuing TXs immediately"""
         self.num = amount
@@ -140,6 +142,8 @@ class LatencyMetric(NodeManager):
             d = self.schedule_op(self.master, "assign %s=%s" % (n, v))
             d.addCallback(lambda r: self.end_run(c))
             d.addErrback(log.err)
+            wfd = defer.waitForDeferred(d)
+            yield wfd
 
     def end_run(self, start):
         self.num -= 1

@@ -952,12 +952,17 @@ disadvantage of this extension to the protocol is that it can increase the proba
 proposers, and therefore increase the latency of the protocol. I shall discuss this in my
 evaluation.
 
-With this extension, the protocol still has protection from dropped or lost messages (the safety
-and liveness properties are still preserved), but in the case of a crashed Proposer, the recovery
-should be far quicker.
+However, this still exhibits ``ping pong'' behaviour, with \msg{NACK}s and \msg{Prepare}s bouncing
+between Proposer and Acceptor until the Proposer catches up with the Acceptor. We can remove this
+message bounce by adding information to the \msg{NACK} message specifying the proposal number the
+Acceptor has accepted, allowing the Proposer to update the proposal number it tries immediately.
+This is ``NACK version 2''.
 
-% ping pong etc
 % can speed up even further by adding information (correct answer)
+
+With either of these versions of the extension, the protocol still has protection from dropped or
+lost messages (the safety and liveness properties are still preserved), but in the case of a
+crashed Proposer, the recovery should be far quicker.
 
 \section{Paxos Implementation}
 
@@ -987,6 +992,9 @@ Section~\ref{sec:message-serialization}), checks the \verb+msg_type+ attribute, 
 by the \verb+Proposer+ subclass. It then calls \verb+self.recv_prepare+, passing in the message,
 and also the Paxos instance dictionary (described in section~\ref{sec:paxos-instance}). If an
 message is received with an unknown message type it is dropped, and a message is logged.
+
+Once the instance's status is set to \verb+complete+, all messages for this instance are dropped -
+this prevents delayed messages restarting or affecting completed instances.
 
 Below is a table outlining which message types are delegated to which mixin classes. \\
 
@@ -1075,13 +1083,17 @@ and \verb+proposer_prev_prop_value+ to \verb+prev_prop_num+ and \verb+prev_prop_
 respectively.
 
 Once a Proposer in the ``trying'' state has received \msg{Promise} messages from a majority of
-Acceptors in the network, it moves to the ``polling'' state. 
+Acceptors in the network, it moves to the ``polling'' state. The Proposer examines the responses
+from the Acceptors and finds the highest numbered proposal that has been accepted by an Acceptor
+in the quorum. It then sends \msg{AcceptRequest} messages containing the value $v$ that is
+associated with that proposal. If there is no proposal that has been accepted by an Acceptor in
+the quorum then the Proposer is free to set its own value for that instance. This means that if
+the Proposer has been directed to set a value $v_1$ and is forced by the protocol to set a
+different value $v_2$, as $v_2$ has already been accepted by a node in the network, it starts a
+new instance of Paxos with $v_1$ as the value, to ensure $v_1$ is eventually committed to the
+network. This restart may be skipped if we are merely ``chasing up'' a value, ie there is a gap in
+the operation log and we need to ascertain the value.
 
-when received majority promises - set status to polling
-checks whether anyone already requested value
-if yes - restart instance (can also not care, and just want to find out - NOP if no-one did but
-don't bother restarting if they did)
-if no - request our value
 
 \begin{figure}[htb]
 \centering
@@ -1091,17 +1103,67 @@ if no - request our value
 
 \subsubsection{Acceptor}
 
-acceptor is a fairly simple (not even state machine?)
-just records variables and sends messages
+The Acceptor role is a fairly simple class that only stores three variables in each instance:
+
+\begin{tabular}{ | c | p{7cm} | }
+  \hline
+  {\bf Variable} & {\bf Usage} \\ \hline
+  \verb+acceptor_prepare_prop_num+ & The highest Proposal number we have seen - corresponds to
+  $\rho$ \\ \hline
+  \verb+acceptor_cur_prop_num+ & The current accepted Proposal - $\eta$ \\ \hline
+  \verb+acceptor_cur_prop_value+ & The value of Proposal $\eta$, corresponds to $\nu$ \\ \hline
+\end{tabular}
+
+The implementation is a near-direct version of the description of the algorithm in the Preparation
+section.
+
+When an acceptor receives a \msg{Prepare(n)} if $n > $
+If an acceptor $A$ receives a message , and $n > \rho$, then it replies with the
+message \msg{Promise(n, $\bm{\eta}$, $\bm{\nu}$)}, meaning that it will not accept any proposals
+numbered less than $n$.
+
+\paragraph{Phase 2}
+
+If an acceptor receives a message \msg{AcceptRequest(n, v)}, if $n > \rho$ it accepts the
+proposal, settings $\eta := n$ and $\nu := v$. It also notifies Learners in the network of its
+decision by sending an \msg{AcceptNotify(n, v)} message to them.
+
+% XXX: is this PMS or PTP??
+\emph{Paxos Made Simple} \cite{lamport01} describes several different ways of notifying Learners
+of accepted proposals - we can specify a \emph{distinguished Learner}, who then notifies
+other Learners when a quorum of Acceptors has accepted a proposal, we can specify several
+distinguished Learners, or we can broadcast all \msg{AcceptRequest} messages to all Learners.
+While this method generates $L\times A$ messages (where $L$ is the number of Learners in the
+network and $A$ is the number of Acceptors in the network), it is the simplest and the most
+resilient to failures, and therefore the one I have chosen to implement. By contrast, the first
+method generates $A + L$ messages, and the second generates $D\times A + L$ messages, where $D$ is
+the size of the set of distinguished Learners.
+
 
 \subsubsection{Learner}
 
-learner is simple
-records a set for each prop num seen (per instance).
-when set size > quorum size:
-  sets status := complete
-  sets value
-  calls callback with instance data (why is this useful?)
+The Learner agent is the simplest out of the three agents. Its only state is a dictionary mapping
+each proposal number to a set of Acceptors who have accepted that proposal.
+
+When the Learner receives an \msg{AcceptNotify} message, it adds it to the set of Acceptors for
+that proposal number. It then checks whether the set constitutes a quorum (ie, is a majority of
+Acceptors). If so, it sets the \verb+status+ variable to \verb+"completed"+ and sets the
+\verb+value+ variable to the value of the proposal. It finally calls the instance callback with
+the instance data itself, this is so the upper layer can handle the ``learned'' information in a
+flexible way (for example, outputting which nodes formed the majority), as well as merely learning
+the instance ID and learnt value.
+
+% when set size > quorum size:
+%   sets status := complete
+%   sets value
+%   calls callback with instance data (why is this useful?)
+
+\subsection{NACKs Improvement}
+
+As a potential improvement to the protocol I added support for \msg{NACK} messages, which is
+configurable at run time. This was relatively simple to implement, I first abstracted out the
+timeout behaviour into its own method, then whenever a \msg{NACK} is received, this method is
+called, initiating the timeout behaviour without having to wait for an actual timeout.
 
 \section{Database Design}
 

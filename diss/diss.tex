@@ -790,9 +790,33 @@ see simple change propagate across complex system
 
 \section{Event Driven Programming}
 
-callbacks - deferred
+Event Driven Programming is a paradigm that involves structuring the program flow around events
+that occur - in this context this mainly means in response to network packets arriving, but can
+also mean user input or timers firing. This is co-ordinated by an event loop, which calls
+appropriate functions when events occur. When the event is handled, execution yields to the event
+loop again, which handles the next event. This means the code is not concurrent, which makes
+reasoning about it a lot simpler. Twisted provides an event loop and network interfaces, so it is
+relatively trivial to listen on an interface and have a callback be passed events that occur.
 
-diagram of semantic divide between paxos/db
+A useful class that Twisted provides is the Deferred class. This represents the ``promise'' of a
+value which has not actually been learnt yet. It can be passed around in place of the value, and
+callbacks added to it in a chain that will be called when the value is finally learnt.
+
+\section{Module Design}
+
+\begin{figure}[htb]
+\centering
+\lwincludegraphics[scale=0.5]{figs/module-layout.eps}
+\caption{\label{fig:module-layout}Simplified module layout}
+\end{figure}
+
+Figure~\ref{fig:module-layout} shows the basic design for the code, illustrated with how objects
+are passed through the different layers. The DBP Core class is the main event handler, passing
+operations down to Paxos through the Manager class to be committed to the network. The Manager
+class receives operations from Paxos in the order they are learnt. It then passes operations up to
+the DBP Core class in order, as they become available. An operation is available if the operation
+that precedes it has been received, ie, every operation before it is also available. The DBP Core
+class then interfaces with the database, which is a simple row-based table.
 
 \section{Paxos Design}
 

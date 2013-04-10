@@ -1212,7 +1212,7 @@ guarantee about the OID the statement would have. This made for a cleaner abstra
 between the database and Paxos. The database code now only needed to pass the Paxos layer a
 statement/op, and it would receive a callback when that statement was finally entered into the
 transaction log, along with the OID it was entered as (which would be the instance ID, as there is
-a one-to-one correspondance of OIDs-instance IDs).
+a one-to-one correspondance of OIDs -- instance IDs).
 
 \subsection{Reads}
 
@@ -1226,15 +1226,34 @@ may return out of date data. A slow read forces us to actually examine the curre
 database by inserting an operation, to ensure we have obtained all transactions issued
 prior to the slow read.
 
-explain
-
 In fact, I chose to use a \op{NOP} operation rather than a \op{READ} operation, although they
 would semantically be the same (as other nodes do nothing on a \op{READ}), as I felt a \op{NOP}
 better represented the operation being sent (do nothing).
 
-explain about using reads/nops to build knowledge of db
+\begin{figure}[htb]
+\centering
+\includegraphics[scale=0.5]{figs/op-log-slow-read-1.eps}
+\caption{\label{fig:op-log-slow-read-1}Performing a slow read}
+\end{figure}
 
-% XXX: diagram of read showing updated op log
+We can see this from figure~\ref{fig:op-log-slow-read-1}. This is the situation as seen by a node
+$N$ at time $t_1$. At time $t_1$ $N$ has only received OID 1 - the \op{ASSIGN} in OID 2 has been
+learnt by the network but not by $N$. In order to make sure $N$ is up to date with the network, it
+tries to insert a \op{NOP} at OID 2.
+
+As the network has already reached consensus on OID 2, when $N$ tries to set it to a \op{NOP}, the
+it will learn the value already obtained by consensus in the network and try and set OID 3 to
+\op{NOP} instead. As OID 3 has not had any value set, $N$ succeeds in setting OID 3 to \op{NOP}.
+
+\begin{figure}[htb]
+\centering
+\includegraphics[scale=0.5]{figs/op-log-slow-read-2.eps}
+\caption{\label{fig:op-log-slow-read-2}After a slow read}
+\end{figure}
+
+In figure~\ref{fig:op-log-slow-read-2} we see the situation at time $t_2$ - the \op{NOP} has been
+inserted at OID 3 - from this $N$ can tell that at $t_2$ the latest operation in the op-log is OID
+3 - the slow read it just performed.
 
 \subsection{Transactions}
 

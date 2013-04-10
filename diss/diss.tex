@@ -1323,35 +1323,67 @@ potential further locking schemes?
 
 \subsection{SQL}
 
+\subsubsection{Grammar}
 
+I implemented SQL parsing using PyParsing, a python library that makes it easy to programmatically
+construct simple grammars. Using this I constructed a grammar of the form:
 
-How tools affected things
-Optimisation - ``what it is''
-Talk about iterations
+\verb+SELECT (field1,field2,...) WHERE <where-clause>+ \\
+\verb+INSERT (value1,value2,...)+ \\
+\verb+DELETE WHERE <where-clause>+ \\
+\verb+UPDATE SET k1=v1, k2=v2, ... WHERE <where-clause>+ \\
 
-SQL parser
-- what it supports
+The grammar for the WHERE clause (marked as \verb+<where-clause>+ above) is more complicated and
+is presented below in production rules:
+\begin{enumerate}
+\item \verb+B -> AND | OR+
+\item \verb+T -> f op f | ( C )+
+\item \verb+C -> T B T | T+
+\item \verb+S -> C EOL+
+\end{enumerate}
 
--start up costs
-  - ping time etc
-  - inefficiencies
-  - cf. ``supernodes'' vs DHTs to organise nodes
+In the above production rules \verb+f+ is either a fieldname, string or integer and \verb+EOL+
+refers to the end of the string.
 
-Talk about laptop breaking
+\subsubsection{Recursive Descent Parser}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[scale=0.5]{figs/where-ast.eps}
+\caption{\label{fig:where-ast}Example WHERE clause matching tree}
+\end{figure}
+
+For this grammar I then built a simple recursive descent parser to construct a boolean matching
+tree. For example, the SQL fragment \verb+WHERE (field1 == 'a' AND field2 == 1) OR field2 <= field3+
+would be parsed into the tree represented by figure~\ref{fig:where-ast}.
+
+% How tools affected things
+% Optimisation - ``what it is''
+% Talk about iterations
+% 
+% SQL parser
+% - what it supports
+% 
+% -start up costs
+%   - ping time etc
+%   - inefficiencies
+%   - cf. ``supernodes'' vs DHTs to organise nodes
+%
+% Talk about laptop breaking
 
 \section{Testing}
 
 I started off implementing unit tests for the
 
-\section{Commandline Tools}
+\subsection{Commandline Tools}
 
-bin/peval
-etc etc
-500 words
-
+I implemented several commandline tools to interface with the main body of code. As I implemented
+Paxos
 
 \cleardoublepage
 \chapter{Evaluation}
+
+Also for evaluation I wrote a script that created a number of nodes, specified on the commandline
 
 This is where the second most amount of marks are gained.
 

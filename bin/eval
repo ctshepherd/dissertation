@@ -52,9 +52,6 @@ class LimitedTransport(object):
 
 
 class PaxosBackend(object):
-    def __init__(self, mode):
-        pass
-
     def schedule_op(self, node, v):
         return node.run(v)
 
@@ -80,7 +77,7 @@ class DBBackend(object):
 
     @staticmethod
     def make_val(n, v):
-        return "assign %s=%s" % (n, v)
+        return {"type": "nop"}
 
     @staticmethod
     def make_lmt_node(port, bootstrap=None):
@@ -112,7 +109,7 @@ class DBBackend(object):
     @staticmethod
     def schedule_mul(db, val):
         def n(res):
-            return db.execute("nop")
+            return db.execute({"type": "nop"})
         def p(res):
             return db.execute(val)
         def c(res):
@@ -127,6 +124,8 @@ class NodeManager(object):
         self.backend = backend
         self.master = self.backend.make_lmt_node(self.start_port)
         self.writers = [self.master]
+        if write_num == 0:
+            write_num = 1
         for x in xrange(1, write_num):
             n = self.backend.make_lmt_node(self.start_port + x,
                                    ("localhost", self.start_port))
@@ -231,9 +230,7 @@ def main():
     parser.add_option("-D", "--debug", action="store", type="int", default=config.DEBUG,
                       help="debug level to run at")
     parser.add_option("-M", "--mode", action="store", default="op",
-                      help="which mode to use (valid is [op, tx, mul])")
-    parser.add_option("-B", "--backend", action="store", default="paxos",
-                      help="which backend to use (valid is [paxos, db])")
+                      help="which mode to use (valid is [p, o, m])")
     parser.add_option("-w", "--writers", action="store", type="int", default=0,
                       help="number of nodes which are writers")
 
@@ -244,8 +241,8 @@ def main():
         parser.error("Need to specify number of ops")
     if options.file is None:
         parser.error("Need to specify csv file to use")
-    if options.backend is None:
-        parser.error("Need to specify which backend to use")
+    if options.mode is None:
+        parser.error("Need to specify which mode to use")
     i = (x+1 for x in count())
 
     if options.metric == "lat":
@@ -255,12 +252,14 @@ def main():
     else:
         parser.error("Unknown metric %s" % options.metric)
 
-    if options.backend == "paxos":
-        backend = PaxosBackend(options.mode)
-    elif options.backend == "db":
-        backend = DBBackend(options.mode)
+    if options.mode == "p":
+        backend = PaxosBackend()
+    elif options.mode == "o":
+        backend = DBBackend("op")
+    elif options.mode == "m":
+        backend = DBBackend("mul")
     else:
-        parser.error("Unknown backend %s" % options.backend)
+        parser.error("Unknown mode %s" % options.mode)
 
     if options.writers > options.nodes:
         parser.error("Writer percentage must be less than or equal to number of nodes")

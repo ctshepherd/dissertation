@@ -16,7 +16,8 @@ FIGS = figs/op-log.eps \
        figs/module-layout.eps \
        figs/two-pc.eps \
        figs/three-pc.eps \
-       figs/where-ast.eps
+       figs/where-ast.eps \
+       figs/thru.eps
 
 DISS = diss.tex \
        refs.bib \
@@ -25,22 +26,10 @@ DISS = diss.tex \
 
 PROP = proposal.tex propbody.tex
 
-help:
-	@echo
-	@echo "USAGE:"
-	@echo
-	@echo "make          display help information"
-	@echo "make prop     make the proposal and view it using xdvi"
-	@echo "make diss.ps  make a postscript version of the dissertation"
-	@echo "make diss.pdf make a .pdf version of the dissertation"
-	@echo "make gv       view the dissertation with ghostview"
-	@echo "make gs       view the dissertation with ghostscript"
-	@echo "make all      construct proposal.dvi and diss.ps"
-	@echo "make count    display an estimated word count"
-	@echo "make pub      put demodiss.tar on my homepage"
-	@echo "make clean    remove all remakeable files"
-	@echo "make pr       print the dissertation"
-	@echo
+pub: /home/cs648/public_html/diss.pdf
+
+/home/cs648/public_html/diss.pdf:	diss.pdf
+	cp diss.pdf ~/public_html/
 
 prop:	proposal.dvi proposal.pdf
 	cp proposal.pdf ~/public_html/
@@ -75,9 +64,6 @@ proposal.dvi: $(PROP)
 	latex proposal
 
 all:	proposal.dvi diss.ps
-
-pub:	diss.pdf
-	cp diss.pdf ~/public_html/
 
 clean:
 	rm -f diss.ps *.dvi *.aux *.log *.err

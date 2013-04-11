@@ -666,7 +666,7 @@ chapter.
 
 \section{ACID}
 
-\subsubsection*{Atomic}
+\subsection*{Atomic}
 
 Atomicity means that either an operation completes, or it does not, ie, that the database is not
 left in a ``halfway'' state. This means that we do not need to worry about cleaning up after an
@@ -678,7 +678,7 @@ and some not to. In this example, we may have the constraint $A = 10\times B$. I
 incremented but then the transaction failed before A was updated, we would leave the database in
 an inconsistent state.
 
-\subsubsection*{Consistent}
+\subsection*{Consistent}
 
 Consistency is very closely related to atomicity, as consistency refers to a property of the
 database, and atomicity refers to a property of operations performed on the database. In the
@@ -689,14 +689,14 @@ node, and in a different order at another node. If we apply the operations in th
 receive them, the two nodes are likely to be in inconsistent states. XXX: define consistency in a
 distributed system.
 
-\subsubsection*{Isolated}
+\subsection*{Isolated}
 
 Isolation is the property that ensures that if one transaction is in the process of completing,
 another transaction cannot see the intermediate state. It ensures that transactions that execute
 concurrently to each other are also invisible to each other - a transaction cannot tell, and does
 not need to worry about whether another transaction is executing or not.
 
-\subsubsection*{Durable}
+\subsection*{Durable}
 
 The durable property refers to the permanance of a transaction. Once a database reports that a
 transaction has been commited, it should persist in the database even in the face of power loss or
@@ -1383,13 +1383,42 @@ Paxos
 \cleardoublepage
 \chapter{Evaluation}
 
+\section{Method and Results}
+
+\subsection{Method}
+
+is it io bound vs cpu bound?
+networking delay
+no congestion control or flow control
+talk about ratelimiting
+python is only limited to one core
+
 Also for evaluation I wrote a script that created a number of nodes, specified on the commandline
 
-This is where the second most amount of marks are gained.
+\subsection{Contention}
 
-Talk about scaling - different types of hierachy - DHT, supernodes etc
+\subsubsection{Latency}
 
-\section{Testing}
+\subsubsection{Throughput}
+
+\subsection{Start up costs}
+
+\subsubsection{$N^2$}
+
+\subsubsection{Sublinear}
+
+\section{Summary}
+\section{My Project}
+\section{Limitations}
+
+\section{Changes with hindsight}
+
+\subsection{Twisted}
+
+evaluate twisted
+
+
+\subsection{Testing}
 
 \begin{enumerate}
 	\item unit test inertia

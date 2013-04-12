@@ -747,7 +747,7 @@ ACID properties
 
 There are several different software development models. Initially I considered using the
 waterfall model, but it has several drawbacks. The waterfall models is very rigid, and doesn't
-allow for any changes in requirements. However I 
+allow for any changes in requirements. However I
 
 didn't fit in with my requirement to do fast prototyping (as I needed to
 gain a better understanding of Paxos). I settled on the spiral model
@@ -1309,7 +1309,7 @@ retries its assignment, which can finally be performed as no-one now holds the l
 
 \subsubsection{Two Phase Locking}
 
-I improved 
+I improved
 
 used two phase locking
 take locks in schema order to avoid deadlock and livelock
@@ -1360,10 +1360,10 @@ would be parsed into the tree represented by figure~\ref{fig:where-ast}.
 % How tools affected things
 % Optimisation - ``what it is''
 % Talk about iterations
-% 
+%
 % SQL parser
 % - what it supports
-% 
+%
 % -start up costs
 %   - ping time etc
 %   - inefficiencies
@@ -1393,7 +1393,7 @@ and connected them in a network.
 I simulated the network on a single machine. I did this for a number of reasons. Firstly, it is
 impractical to create an actual network on a number of computers. As the number of nodes
 increases, it becomes increasingly difficult to get meaningful results from a nodes run on a
-physical network. 
+physical network.
 
 is it io bound vs cpu bound?
 networking delay
@@ -1405,13 +1405,42 @@ python is only limited to one core
 
 \subsubsection{Latency}
 
+\paragraph{5 Nodes}
+
+\begin{figure}[htb]
+\centering
+\lwincludegraphics[scale=2]{figs/lat_5.eps}
+\caption{\label{fig:lat-5}Latency for 5 Nodes}
+\end{figure}
+
+
 \subsubsection{Throughput}
+
+\paragraph{5 Nodes}
 
 \begin{figure}[htb]
 \centering
 \lwincludegraphics[scale=2]{figs/thru_5.eps}
 \caption{\label{fig:thruput-5}Throughput for 5 Nodes}
 \end{figure}
+
+In figure~\ref{fig:thruput-5} we can see that the throughput of the network decreases
+exponentially with the number of concurrent writers in the system. We can also see that while
+there is little overhead from using the database layer over the top of Paxos, there is substantial
+overhead performing multiple transactions.
+
+% \paragraph{20 Nodes}
+%
+% \begin{figure}[htb]
+% \centering
+% \lwincludegraphics[scale=2]{figs/thru_20.eps}
+% \caption{\label{fig:thruput-5}Throughput for 20 Nodes}
+% \end{figure}
+%
+% In figure~\ref{fig:thruput-20} we can see that the throughput of the network decreases
+% exponentially with the number of concurrent writers in the system. We can also see that while
+% there is little overhead from using the database layer over the top of Paxos, there is substantial
+% overhead performing multiple transactions.
 
 \subsection{Start up costs}
 

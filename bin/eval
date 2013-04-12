@@ -8,10 +8,8 @@ from optparse import OptionParser
 from twisted.internet import reactor
 from collections import namedtuple
 from timeit import default_timer as clock
-from math import ceil
 
 from twisted.python import log
-from twisted.internet import defer
 
 from dbp import config, util
 from dbp.core import DBP
@@ -118,7 +116,7 @@ class DBBackend(object):
 
 
 class NodeManager(object):
-    start_port = 10000
+    start_port = 20000
 
     def __init__(self, backend, node_num, write_num):
         self.backend = backend
@@ -184,36 +182,47 @@ class ThroughputMetric(NodeManager):
 
 class LatencyMetric(NodeManager):
 
-    @defer.deferredGenerator
     def start_run(self, amount, values):
         """Start run: measure latency of master node, queuing TXs immediately"""
-        self.num = amount
+        self.num = len(self.writers)
         self.timings = []
 
-        for n, v in izip(xrange(amount), values):
-            c = clock()
-            d = self.backend.schedule_op(self.master, self.backend.make_val(n, v))
-            d.addCallback(lambda r: self.end_run(c))
-            d.addErrback(log.err)
-            wfd = defer.waitForDeferred(d)
-            yield wfd
+        for node in self.writers:
+            # print "Scheduling %s" % node
+            i = izip(xrange(amount), values)
+            self.schedule_next(node, i)
 
-    def end_run(self, start):
-        self.num -= 1
+    def schedule_end(self, res, start, node, i):
         t = Timing(start, clock())
         self.timings.append(t)
+        self.schedule_next(node, i)
+
+    def end_run(self):
+        self.num -= 1
         if not self.num:
             self.finish()
+
+    def schedule_next(self, node, i):
+        try:
+            n, v = i.next()
+            d = self.backend.schedule_op(self.master, self.backend.make_val(n, v))
+            d.addCallback(self.schedule_end, clock(), node, i)
+            d.addErrback(log.err)
+        except StopIteration:
+            # print "Transaction %s done, ending %s" % (res['instance_id'], node)
+            self.end_run()
 
     def finish(self):
         super(LatencyMetric, self).finish()
         reactor.stop()
 
     def output(self, file):
-        with open(file, 'wb') as csvfile:
-            c = csv.writer(csvfile)
-            for n, t in enumerate(self.timings):
-                c.writerow([n, t.end - t.start])
+        for t in self.timings:
+            print t.end - t.start
+        # with open(file, 'wb') as csvfile:
+        #     c = csv.writer(csvfile)
+        #     for n, t in enumerate(self.timings):
+        #         c.writerow([n, t.end - t.start])
 
 
 def main():
@@ -229,7 +238,7 @@ def main():
                       help="csv file to use")
     parser.add_option("-D", "--debug", action="store", type="int", default=config.DEBUG,
                       help="debug level to run at")
-    parser.add_option("-M", "--mode", action="store", default="op",
+    parser.add_option("-M", "--mode", action="store", default="p",
                       help="which mode to use (valid is [p, o, m])")
     parser.add_option("-w", "--writers", action="store", type="int", default=0,
                       help="number of nodes which are writers")

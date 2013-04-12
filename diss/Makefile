@@ -17,7 +17,8 @@ FIGS = figs/op-log.eps \
        figs/two-pc.eps \
        figs/three-pc.eps \
        figs/where-ast.eps \
-       figs/thru_5.eps
+       figs/thru_5.eps \
+       figs/lat_5.eps
 
 DISS = diss.tex \
        refs.bib \

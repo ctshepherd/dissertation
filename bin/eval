@@ -116,7 +116,6 @@ class DBBackend(object):
 
 
 class NodeManager(object):
-    start_port = 20000
 
     def __init__(self, backend, node_num, write_num):
         self.backend = backend
@@ -242,6 +241,8 @@ def main():
                       help="which mode to use (valid is [p, o, m])")
     parser.add_option("-w", "--writers", action="store", type="int", default=0,
                       help="number of nodes which are writers")
+    parser.add_option("-P", "--port", action="store", type="int", default=10000,
+                      help="port number to start from")
 
     (options, args) = parser.parse_args()
     if options.nodes is None:
@@ -252,6 +253,8 @@ def main():
         parser.error("Need to specify csv file to use")
     if options.mode is None:
         parser.error("Need to specify which mode to use")
+    if options.port is None:
+        parser.error("Need to specify which port to use")
     i = (x+1 for x in count())
 
     if options.metric == "lat":
@@ -273,9 +276,9 @@ def main():
     if options.writers > options.nodes:
         parser.error("Writer percentage must be less than or equal to number of nodes")
 
-
     util.DEBUG = options.debug
 
+    kls.start_port = options.port
     m = kls(backend, options.nodes, options.writers)
 
     reactor.callLater(7, m.start_run, options.ops, i)

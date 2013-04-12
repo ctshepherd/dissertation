@@ -1387,19 +1387,31 @@ Paxos
 
 \subsection{Method}
 
+For evaluation I wrote a script that created a number of nodes (specified on the commandline)
+and connected them in a network.
+
+I simulated the network on a single machine. I did this for a number of reasons. Firstly, it is
+impractical to create an actual network on a number of computers. As the number of nodes
+increases, it becomes increasingly difficult to get meaningful results from a nodes run on a
+physical network. 
+
 is it io bound vs cpu bound?
 networking delay
 no congestion control or flow control
 talk about ratelimiting
 python is only limited to one core
 
-Also for evaluation I wrote a script that created a number of nodes, specified on the commandline
-
 \subsection{Contention}
 
 \subsubsection{Latency}
 
 \subsubsection{Throughput}
+
+\begin{figure}[phtb]
+\centering
+\lwincludegraphics[scale=2]{figs/thru-5.eps}
+\caption{\label{fig:thruput-5}Throughput for 5 Nodes}
+\end{figure}
 
 \subsection{Start up costs}
 

@@ -1390,18 +1390,43 @@ Paxos
 For evaluation I wrote a script that created a number of nodes (specified on the commandline)
 and connected them in a network.
 
-I simulated the network on a single machine. I did this for a number of reasons. Firstly, it is
-impractical to create an actual network on a number of computers. As the number of nodes
-increases, it becomes increasingly difficult to get meaningful results from a nodes run on a
-physical network.
+I simulated the network on a single machine. I did this for a number of reasons.
 
-is it io bound vs cpu bound?
-networking delay
-no congestion control or flow control
+Firstly, it is impractical to create an actual network on a number of computers. Co-ordinating
+tests between a large number of machines is difficult, and even being able to use that amount of
+resources would be impractical.
+
+Also, as the number of nodes increases, it becomes increasingly difficult to get meaningful
+results from nodes run on a physical network, due to other factors such as networking delay. It
+also makes results inconsistent and difficult to reproduce on several runs. For each data point in
+my tests I calculated 5 runs and then calculated the average and standard deviation for each
+point.
+
 talk about ratelimiting
-python is only limited to one core
+networking delay
+
+Unfortunately, my application had no congestion control or flow control built into the protocol.
+While this would be a potential advantage of TCP, other features of TCP would be unnecessary, as
+Paxos is decided to deal with message loss, and TCP provides reliable message delivery. So a
+potential improvement would be to build Paxos on top of another protocol built on UDP, which
+provides congestion control and flow control on the layer underneath, but without providing
+unnecessary features such as reliable message delivery.
+
+As a distributed application, I would expect my application to be mainly IO bound, rather than
+being CPU bound. However, as I am simulating a network on one computer, this assumption begins to
+break down as the number of nodes increases. This problem is exacerbated because Python is
+limited to only using one core without explicit parallelism, and Twisted's event loop is running
+for not just one node but for all the nodes in the network. A way to fix this would be to spawn
+different threads for each node and then join the results when the simulation is done. In this way
+the simulation could utilise the full resources of the simulating machine, instead of being
+artificially. While this is possible in Twisted, it is not straightforward, and unfortunately time
+constraints did not allow further exploration of this evaluation method.
 
 \subsection{Contention}
+
+I started off by measuring how the network responds to contention in the network. This means that
+measuring how the latency and throughput of the network change in response to the number of nodes
+in the network which are writing.
 
 \subsubsection{Latency}
 
@@ -1413,8 +1438,20 @@ python is only limited to one core
 \caption{\label{fig:lat-5}Latency for 5 Nodes}
 \end{figure}
 
-In figure~\ref{fig:lat-5} we can see that the latency of commiting something to the network
-increases linearly with the number of writers in the network.
+Firstly I measured a network with 5 nodes. Figure~\ref{fig:lat-5} shows the number of writers vs
+the average latency of an operation. There are three lines plotted on the graph, corresponding to
+three different types of network operations. Firstly the latency of a pure Paxos is plotted. On
+top of this is plotted the latency of a single database operation. This is very close to the Paxos
+latency. This is expected as a database operation is simply a specific Paxos operation, so the
+minor difference is due to the database processing overhead. As mentioned in the Method section,
+we expect this overhead to minor, as the application is mainly IO bound rather than CPU bound.
+However, a small amount of added CPU latency is not unexpected. However, the third line plots a
+database transaction, which has significantly more latency. This is because a transaction involves
+waiting on several Paxos operations to be committed before it is considered done.
+
+However, in all cases we can see that the latency of commiting an operation to the
+network increases linearly with the number of writers in the network, with a very strong
+correlation.
 
 \paragraph{20 Nodes}
 
@@ -1436,6 +1473,10 @@ overhead performing multiple transactions.
 \end{figure}
 
 \subsubsection{Throughput}
+
+Next I measured the throughput of the network. This is the number of operations per second that
+can be processed by the network. Again I plotted three lines for each graph -- paxos throughput,
+database operation throughput and database transaction throughput.
 
 \paragraph{5 Nodes}
 

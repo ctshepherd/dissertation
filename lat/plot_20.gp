@@ -1,3 +1,5 @@
+load "../style.gp"
+
 set title "Contention vs Latency with 20 nodes"
 set xlabel "Number of writers"
 set ylabel "Latency (s)"

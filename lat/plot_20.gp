@@ -6,7 +6,6 @@ set ylabel "Latency (s)"
 set grid
 set key on # change this later
 set xtics 1
-set term post eps
 set output "lat_20.eps"
 plot "lat_20-p.csv" using 1:2 title "Paxos" with linespoints, \
      "lat_20-o.csv" using 1:2 title "Database Op" with linespoints, \

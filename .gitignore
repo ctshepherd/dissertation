@@ -29,6 +29,12 @@ thru/thru_20-p.csv
 thru/thru_20.eps
 diss/figs/thru_20.eps
 
+thru/thru_rev-m.csv
+thru/thru_rev-o.csv
+thru/thru_rev-p.csv
+thru/thru_rev.eps
+diss/figs/thru_rev.eps
+
 lat/lat_5-m.csv
 lat/lat_5-o.csv
 lat/lat_5-p.csv
@@ -40,3 +46,9 @@ lat/lat_20-o.csv
 lat/lat_20-p.csv
 lat/lat_20.eps
 diss/figs/lat_20.eps
+
+lat/lat_rev-m.csv
+lat/lat_rev-o.csv
+lat/lat_rev-p.csv
+lat/lat_rev.eps
+diss/figs/lat_rev.eps

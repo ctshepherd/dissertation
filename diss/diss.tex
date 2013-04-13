@@ -1413,6 +1413,9 @@ python is only limited to one core
 \caption{\label{fig:lat-5}Latency for 5 Nodes}
 \end{figure}
 
+In figure~\ref{fig:lat-5} we can see that the latency of commiting something to the network
+increases linearly with the number of writers in the network.
+
 \paragraph{20 Nodes}
 
 \begin{figure}[htb]
@@ -1421,6 +1424,16 @@ python is only limited to one core
 \caption{\label{fig:lat-20}Latency for 20 Nodes}
 \end{figure}
 
+In figure~\ref{fig:lat-20} we can see that the throughput of the network decreases
+exponentially with the number of concurrent writers in the system. We can also see that while
+there is little overhead from using the database layer over the top of Paxos, there is substantial
+overhead performing multiple transactions.
+
+\begin{figure}[htb]
+\centering
+\lwincludegraphics[scale=2]{figs/lat_rev.eps}
+\caption{\label{fig:latency-rev}Rev Lat for 5 Nodes}
+\end{figure}
 
 \subsubsection{Throughput}
 
@@ -1442,13 +1455,19 @@ overhead performing multiple transactions.
 \begin{figure}[htb]
 \centering
 \lwincludegraphics[scale=2]{figs/thru_20.eps}
-\caption{\label{fig:thruput-5}Throughput for 20 Nodes}
+\caption{\label{fig:thruput-20}Throughput for 20 Nodes}
 \end{figure}
 
 In figure~\ref{fig:thruput-20} we can see that the throughput of the network decreases
 exponentially with the number of concurrent writers in the system. We can also see that while
 there is little overhead from using the database layer over the top of Paxos, there is substantial
 overhead performing multiple transactions.
+
+\begin{figure}[htb]
+\centering
+\lwincludegraphics[scale=2]{figs/thru_rev.eps}
+\caption{\label{fig:thruput-rev}Rev Thru for 5 Nodes}
+\end{figure}
 
 \subsection{Start up costs}
 

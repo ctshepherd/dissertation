@@ -1383,14 +1383,27 @@ Paxos
 \cleardoublepage
 \chapter{Evaluation}
 
-\section{Method and Results}
+After designing and implementing the system, I evaluated its performance against a number of
+metrics. These were designed to measure how the system's performance differed with regard to
+different parameters. The main parameters I varied were the number of nodes in the network and the
+number of writers in the network. I also measured how the system performed in a situation with
+limited bandwidth, and how the various improvements to the implementation that I made performed
+against each other.
 
-\subsection{Method}
+\section{Method}
 
-For evaluation I wrote a script that created a number of nodes (specified on the commandline)
-and connected them in a network.
+There were a number of metrics I used to evaluate the system. The two main metrics were the
+latency of an operation -- how long it took to complete after being issued, and the throughput of
+the system -- how many operations could be completed in unit time. I also measured how the
+bandwidth used varied in different situations.
 
-I simulated the network on a single machine. I did this for a number of reasons.
+\subsection{Simulation}
+
+In order to evaluate the database I decided to simulate the network on a single machine. Initially
+I created a seperate program for each node, but for all but the most simple network scenarios it
+became necessary to run all nodes in the same Python script to programmatically generate results.
+I discuss the limitations of this in the section below. There were a number of reasons why it was
+necessary to simulate the network on a single machine.
 
 Firstly, it is impractical to create an actual network on a number of computers. Co-ordinating
 tests between a large number of machines is difficult, and even being able to use that amount of
@@ -1398,9 +1411,30 @@ resources would be impractical.
 
 Also, as the number of nodes increases, it becomes increasingly difficult to get meaningful
 results from nodes run on a physical network, due to other factors such as networking delay. It
-also makes results inconsistent and difficult to reproduce on several runs. For each data point in
-my tests I calculated 5 runs and then calculated the average and standard deviation for each
-point.
+also makes results inconsistent and difficult to reproduce on several runs.
+
+\subsubsection*{Assumptions}
+
+For my simulation to be a valid measure of how the network responds, I made certain assumptions.
+As a distributed application, I would expect my application to be mainly IO bound, rather than
+being CPU bound. IO bound means that the application spends most of the time waiting for IO, in
+this case network IO -- sending and receiving messages, as opposed to CPU bound, which means the
+application spends most of its time running on the CPU. It is necessary for the application to be
+IO bound in order for the simulation to be valid - if it is in fact CPU bound, running multiple
+nodes on the same machine will lead to increased CPU load which will mean that the simulation
+becomes invalid, as the performance of the simulated nodes deviates from the performance of a real
+network.
+
+However, as I am simulating a network on one computer, this assumption does begin to
+break down as the number of nodes increases. This problem is exacerbated because Python is
+limited to only using one core without explicit parallelism, and Twisted's event loop runs
+for not just one node but for all the nodes in the network. A potential fix to would be to spawn
+different threads for each node and then join the results when the simulation is done. In this way
+the simulation could utilise the full resources of the simulating machine, instead of being
+artificially. While this is possible in Twisted, it is not straightforward, and unfortunately time
+constraints did not allow further exploration of this evaluation method.
+
+\subsection{Ratelimiting}
 
 talk about ratelimiting
 networking delay
@@ -1412,23 +1446,40 @@ potential improvement would be to build Paxos on top of another protocol built o
 provides congestion control and flow control on the layer underneath, but without providing
 unnecessary features such as reliable message delivery.
 
-As a distributed application, I would expect my application to be mainly IO bound, rather than
-being CPU bound. However, as I am simulating a network on one computer, this assumption begins to
-break down as the number of nodes increases. This problem is exacerbated because Python is
-limited to only using one core without explicit parallelism, and Twisted's event loop is running
-for not just one node but for all the nodes in the network. A way to fix this would be to spawn
-different threads for each node and then join the results when the simulation is done. In this way
-the simulation could utilise the full resources of the simulating machine, instead of being
-artificially. While this is possible in Twisted, it is not straightforward, and unfortunately time
-constraints did not allow further exploration of this evaluation method.
 
-\subsection{Contention}
+\subsection{Gathering and Formatting Results}
+
+To generate the results, I ran a simulation of the network and generated the data points
+necessary. I then performed some simple statistical methods on it, and output it to a datafile. I
+then used gnuplot to format the data into a graph which I could then embed in my dissertation. I
+used this method so that it was very straightforward to regenerate the graph automatically,
+without having to perform manual tweaking, which would be very time consuming.
+
+I wrote a script that performed the actual simulation and output the data. It took a number of
+commandline parameters, specifying the number of nodes in the network, the number of writers, the
+number of operations to perform and the type of operations. It then constructed this network and
+bootstrapped it. It could not immediately run the operations, but had to wait for every node in
+the network to be aware of other nodes in the network. This start up time was not reflected in the
+results. After the network bootstrapped, the script started the required number of nodes writing,
+and recorded the relevant metric in a CSV file.
+
+I ran this script 5 times for each statistic, and then calculated the average and standard
+deviation for each point using another script. The output of this was then put in a datafile
+suitable for gnuplot to process.
+
+Finally I ran a gnuplot script which generated a graph for the datafile. It handled formatting and
+plotting the graph. This was all co-ordinated from a Makefile, so that with a single command I
+could regenerate all graphs necessary. This automation meant I could review my data generation
+process thoroughly to be sure it was valid, and be sure that I was handling all the data
+consistently.
+
+\section{Contention}
 
 I started off by measuring how the network responds to contention in the network. This means that
 measuring how the latency and throughput of the network change in response to the number of nodes
 in the network which are writing.
 
-\subsubsection{Latency}
+\subsection{Latency}
 
 \paragraph{5 Nodes}
 
@@ -1461,22 +1512,36 @@ correlation.
 \caption{\label{fig:lat-20}Latency for 20 Nodes}
 \end{figure}
 
+I repeated this experiment with a network of 20 nodes
+
+
 In figure~\ref{fig:lat-20} we can see that the throughput of the network decreases
 exponentially with the number of concurrent writers in the system. We can also see that while
 there is little overhead from using the database layer over the top of Paxos, there is substantial
 overhead performing multiple transactions.
 
+\paragraph{Network Size}
+
 \begin{figure}[htb]
 \centering
 \lwincludegraphics[scale=2]{figs/lat_rev.eps}
-\caption{\label{fig:latency-rev}Rev Lat for 5 Nodes}
+\caption{\label{fig:latency-rev}Latency vs Network Size}
 \end{figure}
 
-\subsubsection{Throughput}
+I also measured how the network response time is affected by the number of nodes in the network.
+Using only a single writer, I measured the latency for networks of varying sizes. This is
+displayed in figure~\ref{fig:latency-rev}.
+
+\subsection{Throughput}
 
 Next I measured the throughput of the network. This is the number of operations per second that
 can be processed by the network. Again I plotted three lines for each graph -- paxos throughput,
 database operation throughput and database transaction throughput.
+
+I measured the throughput by measuring how long it took to commit 5 operations to the network with
+a given number of writers. I did this 5 times for each writer and then took the average and
+standard deviation of each point. I then plotted $5/x$ for each point as the average throughput in
+\emph{$operation seconds^{-1}$}
 
 \paragraph{5 Nodes}
 
@@ -1486,10 +1551,12 @@ database operation throughput and database transaction throughput.
 \caption{\label{fig:thruput-5}Throughput for 5 Nodes}
 \end{figure}
 
-In figure~\ref{fig:thruput-5} we can see that the throughput of the network decreases
-exponentially with the number of concurrent writers in the system. We can also see that while
-there is little overhead from using the database layer over the top of Paxos, there is substantial
-overhead performing multiple transactions.
+Again I initially did this for a network of 5 nodes. The results of this are in
+figure~\ref{fig:thruput-5}. We can see that the throughput of the network decreases with
+$\frac{1}{w}$, where $w$ is the number of concurrent writers in the system. Again the performance of
+Paxos and database operations is similar, with very similar throughputs. However there is still a
+big overhead to using transactions, as evidenced from the substationally reduced throughput,
+reduced by nearly a factor of 5.
 
 \paragraph{20 Nodes}
 
@@ -1507,25 +1574,39 @@ overhead performing multiple transactions.
 \begin{figure}[htb]
 \centering
 \lwincludegraphics[scale=2]{figs/thru_rev.eps}
-\caption{\label{fig:thruput-rev}Rev Thru for 5 Nodes}
+\caption{\label{fig:thruput-rev}Throughput vs Network size}
 \end{figure}
 
 \subsection{Start up costs}
+
+As the size of the network increases the cost of bootstrapping the network becomes prohibitively
+expensive 
 
 \subsubsection{$N^2$}
 
 \subsubsection{Sublinear}
 
 \section{Summary}
-\section{My Project}
+
+
+
 \section{Limitations}
+
+
 
 \section{Changes with hindsight}
 
+
 \subsection{Twisted}
 
-evaluate twisted
+In retrospect, if I was to do the project again I would probably not use Twisted. Twisted provided
+me with a framework 
 
+high learning curve
+spent lots of time interfacing with it
+message requirements of paxos are simple
+wouldn't have had to learn asynchronous
+debugging would have been easier
 
 \subsection{Testing}
 
@@ -1540,10 +1621,103 @@ evaluate twisted
 \cleardoublepage
 \chapter{Conclusion}
 
-Conclude here.
+In summary, I successfully completed both an implementation of the Paxos protocol and a
+distributed database on top. The theory behind the design and the requirements are set out in the
+Preparation Chapter. The design and implementation of these two components is discussed in detail
+in the Implementation Chapter. Both were designed simply, and this led to various inefficiencies
+and tradeoffs that I measured and quantatively evaluated in the Evaluation Chapter, also
+discussing the limitations of the project. Here I will outline the formal success criteria and how
+my project compares with them, as well as proposing potential extensions or improvements that
+could be investigated further.
 
+\section{Comparison with Requirements}
 
+The requirements described in Chapter 2 are a formal list of elements of the project to be
+considered in evaluating its success. I will outline them here and discuss how each was realised,
+and to what extent.
 
+\subsection{Paxos}
+
+The project successfully meets the requirements of being able to form a running network which can
+achieve consensus. It can perform dynamic leader election through the Paxos network, and
+supports nodes joining and leaving arbitrarily. This area of the success criteria was met fully.
+
+\subsection{ACID}
+
+The ACID success criterion was to support all ACID properties - Atomic, Consistent, Isolated and
+Durable. The project supports all of them as long as the network persists - there is no support
+for stable storage.
+
+\subsection{SQL}
+
+The success criterion for SQL was designed to reduce the scope of SQL in order to allow me to
+focus on the design of the Paxos protocol and the database. It was reduced to a single table with
+a static name, SELECT and INSERT statements, including a WHERE clause, and GROUP BY, ORDER BY and
+aggregation. The latter three of these I did not implement, due to time constraints. I decided to
+focus on Paxos and the database rather than on implementing SQL, as I felt they were the core of
+my project and SQL merely an interface for it. However I did successfully implement the first
+three elements of this criterion, that is, the SELECT and INSERT statements with a table name, and
+a recursive descent WHERE clause parser.
+
+\section{Further Work}
+
+There are multiple opportunities that could be investigated given more time that would allow for
+the project to be improved and extended.
+
+\subsection{Transactions}
+
+Transactions are a core component of databases today, and one of the foundations of ACID - a key
+requirement of mine. As it stands, transactions are the weakest part of my project. There are
+several different locking schemes that could be used instead of the basic ones used in my project,
+Optimistic Concurrency Control (OCC) being one of particular interest, as it is much more
+effective in a network with low contention.
+
+\subsection{Durability}
+
+A large part of contempary database design involves ensuring that database operations persist
+ie, durability - the ``D'' from ACID. My project did not support stable storage as a means of
+ensuring durability and extending this, through the use of write-ahead logs (WAL) and or shadow
+paging, would be a high priority given more time.
+
+\subsection{Network Hierachy}
+
+A clear problem during evaluation was the effect of the network size on the amount of time and the
+amount of bandwidth used to bootstrap the network. Increasing the size beyond a certain number of
+nodes led to large slow downs in the network, that in the real world would have serious practical
+implications on the efficacy of the network.
+
+For large peer-to-peer networks there are several mature techniques that could be used to manage a
+network of scale efficiently. One of these is using ``supernodes'' -- nodes designated either
+through bandwidth or chosen randomly to co-ordinate their child nodes, reducing the message
+overhead from $N^2$ to $S^2$ where $S$ is the number of supernodes. Another technique is the use
+of Distributed Hashing Tables (DHTs) to manage nodes. This involves computing a measure or
+pseudo-measure of ``distance'' to other nodes, then having nodes only contact their
+``neighbours'', rather than the entire network.
+
+Either of these would be much more efficient to manage the network than the current $N^2$ na\"ive
+approach.
+
+\subsection{SQL}
+
+Although I had planned to support a more comprehensive subset of SQL syntax, time constraints meant
+that I was unable to do so. A more complete database solution would include aggregation support,
+as well as \verb+ORDER BY+ and \verb+GROUP BY+ clauses.
+
+\subsection{MultiPaxos}
+
+My implementation of MultiPaxos was limited by the amount of time I had to implement the project,
+and the difficulty I had initially understanding the Paxos and MultiPaxos protocol. Redesigning
+the project to support the more efficient MultiPaxos and FastPaxos variants would allow an
+increase in efficiency both in terms of network throughput and latency, and also in terms of
+bandwidth.
+
+\subsection{Security}
+
+One area of Computer Science that I constantly encountered during this project was security.
+Although I decided it was beyond the scope of my project, given more time it would have been
+valuable to investigate the security implications of many of my design decisions and build more
+security into my design, as well as considering implementing Byzantine Paxos, which can tolerate
+rogue and faulty nodes in the network.
 
 \cleardoublepage
 

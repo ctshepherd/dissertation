@@ -33,6 +33,8 @@
 
 \newcommand{\msg}[1] {{\bf #1}}         % \msg command for formatting Paxos messages
 \newcommand{\op}[1]  {{\bf #1}}         % \op  command for formatting database operations
+\newcommand{\superscript}[1]{\ensuremath{^{\textrm{#1}}}}
+\newcommand{\subscript}[1]{\ensuremath{_{\textrm{#1}}}}
 
 
 \begin{document}
@@ -1323,6 +1325,8 @@ potential further locking schemes?
 
 \subsection{SQL}
 
+% XXX: didn't finish - explain!!!
+
 \subsubsection{Grammar}
 
 I implemented SQL parsing using PyParsing, a python library that makes it easy to programmatically
@@ -1541,7 +1545,7 @@ database operation throughput and database transaction throughput.
 I measured the throughput by measuring how long it took to commit 5 operations to the network with
 a given number of writers. I did this 5 times for each writer and then took the average and
 standard deviation of each point. I then plotted $5/x$ for each point as the average throughput in
-\emph{$operation seconds^{-1}$}
+\emph{operation seconds\superscript{-1}}.
 
 \paragraph{5 Nodes}
 
@@ -1580,42 +1584,113 @@ overhead performing multiple transactions.
 \subsection{Start up costs}
 
 As the size of the network increases the cost of bootstrapping the network becomes prohibitively
-expensive 
+expensive
 
 \subsubsection{$N^2$}
 
 \subsubsection{Sublinear}
 
-\section{Summary}
-
 
 
 \section{Limitations}
 
+% XXX: rewrite
+The main limitation of the system is its speed. In particular, transactions, a core component of
+any database, have a large cost.
 
+Another limitation is the lack of stable storage support in the database. Although it supports
+durability in that, if a node leaves, and then returns, the operation will persist in the network
+and if that node rejoins, then it will see the transaction again, if a majority of nodes leave and
+rejoin, the database will lose its transactions as it has no stable storage and a majority of
+nodes have failed. However if the nodes leave slowly enough for the network quorum to adjust it
+will be fine.
+
+Another drawback is that the network struggles to function as its size increases - the way I have
+implemented Paxos is easy to debug but is very ``chatty''. Using a more efficient variant such as
+MultiPaxos would decrease the bandwidth requirements of the system. Alternatively using a variant
+such as FastPaxos would decrease the latency.
+
+Although I show an improvement to the startup cost of bootstrapping the network, my improvement
+only centralises the bootstrapping, losing all the advantages of using a distributed network. A
+complete solution would be to use a DHT or super-node hierachy.
+
+Due to time constraints I did not have time to implement all the SQL syntax that my requirements
+indicated. However this is not a significant concern as it is relatively easy to add new syntax and
+operations to the database.
 
 \section{Changes with hindsight}
 
+If I was to do the project again, there are several large changes that I would make. These mainly
+are design choices more than anything else. One big design choice I made was to use an
+asynchronous programming paradigm. I chose this because I thought it would make the project
+simpler and quicker to write, by leveraging Twisted's network stack. However I didn't allow for
+the difficulty of understanding and designing Paxos, or a database, or Paxos and a database under
+a new programming paradigm.
 
-\subsection{Twisted}
+Another design problem was that I started with a key/value database prototype, and later
+refactored it into a row based database. I then added an SQL interface and layered transactions on
+top. This was a reasonable choice, as I started small and then worked bigger, but in retrospect
+the system should have been row-based from the start. The SQL interface should have been more
+tightly integrated rather than less tightly, and transactions should have been the core aspect of
+my system, rather than a layering of operations. However it is difficult to predict how the
+project would have turned out with this plan, it is not necessarily as easy to implement as it
+sounds and I believe my choices were very reasonable at the time.
+
+Another possibility is that I should have started with smaller prototypes of the complete system,
+rather than prototypes of both of them that were then joined. A disadvantage of my approach was
+that as my understanding of how the design would work progressed, the API interface between the
+two components changed significantly and repeated. This led to problems with testing, and with
+having to rewrite various user interfaces repeatedly. An alternative approach could have been to
+use an agile programming strategy, rather than an interative one. A quote that summarises my
+experience with my project is by Fred Brooks: ``plan to throw one away; you will, anyhow''.
+
+\subsection*{Twisted}
 
 In retrospect, if I was to do the project again I would probably not use Twisted. Twisted provided
-me with a framework 
+me with a powerful framework for building an asynchronous network application, but it had
+disadvantages as well as advantages, which I will briefly outline.
 
-high learning curve
-spent lots of time interfacing with it
-message requirements of paxos are simple
-wouldn't have had to learn asynchronous
-debugging would have been easier
+I had to learn a lot for this project. I had to learn and understand how how Paxos works and
+design a protocol that implements it. I also had to learn and understand the basics of building a
+database, and on top of that - a distributed database. Twisted has a high learning curve, and I
+ended up investing a lot of time understanding how to work with Twisted and in some cases working
+against it. I spent lots of time interfacing with it, some of which was unnecessary.
 
-\subsection{Testing}
+It is difficult to know how much networking code Twisted saved me writing, however
+the message requirements of paxos are quite simple, and I think that with a few days work making
+some helper network classes much of the complexity of using and interfacing with Twisted could
+have been avoided. Certainly there are cases when debugging would have been easier, and I feel my
+project would have been less ``heavy-weight'', particularly when it came to unit tests, another
+problem I will discuss later.
 
-\begin{enumerate}
-	\item unit test inertia
-	\item test programs, see complex effects of single change.
-	\item durable - network - stable storage
-\end{enumerate}
+As I worked through several prototype versions, Twisted became cumbersome to use. I had to keep
+learning new parts of it, which was frustrating to have to keep delving into the innards of it,
+particularly as I started to feel that it hadn't helped me as much as I had anticipated.
 
+Using the asynchronous paradigm initially helped me reason about Paxos and how I would design my
+system, however later on I felt the asynchronous model was unnecessary, and Twisted became
+superfluous. Certainly my project would have been very different without the decision to use it.
+
+\subsection*{Testing}
+
+Unit tests became a problem as I progressed through the project.  They became a hinderance, as I
+was refactoring my code base often, they were not that effective. Test Driven Development may have
+been a better choice, as I wrote my unit tests after I had written the code, I would often write
+the code, write the tests, it would all work. Then I would refactor the code, rewrite the tests --
+every refactoring would invalidate large numbers of tests. This was also due to how tightly
+coupled my code was with Twisted. This is another reason I would reconsider my decision to use
+Twisted if I were to redo the project.
+
+\section{Summary}
+
+In summary, my project had clear successes but also some clear drawbacks. I effectively
+implemented Paxos, and built an ACID distributed database on top, with support for transactions. I
+made some improvements to my design, but ultimately there are still many more clear avenues for
+improvement. The project suffers from inefficiency, and is slow, but is an effective prototype
+that gives valuable insight into the performance ramifications of different design decisions of a
+distributed database. My project was limited not just by the limited amount of time I had, but
+also by my lack of expertise in the area, and I have gained valuable insights into my decisions
+and how I would improve the project if I were to implement it again.
 
 
 \cleardoublepage

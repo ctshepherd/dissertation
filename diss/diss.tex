@@ -451,7 +451,7 @@ this variant further in this dissertation.
 \subsubsection*{Proposal Numbering}
 
 One of the assumptions that Paxos makes is that every proposal has a unique proposal number. This
-is necessary so that proposals have a \emph{total order}, ie we can compare any two proposals to
+is necessary so that proposals have a \emph{total order}, i.e. we can compare any two proposals to
 find the maximum ordered proposal. The conventional way to achieve this is to define a proposal
 number as a 2-tuple of (sequence number, node address). These can be compared lexicographically,
 and as node addresses are unique, every proposal number will be unique. In practice I plan to use
@@ -626,7 +626,7 @@ by the half of the partition that was able to make progress.
 \begin{enumerate}
 \item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors, but is only
 	able to successfully message one of them.
-\item \msg{Prepare(n):} A second Proposer simulataneously sends a \msg{Prepare} message to the
+\item \msg{Prepare(n):} A second Proposer simultaneously sends a \msg{Prepare} message to the
 	Acceptors, and is able to reach a quorum.
 \item \msg{Promise(n):} The Acceptor on the left side of the split replies with a \msg{Promise},
 	but does not make up a quorum so...
@@ -648,7 +648,7 @@ subsequent \msg{AcceptRequest} message to a quorum of Acceptors, consensus will 
 \begin{enumerate}
 \item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors, but is only
 	able to successfully message one of them.
-\item \msg{Prepare(n):} A second Proposer simulataneously sends a \msg{Prepare} message to the
+\item \msg{Prepare(n):} A second Proposer simultaneously sends a \msg{Prepare} message to the
 	Acceptors, and is able to reach a quorum.
 \item \msg{Promise(n):} The Acceptor on the left side of the split replies with a \msg{Promise},
 	but does not make up a quorum so...
@@ -660,7 +660,7 @@ subsequent \msg{AcceptRequest} message to a quorum of Acceptors, consensus will 
 
 \subsection{MultiPaxos}
 
-MultiPaxos is multiple rounds of Paxos occuring at the same time. The way this is outlined in
+MultiPaxos is multiple rounds of Paxos occurring at the same time. The way this is outlined in
 \emph{Paxos Made Simple} \cite{lamport01} is by a form of leader election. I will outline this
 here but, for simplicity, in my project I will simply use multiple Paxos rounds to form the basis
 of a \emph{distributed operation log}. This will be explained in more detail in the Implementation
@@ -700,8 +700,8 @@ not need to worry about whether another transaction is executing or not.
 
 \subsection*{Durable}
 
-The durable property refers to the permanance of a transaction. Once a database reports that a
-transaction has been commited, it should persist in the database even in the face of power loss or
+The durable property refers to the permanence of a transaction. Once a database reports that a
+transaction has been committed, it should persist in the database even in the face of power loss or
 crashes. This is typically achieved by using a write-ahead log that is append only, so that in the
 event of a crash, the database can reconstruct the state of all transactions reported as
 ``committed''. Distributed systems have an added complication of co-ordinating this property
@@ -721,7 +721,7 @@ I chose Twisted in order to make implementing the network code a lot simpler. Tw
 the event driven paradigm and this means that I can construct my code in terms of network events,
 rather than having to focus on writing network handling code. Twisted provides a lot of built in
 support for implementing protocols and helper classes etc. Also as I am using a state machine
-approach to implementing DBP and Paxos, twisted's asynchronous system works very well with this
+approach to implementing DBP and Paxos, Twisted's asynchronous system works very well with this
 approach.
 
 The other module I decided to use is PyParsing, a Python module for programmatically creating a
@@ -836,7 +836,7 @@ change to Twisted, as I hoped the support it would give me would make writing th
 
 \label{sec:message-serialization}
 
-I initially decided to use a class hierachy to define messages, and to use a simple
+I initially decided to use a class hierarchy to define messages, and to use a simple
 serialization/deserialization technique, transmitting messages in the form
 \verb+"<message type>":<proposal serialization>+. I decided to send messages as simple strings
 over the network for a number of reasons - for a prototype implementation speed was not my primary
@@ -850,11 +850,11 @@ in creating messages (cf. \verb+send(Msg({"msg_type": "accept_requst", ...}))+
 and \verb+send(Msg({"msg_type": "accept_request", ...}))+).
 
 Although security was not a major concern for this project, I wanted to be able to serialize
-arbirtrary objects without allowing remote code execution on a host running my software - even
+arbitrary objects without allowing remote code execution on a host running my software - even
 though it was only running on local host this still seemed unnecessarily risky. Fortunately Python
 has a builtin function called \verb+literal_eval+ which only evaluates literals (strings, tuples,
 lists and dictionaries), and nothing unsafe (classes, functions) which could be used to run
-arbritrary code.
+arbitrary code.
 
 I eventually moved to sending a dictionary in plain string format over the network. This allowed
 me to specify arbitrary key/value pairs without having to add in extra support for them (a
@@ -888,7 +888,7 @@ address and is able to include it in messages, and there are no problems in pote
 adapter situations, where different parts of the network think a node has different addresses.
 
 There is the problem of a node lying about its identity, for example forging a \op{ATTEMPTLOCK}
-request. This is a more pertinant problem because I am using UDP, which is easier to forge than
+request. This is a more pertinent problem because I am using UDP, which is easier to forge than
 TCP. Although a fully secure implementation is beyond the scope of this project, one potential
 solution would be to sign or authenticate messages, and include this signature or MAC with the
 message.
@@ -924,7 +924,7 @@ there are no nodes it has not learned of. $N$ is then fully integrated into the 
 
 Note that this bootstrap method is $N^2$ in the number of messages sent. There are other ways to
 do bootstrap that are more efficient in the number of messages sent (for instance a DHT or a
-supernode hierachy). While this architecture is out of the scope of this project these options are
+supernode hierarchy). While this architecture is out of the scope of this project these options are
 discussed later on.
 
 \subsubsection{Heartbeat}
@@ -1076,7 +1076,7 @@ implemented encapsulated in the mixin class.
 \end{tabular}
 
 
-The Proposer mixin is the most complicated out of the the three roles. It is a simple state
+The Proposer mixin is the most complicated out of the three roles. It is a simple state
 machine with 3 states: ``idle'', ``trying'' and ``polling''. The Proposer initialises the state to
 the ``idle'' state. It then transitions to the ``trying'' state and sends \msg{Prepare} messages
 with a proposal number \verb+(p, <GUID>)+, where $p$ is normally 1, but may be different if we
@@ -1238,7 +1238,7 @@ guarantee about the OID the statement would have. This made for a cleaner abstra
 between the database and Paxos. The database code now only needed to pass the Paxos layer a
 statement/op, and it would receive a callback when that statement was finally entered into the
 transaction log, along with the OID it was entered as (which would be the instance ID, as there is
-a one-to-one correspondance of OIDs -- instance IDs).
+a one-to-one correspondence of OIDs -- instance IDs).
 
 \subsection{Reads}
 
@@ -1404,7 +1404,7 @@ bandwidth used varied in different situations.
 \subsection{Simulation}
 
 In order to evaluate the database I decided to simulate the network on a single machine. Initially
-I created a seperate program for each node, but for all but the most simple network scenarios it
+I created a separate program for each node, but for all but the most simple network scenarios it
 became necessary to run all nodes in the same Python script to programmatically generate results.
 I discuss the limitations of this in the section below. There were a number of reasons why it was
 necessary to simulate the network on a single machine.
@@ -1504,7 +1504,7 @@ However, a small amount of added CPU latency is not unexpected. However, the thi
 database transaction, which has significantly more latency. This is because a transaction involves
 waiting on several Paxos operations to be committed before it is considered done.
 
-However, in all cases we can see that the latency of commiting an operation to the
+However, in all cases we can see that the latency of committing an operation to the
 network increases linearly with the number of writers in the network, with a very strong
 correlation.
 
@@ -1559,7 +1559,7 @@ Again I initially did this for a network of 5 nodes. The results of this are in
 figure~\ref{fig:thruput-5}. We can see that the throughput of the network decreases with
 $\frac{1}{w}$, where $w$ is the number of concurrent writers in the system. Again the performance of
 Paxos and database operations is similar, with very similar throughputs. However there is still a
-big overhead to using transactions, as evidenced from the substationally reduced throughput,
+big overhead to using transactions, as evidenced from the substantially reduced throughput,
 reduced by nearly a factor of 5.
 
 \paragraph{20 Nodes}
@@ -1612,7 +1612,7 @@ such as FastPaxos would decrease the latency.
 
 Although I show an improvement to the startup cost of bootstrapping the network, my improvement
 only centralises the bootstrapping, losing all the advantages of using a distributed network. A
-complete solution would be to use a DHT or super-node hierachy.
+complete solution would be to use a DHT or super-node hierarchy.
 
 Due to time constraints I did not have time to implement all the SQL syntax that my requirements
 indicated. However this is not a significant concern as it is relatively easy to add new syntax and
@@ -1641,7 +1641,7 @@ rather than prototypes of both of them that were then joined. A disadvantage of 
 that as my understanding of how the design would work progressed, the API interface between the
 two components changed significantly and repeated. This led to problems with testing, and with
 having to rewrite various user interfaces repeatedly. An alternative approach could have been to
-use an agile programming strategy, rather than an interative one. A quote that summarises my
+use an agile programming strategy, rather than an iterative one. A quote that summarises my
 experience with my project is by Fred Brooks: ``plan to throw one away; you will, anyhow''.
 
 \subsection*{Twisted}
@@ -1673,7 +1673,7 @@ superfluous. Certainly my project would have been very different without the dec
 
 \subsection*{Testing}
 
-Unit tests became a problem as I progressed through the project.  They became a hinderance, as I
+Unit tests became a problem as I progressed through the project.  They became a hindrance, as I
 was refactoring my code base often, they were not that effective. Test Driven Development may have
 been a better choice, as I wrote my unit tests after I had written the code, I would often write
 the code, write the tests, it would all work. Then I would refactor the code, rewrite the tests --
@@ -1700,7 +1700,7 @@ In summary, I successfully completed both an implementation of the Paxos protoco
 distributed database on top. The theory behind the design and the requirements are set out in the
 Preparation Chapter. The design and implementation of these two components is discussed in detail
 in the Implementation Chapter. Both were designed simply, and this led to various inefficiencies
-and tradeoffs that I measured and quantatively evaluated in the Evaluation Chapter, also
+and tradeoffs that I measured and quantitatively evaluated in the Evaluation Chapter, also
 discussing the limitations of the project. Here I will outline the formal success criteria and how
 my project compares with them, as well as proposing potential extensions or improvements that
 could be investigated further.
@@ -1749,12 +1749,12 @@ effective in a network with low contention.
 
 \subsection{Durability}
 
-A large part of contempary database design involves ensuring that database operations persist
+A large part of contemporary database design involves ensuring that database operations persist
 ie, durability - the ``D'' from ACID. My project did not support stable storage as a means of
 ensuring durability and extending this, through the use of write-ahead logs (WAL) and or shadow
 paging, would be a high priority given more time.
 
-\subsection{Network Hierachy}
+\subsection{Network Hierarchy}
 
 A clear problem during evaluation was the effect of the network size on the amount of time and the
 amount of bandwidth used to bootstrap the network. Increasing the size beyond a certain number of

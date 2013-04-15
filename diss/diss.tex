@@ -193,78 +193,10 @@ Preparation chapter I will go into detail about the types of failure that my dat
 % S comment: too detailed, move to preparation and discuss what 2pc tries to achieve and its flaws
 % rather than details
 
-\begin{figure}[h!]
-\centering
-\includegraphics[scale=0.5]{figs/two-pc.eps}
-\caption{\label{fig:two-pc}Two Phase Commit}
-\end{figure}
-
-2 Phase Commit (2PC) is one of the simplest consensus protocol, and one of the most brittle. The
-basic message flow is shown in figure~\ref{fig:two-pc}. It has two phases:
-
-\begin{enumerate}
-\item The co-ordinator (the node initiating the protocol) sends a \msg{PROPOSE} message to each
-	node in a cohort of size $N$, asking them to accept the value proposed.
-\item The nodes reply with a \msg{YES} or \msg{NO} reply.
-\item If all nodes respond with a \msg{YES} message, the co-ordinator sends a \msg{CONFIRM} message. Otherwise, if
-	any node responds with a \msg{NO} message, it sends an \msg{ABORT} message to all nodes.
-\item Nodes reply with an \msg{ACK} message, and the co-ordinator marks the transaction as
-	complete when all nodes have acknowledged it.
-\end{enumerate}
-
-% S comment: split into 2 paragraphs and use footnotes
-
-2PC solves the consensus problem in a failure free network. However if we can have failures then
-the protocol can suffer from a number of limitations. If the co-ordinator crashes before sending
-any messages, we satisfy consensus trivially. However, if the co-ordinator crashes after sending
-$x$ messages, where $1 \le x < N$, the protocol cannot continue - it is blocked on the
-co-ordinator resuming, and if it never resumes then some members of the cohort are blocked
-permanently. In fact, once a node has sent a \msg{YES} message, it is blocked until it receives a
-response. This is a big disadvantage for a concurrent system. While there are extensions to
-resolve the problem of a crashing co-ordinator, these do not fix the fundamental problem of using
-a blocking protocol in an asynchronous network. (These extensions often involve a ``watchdog'' or
-``recovery node'' This is still not a satisfactory solution as the simultaneous crash of the
-co-ordinator and a cohort member means the state of the network is not recoverable (ie, we cannot
-tell if the cohort member who crashed voted \msg{YES} or \msg{NO}.))
+2 Phase Commit is one of the simplest protocols that aims to solve the Distributed con
 
 \subsection*{3 Phase Commit}
 
-\begin{figure}[h!]
-\centering
-\includegraphics[scale=0.5]{figs/three-pc.eps}
-\caption{\label{fig:three-pc}Three Phase Commit}
-\end{figure}
-
-3 Phase Commit (3PC) is a modification of 2PC that turns it from a synchronous protocol into an
-asynchronous protocol. This is done by adding a third phase, so that we can use timeouts to assert
-the state of the system at any point in time. Again the basic message flow is shown in
-figure~\ref{fig:three-pc}. The three phases are:
-
-\begin{enumerate}
-\item \msg{Prepare}: the co-ordinator asks the cohort members if they can perform the operation. At
-	this stage if there is a failure or timeout, the co-ordinator aborts the transaction.
-\item The cohort respond with a \msg{YES} or \msg{NO}. Again, if there is a failure or timeout the cohort
-	member considers the transaction aborted.
-\item \msg{Pre-commit}: If the co-ordinator receives \msg{YES} messages from every member of the
-	cohort, it sends a \msg{Pre-commit} message to them all, otherwise it aborts the
-	transaction. It also aborts in the case of a failure or timeout.
-\item \msg{Acknowledge}: If the cohort member recieves a \msg{Pre-commit} message, it replies with
-	an \msg{Acknowledge} message. If the co-ordinator aborts, or there is a failure or
-	timeout, the cohort member aborts.
-\item \msg{Finalise}: If the co-ordinator times out, it aborts the transaction. Otherwise, when it
-	has received \msg{Acknowledge} messages from every cohort member it sends a \msg{Finalise}
-	message to them all.
-\item \msg{Confirm}: Once a cohort member has received a \msg{Finalise} message, it commits the
-	transaction, even if the co-ordinator fails. It can reply with a \msg{Confirm} message.
-\end{enumerate}
-
-This fixes the problem of node failure, but still suffers from a significant problem. If there is
-a network partition, and all nodes who voted \msg{YES} are in one half and all nodes who voted
-\msg{NO} are in the other, both partitions will recover into different, inconsistent states.
-Brewer's CAP theorem \cite{gilbert2002} says that we cannot achieve both consensus and availability
-during a network partition - we must choose one. 3PC opts for availability, but for a distributed
-database with ACID properties it is preferable to have consensus. Paxos guarantees consensus at
-the cost of lack of availability in a network partition.
 
 \subsection*{Paxos}
 
@@ -376,6 +308,83 @@ based protocol called ZAB.
 \chapter{Preparation}
 
 % S says start off with software engineering stuff
+
+\section{Distributed Consensus Protocols}
+
+\subsection*{2 Phase Commit}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[scale=0.5]{figs/two-pc.eps}
+\caption{\label{fig:two-pc}Two Phase Commit}
+\end{figure}
+
+2 Phase Commit (2PC) is one of the simplest consensus protocol, and one of the most brittle. The
+basic message flow is shown in figure~\ref{fig:two-pc}. It has two phases:
+
+\begin{enumerate}
+\item The co-ordinator (the node initiating the protocol) sends a \msg{PROPOSE} message to each
+	node in a cohort of size $N$, asking them to accept the value proposed.
+\item The nodes reply with a \msg{YES} or \msg{NO} reply.
+\item If all nodes respond with a \msg{YES} message, the co-ordinator sends a \msg{CONFIRM} message. Otherwise, if
+	any node responds with a \msg{NO} message, it sends an \msg{ABORT} message to all nodes.
+\item Nodes reply with an \msg{ACK} message, and the co-ordinator marks the transaction as
+	complete when all nodes have acknowledged it.
+\end{enumerate}
+
+% S comment: split into 2 paragraphs and use footnotes
+
+2PC solves the consensus problem in a failure free network. However if we can have failures then
+the protocol can suffer from a number of limitations. If the co-ordinator crashes before sending
+any messages, we satisfy consensus trivially. However, if the co-ordinator crashes after sending
+$x$ messages, where $1 \le x < N$, the protocol cannot continue - it is blocked on the
+co-ordinator resuming, and if it never resumes then some members of the cohort are blocked
+permanently. In fact, once a node has sent a \msg{YES} message, it is blocked until it receives a
+response. This is a big disadvantage for a concurrent system. While there are extensions to
+resolve the problem of a crashing co-ordinator, these do not fix the fundamental problem of using
+a blocking protocol in an asynchronous network. \footnote{These extensions often involve a ``watchdog'' or
+``recovery'' node. This is still not a satisfactory solution as the simultaneous crash of the
+co-ordinator and a cohort member means the state of the network is not recoverable (i.e., we cannot
+tell if the cohort member who crashed voted \msg{YES} or \msg{NO}.)}
+
+\subsection*{3 Phase Commit}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[scale=0.5]{figs/three-pc.eps}
+\caption{\label{fig:three-pc}Three Phase Commit}
+\end{figure}
+
+3 Phase Commit (3PC) is a modification of 2PC that turns it from a synchronous protocol into an
+asynchronous protocol. This is done by adding a third phase, so that we can use timeouts to assert
+the state of the system at any point in time. Again the basic message flow is shown in
+figure~\ref{fig:three-pc}. The three phases are:
+
+\begin{enumerate}
+\item \msg{Prepare}: the co-ordinator asks the cohort members if they can perform the operation. At
+	this stage if there is a failure or timeout, the co-ordinator aborts the transaction.
+\item The cohort respond with a \msg{YES} or \msg{NO}. Again, if there is a failure or timeout the cohort
+	member considers the transaction aborted.
+\item \msg{Pre-commit}: If the co-ordinator receives \msg{YES} messages from every member of the
+	cohort, it sends a \msg{Pre-commit} message to them all, otherwise it aborts the
+	transaction. It also aborts in the case of a failure or timeout.
+\item \msg{Acknowledge}: If the cohort member receives a \msg{Pre-commit} message, it replies with
+	an \msg{Acknowledge} message. If the co-ordinator aborts, or there is a failure or
+	timeout, the cohort member aborts.
+\item \msg{Finalise}: If the co-ordinator times out, it aborts the transaction. Otherwise, when it
+	has received \msg{Acknowledge} messages from every cohort member it sends a \msg{Finalise}
+	message to them all.
+\item \msg{Confirm}: Once a cohort member has received a \msg{Finalise} message, it commits the
+	transaction, even if the co-ordinator fails. It can reply with a \msg{Confirm} message.
+\end{enumerate}
+
+This fixes the problem of node failure, but still suffers from a significant problem. If there is
+a network partition, and all nodes who voted \msg{YES} are in one half and all nodes who voted
+\msg{NO} are in the other, both partitions will recover into different, inconsistent states.
+Brewer's CAP theorem \cite{gilbert2002} says that we cannot achieve both consensus and availability
+during a network partition - we must choose one. 3PC opts for availability, but for a distributed
+database with ACID properties it is preferable to have consensus. Paxos guarantees consensus at
+the cost of lack of availability in a network partition.
 
 \section{Paxos}
 

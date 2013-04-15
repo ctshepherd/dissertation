@@ -1,0 +1,77 @@
+#!/usr/bin/env python
+
+from __future__ import division
+
+from optparse import OptionParser
+from twisted.internet import reactor
+
+from dbp import config, util
+from dbp.paxos.agent import NodeProtocol
+
+
+class LogTransport(object):
+
+    def __init__(self, transport, clock=None, debug=False):
+        self.transport = transport
+        self.count = 0
+
+    def write(self, data, host=None):
+        """Wrapper around TStringTransport.write: log the amount of data sent"""
+        self.count += len(data)
+        self.transport.write(data, host)
+
+
+def make_lmt_node(port, args=None):
+    if args is None:
+        a = []
+    else:
+        a = [args]
+    n = NodeProtocol(*a)
+    t = reactor.listenUDP(port, n)
+    n.transport = LogTransport(t)
+    return n
+
+
+class NodeManager(object):
+
+    def __init__(self, node_num):
+        self.master = make_lmt_node(self.start_port)
+        self.nodes = [self.master]
+        for x in xrange(1, node_num):
+            n = make_lmt_node(self.start_port + x, ("localhost", self.start_port + x - 1))
+            self.nodes.append(n)
+
+    def collate(self):
+        self.counts = [n.transport.count for n in self.nodes]
+        reactor.stop()
+
+
+def main():
+    usage = "usage: %prog [options]"
+    parser = OptionParser(usage=usage)
+    parser.add_option("-n", "--nodes", action="store", type="int",
+                      help="number of nodes to run")
+    parser.add_option("-D", "--debug", action="store", type="int", default=config.DEBUG,
+                      help="debug level to run at")
+    parser.add_option("-P", "--port", action="store", type="int", default=10000,
+                      help="port number to start from")
+
+    (options, args) = parser.parse_args()
+    if options.nodes is None:
+        parser.error("Need to specify number of nodes")
+    if options.port is None:
+        parser.error("Need to specify which port to use")
+
+    util.DEBUG = options.debug
+
+    NodeManager.start_port = options.port
+    m = NodeManager(options.nodes)
+
+    reactor.callLater(7, m.collate)
+    reactor.run()
+
+    print ','.join(str(x) for x in m.counts)
+
+
+if __name__ == "__main__":
+    main()

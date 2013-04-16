@@ -484,7 +484,7 @@ Paxos utilises several message types:
 \item \msg{Promise(n, m, v)}, promising to only accept proposals numbered greater than or equal to
 	$n$. $m$ refers to the number of the highest proposal previously accepted by the recipient and
 	$v$ is the value of that proposal. If they are not included and the message is in the form
-	\msg{Promise(n), it is assumed that the recipient has not accepted any proposals
+	\msg{Promise(n)}, it is assumed that the recipient has not accepted any proposals
 		previously.
 \item \msg{AcceptRequest(n, v)}, asking the recipient to accept the proposal ($n$, $v$).
 \item \msg{AcceptNotify(n, v)}, notifying the recipient that the sender has accepted the proposal
@@ -506,8 +506,8 @@ prepare them to accept a proposal. They respond with the greatest proposal they 
 accepted. It is this key step which ensures that Paxos enforces consistency. In the second step,
 the co-ordinating node sends out a proposal for nodes to accept. However, the value of this
 proposal must be the value of the greatest proposal previously accepted by a node in $Q$.
-% XXX: Formally, if $v$ is the value of the proposal, $\exists (p, v) \in {
 
+\subsubsection*{Formal description of the algorithm}
 In \emph{Paxos Made Simple} \cite{lamport01}, the actions of a Paxos node are split into three
 roles - Proposer, Acceptor and Learner. Explaining it in terms of these roles is simpler, however
 in practice they are combined into one client.
@@ -520,17 +520,14 @@ To start a round of Paxos, the Proposer $P$ sends out a \msg{Prepare(n)} message
 the network with a unique proposal number, $n$. This proposal number $n$ must
 be higher than any proposal numbers $P$ has sent for this instance of Paxos.
 
-% XXX: should i use a mathematical symbol for the highest proposal number? might help explanation
-% of NACKS later on?
-
 \paragraph{Phase 2}
 
-If the Proposer receives \msg{Promise} replies from a quorum of acceptors, $Q$,
+If the Proposer receives  replies from a quorum of acceptors, $Q$,
 to its \msg{Prepare(n)} message, it sends the message \msg{AcceptRequest(n, v)} to all
-$q \in Q$, where
-% XXX: how do i say this in a formal way?? email stephen?
-$v := $ the value of the maximum \msg{Promise(n, v)} received.
-%$v \buildrel \text{d{}ef}\over = $
+$q \in Q$, where $v$ is defined as follows. If the message set $M$ is defined as
+${(n, v) for all \msg{Promise(n, v)}}$, $v$ is defined as
+$(n', v) \in M. \forall (n'', v'') \in M.  n' >= n''$.
+Informally, $v$ the value of the maximum \msg{Promise(n, v)} received.
 
 \subsubsection*{Acceptor}
 
@@ -556,16 +553,16 @@ If an Acceptor receives a message \msg{AcceptRequest(n, v)}, if $n > \rho$ it ac
 proposal, setting $\eta := n$ and $\nu := v$. It also notifies Learners in the network of its
 decision by sending an \msg{AcceptNotify(n, v)} message to them.
 
-% XXX: is this PMS or PTP??
-\emph{Paxos Made Simple} \cite{lamport01} describes several different ways of notifying Learners
-of accepted proposals - we can specify a \emph{distinguished Learner}, who then notifies
-other Learners when a quorum of Acceptors has accepted a proposal, we can specify several
-distinguished Learners, or we can broadcast all \msg{AcceptRequest} messages to all Learners.
-While this method generates $L\times A$ messages (where $L$ is the number of Learners in the
-network and $A$ is the number of Acceptors in the network), it is the simplest and the most
-resilient to failures, and therefore the one I have chosen to implement. By contrast, the first
-method generates $A + L$ messages, and the second generates $D\times A + L$ messages, where $D$ is
-the size of the set of distinguished Learners.
+% % XXX: is this PMS or PTP??
+% \emph{Paxos Made Simple} \cite{lamport01} describes several different ways of notifying Learners
+% of accepted proposals. One way is to specify a \emph{distinguished Learner}, who then notifies
+% other Learners when a quorum of Acceptors has accepted a proposal. This can also be extended to specify several
+% distinguished Learners. or we can broadcast all \msg{AcceptRequest} messages to all Learners.
+% While this method generates $L\times A$ messages (where $L$ is the number of Learners in the
+% network and $A$ is the number of Acceptors in the network), it is the simplest and the most
+% resilient to failures, and therefore the one I have chosen to implement. By contrast, the first
+% method generates $A + L$ messages, and the second generates $D\times A + L$ messages, where $D$ is
+% the size of the set of distinguished Learners.
 
 \subsubsection*{Learner}
 
@@ -596,13 +593,13 @@ until the proposed value is learnt.
 
 \begin{enumerate}
 \item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors.
-\item \msg{Promise(n):} The Acceptors all accept the proposal, as they have not seen any
-	\msg{Prepare} requests yet (and therefore trivially cannot have promised to accept a
-	proposal higher than $n$).
+\item \msg{Promise(n):} The Acceptors all promise to accept proposals numbered $>= n$, as they
+	have not seen any \msg{Prepare} requests yet and therefore trivially cannot have promised
+	to accept a proposal higher than $n$.
 \item \msg{AcceptRequest(n, v):} The Proposer sends a value $v$, with the proposal number $n$, to
-the Acceptors.
-\item \msg{AcceptNotify(n, v):} The Acceptors have not promised to accept a proposal numbered
-	greater than $n$, so they accept $v$ as the value for the round of Paxos and notify the
+	the Acceptors.
+\item \msg{AcceptNotify(n, v):} The Acceptors have not made any promises preventing them from
+	accepting $n$, so they accept $v$ as the value for the round of Paxos and notify the
 	Learner.
 \end{enumerate}
 
@@ -622,8 +619,8 @@ proposed value is learnt.
 \begin{enumerate}
 \item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors.
 \item Failure: Acceptor 3 fails.
-\item \msg{Promise(n):} Acceptors 1 and 2 still accept the proposal, for the same reason as
-	before.
+\item \msg{Promise(n):} Acceptors 1 and 2 still promise to accept the proposal, for the same
+	reason as before.
 \item \msg{AcceptRequest(n, v):} The quorum size is 2, so a quorum of acceptors has responded, and
 	the Proposer can continue as normal.
 \item \msg{AcceptNotify(n, v):} The Learner receives \msg{AcceptNotify} messages from a quorum of
@@ -668,24 +665,32 @@ by the half of the partition that was able to make progress.
 \subsubsection*{Duelling Proposers}
 
 Figure~\ref{fig:paxos-duelling} shows the worst case scenario
-for Paxos - duelling Proposers. This is the pathological case for Paxos where it is possible for
-it to never make progress - this eventuality is unlikely because the messages from the proposers
+for Paxos -- duelling Proposers. This is the pathological case for Paxos where it is possible for
+it to never make progress. However this eventuality is unlikely because the messages from the proposers
 must interleave so that there is no contiguous sequence of \msg{Prepare} and \msg{AcceptRequest}
-messages, if any single Proposer manages to send a \msg{Prepare} message followed by a
+messages. This means that if any single Proposer manages to send a \msg{Prepare} message followed by a
 subsequent \msg{AcceptRequest} message to a quorum of Acceptors, consensus will be achieved.
 
 \begin{enumerate}
-\item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors, but is only
-	able to successfully message one of them.
-\item \msg{Prepare(n):} A second Proposer simultaneously sends a \msg{Prepare} message to the
-	Acceptors, and is able to reach a quorum.
-\item \msg{Promise(n):} The Acceptor on the left side of the split replies with a \msg{Promise},
-	but does not make up a quorum so...
-\item the first Proposer times out. It could restart with a higher proposal number, but in this
-	case it will be unable to make any progress until the partition is resolved.
-\item \msg{AcceptNotify(n, v):} The Acceptors make up a quorum so are able to proceed through to
-	completion.
+\item \msg{Prepare(1):} The Proposer sends a \msg{Prepare} message to the Acceptors as usual.
+\item \msg{Prepare(1):} The Acceptors respond with a \msg{Promise} to only accept proposals
+	numbered $>= 1$.
+\item \msg{Prepare(2):} Before the first Proposer sends an \msg{AcceptRequest} message, another
+	Proposer sends a \msg{Prepare} message to the Acceptors asking them to only accept
+	proposals $>= 2$.
+\item \msg{Promise(2):} The Acceptors promise to do so.
+\item \msg{AcceptRequest(1, a):} The first Proposer sends an \msg{AcceptRequest} message to the
+	Acceptors, but they cannot accept as they have promised to only accept proposals $>= 2$.
+\item \msg{Nack(2):} The Acceptors inform the Proposer they cannot accept with a \msg{Nack}
+	message. This step is not strictly necessary as the Proposer would retry with a higher
+	proposal number after a timeout, but is included for clarity.
+\item \msg{Prepare(3):} The Proposer sends another \msg{Prepare} message to the Acceptors...
+\item \msg{Promise(3):} and they promise not to accept proposals $>= 3$
 \end{enumerate}
+
+% XXX
+This cycle can continue indefinitely, but the probability of it doing so becomes very small very
+quickly.
 
 \subsection{MultiPaxos}
 
@@ -713,9 +718,9 @@ an operation, because if it does not succeed we can simply retry it without need
 the state it has left the database in. Atomicity also applies to transactions in the same way --
 if we have a transaction as an operation composed of smaller single operations (for example, INCR
 B, READ A $\rightarrow$ X, WRITE X + 10 $\rightarrow$ A), we don't want some of the operations to
-complete and some not to. In this example, we may have the constraint $A = 10\times B$. If B was
+complete and some not to. In this example, we may have the invariant $A = 10\times B$. If B was
 incremented but then the transaction failed before A was updated, we would leave the database in
-an inconsistent state.
+an invalid state.
 
 \subsection*{Consistent}
 
@@ -743,18 +748,20 @@ crashes. This is typically achieved by using a write-ahead log that is append on
 event of a crash, the database can reconstruct the state of all transactions reported as
 ``committed''. Distributed systems have an added complication of co-ordinating this property
 across the network before the transaction can be reported as ``committed''.
+``as if they were executed sequentially''
 
 \section{Software Engineering}
 
 \subsection{Module Dependencies}
 
+% XXX
 Twisted is a large Python framework used for event driven network programming. It contains support
 for many different protocols, making writing efficient networking code a lot easier by writing
-short callbacks, which are called when network events happen. However it is still single threaded,
-saving the headache of me having to worry about concurrency issues. Twisted is licensed under the
-MIT license, meaning there are no license issues in using it for my project.
+short callbacks, which are called when network events happen. It is single threaded, which means I
+will not have to worry about concurrency issues in my project. Twisted is licensed under the MIT
+license so there are no license issues in using it for my project.
 
-I chose Twisted in order to make implementing the network code a lot simpler. Twisted is based on
+I chose Twisted to make implementing the network code a lot simpler. Twisted is based on
 the event driven paradigm and this means that I can construct my code in terms of network events,
 rather than having to focus on writing network handling code. Twisted provides a lot of built in
 support for implementing protocols and helper classes etc. Also as I am using a state machine

@@ -241,7 +241,7 @@ However, a potential drawback is that Paxos has a pathological case where it wil
 progress, ie, there is no upper bound on the time it will take to achieve consensus (it may never
 terminate). This is due to the FLP impossibility proof \cite{fischer85}, which states that it is
 impossible to guarantee liveness in an asynchronous network where there is at least one failure.
-In practise it is a situation that is relatively easy to avoid, and is not a serious concern.
+In practice it is a situation that is relatively easy to avoid, and is not a serious concern.
 
 \section{Databases}
 
@@ -457,39 +457,57 @@ this variant further in this dissertation.
 
 \subsection{Definitions}
 
+\subsubsection*{Proposals}
+
+In an instance of Paxos, values that can be accepted are called \emph{proposals}. A proposal is a
+2-tuple of the form ($n$, $v$), where $n$ is the unique proposal number and $v$ is the value
+proposed.
+
 \subsubsection*{Proposal Numbering}
 
 One of the assumptions that Paxos makes is that every proposal has a unique proposal number. This
-is necessary so that proposals have a \emph{total order}, i.e. we can compare any two proposals to
+is necessary so that proposals have a \emph{total order}. A total order means that every proposal
+can be compared to any other proposal. This is necessary in order to
 find the maximum ordered proposal. The conventional way to achieve this is to define a proposal
 number as a 2-tuple of (sequence number, node address). These can be compared lexicographically,
 and as node addresses are unique, every proposal number will be unique. In practice I plan to use
-UUIDs as node identifiers, in order to be confident on uniqueness.
+UUIDs as node identifiers, in order to be confident of their uniqueness.
 
-\subsubsection*{Quorums}
-
-Paxos relies on quorums to ensure that even in the event of failures, consistency is preserved. A
-quorum is defined as a majority of nodes. In some versions of Paxos, weighting can be used to
-define quorums, however here I will use unweighted quorums.
 
 \subsubsection*{Messages}
 
 Paxos utilises several message types:
 
 \begin{itemize}
-\item \msg{Prepare(n)}, where $n$ is the proposal number of the message.
-% XXX
-\item \msg{Promise(n, m, v)}, promising to only accept proposals numbered where $m$ is the highest accepted proposal number by the recipient and
-	$v$ is the value of that proposal.
-\item \msg{AcceptRequest(n, v)}, where $n$ is the proposal number of the proposal and $v$ is the
-	value of that proposal.
-\item \msg{AcceptNotify(n, v)}, where $n$ is the proposal number of the proposal and $v$ is the value
-	of that proposal.
+\item \msg{Prepare(n)}, asking the recipient to respond with a \msg{Promise} not to
+	accept any proposals numbered less than $n$.
+\item \msg{Promise(n, m, v)}, promising to only accept proposals numbered greater than or equal to
+	$n$. $m$ refers to the number of the highest proposal previously accepted by the recipient and
+	$v$ is the value of that proposal. If they are not included and the message is in the form
+	\msg{Promise(n), it is assumed that the recipient has not accepted any proposals
+		previously.
+\item \msg{AcceptRequest(n, v)}, asking the recipient to accept the proposal ($n$, $v$).
+\item \msg{AcceptNotify(n, v)}, notifying the recipient that the sender has accepted the proposal
+	($n$, $v$).
 \end{itemize}
 
 \subsection{How it works}
 
 \label{sec:how-paxos-works}
+
+The central concept of Paxos is that of majority vote. A \emph{quorum} is defined as a majority of
+nodes in the system.  Paxos requires a quorum of nodes to accept a proposal before the proposal is
+considered ``learnt'' by the network. As any quorum of nodes must share at least one node with any
+other quorum, if a proposal is accepted by a quorum $Q$ and learnt, any subsequent decision taken
+must involve at least one node $q \in Q$.
+
+Paxos is comprised of two stages. First, a quorum of nodes $Q$ are sent \msg{Prepare} messages to
+prepare them to accept a proposal. They respond with the greatest proposal they have previously
+accepted. It is this key step which ensures that Paxos enforces consistency. In the second step,
+the co-ordinating node sends out a proposal for nodes to accept. However, the value of this
+proposal must be the value of the greatest proposal previously accepted by a node in $Q$.
+% XXX: Formally, if $v$ is the value of the proposal, $\exists (p, v) \in {
+
 In \emph{Paxos Made Simple} \cite{lamport01}, the actions of a Paxos node are split into three
 roles - Proposer, Acceptor and Learner. Explaining it in terms of these roles is simpler, however
 in practice they are combined into one client.
@@ -498,17 +516,17 @@ in practice they are combined into one client.
 
 \paragraph{Phase 1}
 
-To start a round of Paxos, the Proposer sends out a \msg{Prepare(n)} message to the acceptors in
-the network, with a unique proposal number, $n$, as outlined before. This proposal number $n$ must
-be higher than any proposal numbers it has sent for this instance of Paxos.
+To start a round of Paxos, the Proposer $P$ sends out a \msg{Prepare(n)} message to the acceptors in
+the network with a unique proposal number, $n$. This proposal number $n$ must
+be higher than any proposal numbers $P$ has sent for this instance of Paxos.
 
 % XXX: should i use a mathematical symbol for the highest proposal number? might help explanation
 % of NACKS later on?
 
 \paragraph{Phase 2}
 
-If the Proposer receives \msg{Promise} replies from a quorum of acceptors, $Q$, (that is, a majority of
-acceptors) to its \msg{Prepare(n)} message, it sends the message \msg{AcceptRequest(n, v)} to all
+If the Proposer receives \msg{Promise} replies from a quorum of acceptors, $Q$,
+to its \msg{Prepare(n)} message, it sends the message \msg{AcceptRequest(n, v)} to all
 $q \in Q$, where
 % XXX: how do i say this in a formal way?? email stephen?
 $v := $ the value of the maximum \msg{Promise(n, v)} received.
@@ -526,14 +544,16 @@ Acceptors need to store a few variables. An acceptor $A$ stores:
 
 \paragraph{Phase 1}
 
-If an acceptor $A$ receives a message \msg{Prepare(n)}, and $n > \rho$, then it replies with the
-message \msg{Promise(n, $\bm{\eta}$, $\bm{\nu}$)}, meaning that it will not accept any proposals
-numbered less than $n$.
+If an Acceptor $A$ receives a message \msg{Prepare(n)}, and $n > \rho$, then it replies with the
+message \msg{Promise(n, $\bm{\eta}$, $\bm{\nu}$)} and sets $\rho$ to $n$. This means it will not
+accept any proposals numbered less than $n$. If it has not accepted any proposals yet then $\eta$
+and $\nu$ will still be set to their initial values.
+% XXX
 
 \paragraph{Phase 2}
 
-If an acceptor receives a message \msg{AcceptRequest(n, v)}, if $n > \rho$ it accepts the
-proposal, settings $\eta := n$ and $\nu := v$. It also notifies Learners in the network of its
+If an Acceptor receives a message \msg{AcceptRequest(n, v)}, if $n > \rho$ it accepts the
+proposal, setting $\eta := n$ and $\nu := v$. It also notifies Learners in the network of its
 decision by sending an \msg{AcceptNotify(n, v)} message to them.
 
 % XXX: is this PMS or PTP??
@@ -551,15 +571,15 @@ the size of the set of distinguished Learners.
 
 % XXX: pseudo code?
 Learners must store a map of proposal numbers $\rightarrow$ acceptor IDs. When a Learner receives a
-message \msg{AcceptNotify(n, v)} from an Acceptor $A$, it must add $A$ to the set of acceptors who
+message \msg{AcceptNotify(n, v)} from an Acceptor $A$, it must add $A$ to the set of Acceptors who
 have accepted proposal $n$. When this set becomes a quorum (ie, the size of the set $S$ becomes
 greater than $N / 2$, where $N$ is the size of the network), the Learner can ``learn'' the $v$ as
-% XXX: ooh, preposition?
 the value decided on for that instance of Paxos. Because of the properties of Paxos, once a quorum
-% XXX: do i need to explain this?
-of acceptors has accepted $v$, the value of that instance will never change.
+of acceptors has accepted the proposal ($n$, $v$), the value of that instance will never change.
 
 \subsection*{Examples}
+
+The behaviour of Paxos is perhaps best explained with a few examples of different situations.
 
 \subsubsection*{Normal Behaviour}
 
@@ -569,7 +589,7 @@ of acceptors has accepted $v$, the value of that instance will never change.
 \caption{\label{fig:paxos-usual}Paxos Message Flow: Usual Behaviour}
 \end{figure}
 
-Figure~\ref{fig:paxos-usual} (page~\pageref{fig:paxos-usual}) shows the message flow for a
+Figure~\ref{fig:paxos-usual} shows the message flow for a
 complete round of Paxos if there are no failures and everything proceeds as expected. In this
 case, then the behaviour is reasonably straightforward to follow. There are four message delays
 until the proposed value is learnt.
@@ -594,7 +614,7 @@ the Acceptors.
 \caption{\label{fig:paxos-acceptor-fail}Paxos Message Flow: Acceptor Failure}
 \end{figure}
 
-Figure~\ref{fig:paxos-acceptor-fail} (page~\pageref{fig:paxos-acceptor-fail}) shows the same
+Figure~\ref{fig:paxos-acceptor-fail} shows the same
 scenario, but with a single Acceptor failing. In this case there is still a quorum of Acceptors
 available, so behaviour carries on as normal. There are still four message delays until the
 proposed value is learnt.
@@ -626,7 +646,7 @@ proposed value is learnt.
 \caption{\label{fig:paxos-duelling}Paxos Message Flow: Duelling Proposers}
 \end{figure}
 
-Figure~\ref{fig:paxos-partition} (page~\pageref{fig:paxos-partition}) shows what happens in a
+Figure~\ref{fig:paxos-partition} shows what happens in a
 network partition. A second Proposer is able to continue the instance of Paxos, and no
 inconsistencies are allowed to occur in the network, as the left half of the partition is unable
 to make progress until the partition is resolved, at which point it can learn the decisions made
@@ -647,7 +667,7 @@ by the half of the partition that was able to make progress.
 
 \subsubsection*{Duelling Proposers}
 
-Figure~\ref{fig:paxos-duelling} (page~\pageref{fig:paxos-duelling}) shows the worst case scenario
+Figure~\ref{fig:paxos-duelling} shows the worst case scenario
 for Paxos - duelling Proposers. This is the pathological case for Paxos where it is possible for
 it to never make progress - this eventuality is unlikely because the messages from the proposers
 must interleave so that there is no contiguous sequence of \msg{Prepare} and \msg{AcceptRequest}
@@ -669,23 +689,31 @@ subsequent \msg{AcceptRequest} message to a quorum of Acceptors, consensus will 
 
 \subsection{MultiPaxos}
 
-MultiPaxos is multiple rounds of Paxos occurring at the same time. The way this is outlined in
-\emph{Paxos Made Simple} \cite{lamport01} is by a form of leader election. I will outline this
-here but, for simplicity, in my project I will simply use multiple Paxos rounds to form the basis
-of a \emph{distributed operation log}. This will be explained in more detail in the Implementation
-chapter.
+While Paxos is capable of forming consensus in a single network, it can only agree on a single
+value. A distributed application needs a series of values rather than a single value. There are
+several ways to achieve this. The way outlined in \emph{Paxos Made Simple} \cite{lamport01}, known
+as MultiPaxos, is by a form of leader election. The Proposer who proposed the successful value in
+the last round of Paxos becomes the leader, and is only required to send a \msg{AcceptRequest}
+message in the subsequent instance to have a value accepted -- by winning the last round there is
+an implicit Phase 1. If this \msg{AcceptRequest} fails for whatever reason, the instance degrades
+into a standard instance of Paxos.
+
+In my project I chose an even simpler approach to running multiple rounds of Paxos. Each instance
+of Paxos runs independently in my application, unaware of any other instance. This is a simple and
+effective way of having multiple instances of Paxos running, although it does have drawbacks,
+which I will go into in my evaluation chapter.
 
 \section{ACID}
 
 \subsection*{Atomic}
 
-Atomicity means that either an operation completes, or it does not, ie, that the database is not
-left in a ``halfway'' state. This means that we do not need to worry about cleaning up after an
-operation, if it does not succeed we can simply retry it, without needing to worry about the state
-it has left the database in. Atomicity also applies to transactions in the same way - if we have a
-transaction as an operation composed of smaller single operations (for example, INCR B, READ A
-$\rightarrow$ X, WRITE X + 10 $\rightarrow$ A), we don't want some of the operations to complete
-and some not to. In this example, we may have the constraint $A = 10\times B$. If B was
+Atomicity means that either an operation completes or it does not, there is no ``halfway'' state.
+This means that the programmer using the database does not need to worry about cleaning up after
+an operation, because if it does not succeed we can simply retry it without needing to worry about
+the state it has left the database in. Atomicity also applies to transactions in the same way --
+if we have a transaction as an operation composed of smaller single operations (for example, INCR
+B, READ A $\rightarrow$ X, WRITE X + 10 $\rightarrow$ A), we don't want some of the operations to
+complete and some not to. In this example, we may have the constraint $A = 10\times B$. If B was
 incremented but then the transaction failed before A was updated, we would leave the database in
 an inconsistent state.
 
@@ -704,8 +732,8 @@ distributed system.
 
 Isolation is the property that ensures that if one transaction is in the process of completing,
 another transaction cannot see the intermediate state. It ensures that transactions that execute
-concurrently to each other are also invisible to each other - a transaction cannot tell, and does
-not need to worry about whether another transaction is executing or not.
+concurrently to each other are also invisible to each other -- a transaction cannot tell, and does
+not need to worry about, whether another transaction is executing or not.
 
 \subsection*{Durable}
 
@@ -802,12 +830,13 @@ see simple change propagate across complex system
 \section{Event Driven Programming}
 
 Event Driven Programming is a paradigm that involves structuring the program flow around events
-that occur - in this context this mainly means in response to network packets arriving, but can
-also mean user input or timers firing. This is co-ordinated by an event loop, which calls
-appropriate functions when events occur. When the event is handled, execution yields to the event
-loop again, which handles the next event. This means the code is not concurrent, which makes
-reasoning about it a lot simpler. Twisted provides an event loop and network interfaces, so it is
-relatively trivial to listen on an interface and have a callback be passed events that occur.
+that occur. For a distributed application this mainly means in response to network packets
+arriving, but can also be caused by user input or by timers firing. Program flow is co-ordinated
+by an event loop, which calls appropriate callbacks when events occur. When the event is handled,
+execution yields to the event loop again, which handles the next event. This means the code is not
+concurrent and does not need to be thread safe, which makes reasoning about it a lot simpler.
+Twisted provides the event loop and network interfaces, so it is relatively trivial to listen on
+an interface and have a callback be passed events that occur.
 
 A useful class that Twisted provides is the Deferred class. This represents the ``promise'' of a
 value which has not actually been learnt yet. It can be passed around in place of the value, and
@@ -1594,6 +1623,20 @@ overhead performing multiple transactions.
 
 As the size of the network increases the cost of bootstrapping the network becomes prohibitively
 expensive
+
+\begin{figure}[htb]
+\centering
+\lwincludegraphics[scale=2]{figs/start.eps}
+\caption{\label{fig:start}Start}
+\end{figure}
+
+
+\begin{figure}[htb]
+\centering
+\lwincludegraphics[scale=2]{figs/start2.eps}
+\caption{\label{fig:start2}Start 2}
+\end{figure}
+
 
 \subsubsection{$N^2$}
 

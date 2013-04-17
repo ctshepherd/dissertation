@@ -307,7 +307,159 @@ based protocol called ZAB.
 
 \chapter{Preparation}
 
-% S says start off with software engineering stuff
+\section{Requirements Analysis}
+
+Given the brief to design and create a protocol and a database there is a huge amount of scope for
+variety in the project. Requirements Analysis narrows down the purpose of a project to formal
+goals which can easily be objectively verified against the finished project.
+
+\subsection*{Paxos}
+\paragraph{Correctness} Above all, the implementation of Paxos must be correct. This means that it
+must conform to the description of the algorithm specified in \emph{The Part Time Parliament}.
+\paragraph{Dynamic node membership} The implementation of Paxos must be able to support nodes
+joining and leaving dynamically without losing correctness.
+
+\subsection*{Database}
+\paragraph{Encapsulation} The database must be a separate module to Paxos, and must be layered on
+top of the API provided by the Paxos module.
+\paragraph{Distributed} The database must be distributed. Any node in the network must have the
+same capabilities as any other node in the network.
+% homogenous
+\paragraph{Transactions} The database must support transactions, which can be aborted, returning
+the database to the state before the transaction was started. Transactions must operate in
+isolation with each other.
+\paragraph{ACID} The database must provide ACID properties. These are Atomicity, Consistency,
+Isolation and Durability.
+\paragraph{SQL} The interface to the database must be SQL. It may be a limited form of SQL, as the
+main priority of the project is the protocol and database design, rather than the interface.
+
+\section{Software Engineering}
+
+In order for the project to be a success, clear software engineering practices must be followed.
+
+\subsection{Development Technique}
+
+There are a number of techniques for developing software. The classic software development
+strategy is the Waterfall model. This follows the steps of Requirements and Specification, Design,
+Implementation, Verification and Maintenance. I decided against using this and instead using the
+Spiral Model. The Spiral Model uses the steps of the Waterfall model but repeats them several
+times, iteratively working towards the final result.
+
+The Spiral Model is more suitable for my project because although I have set out my formal
+requirements, there is still a lot of uncertainty in the project. I have not designed a network
+protocol or a database before and I have not implemented Paxos before. This means that it is
+likely I will encounter unexpected difficulties in developing my project that may lead me to
+change or shift my requirements. The Spiral Model is more flexible than the Waterfall Model in
+this case.
+
+\subsection{Language Choice}
+
+There are many languages this project could be implemented in, but the two main choices were the
+two languages I have the most experience in: C and Python. They are reasonably different languages
+-- C is a compiled low-level language, while Python is an interpreted high level language. I
+decided to use Python for a variety of reasons.
+
+Python handles memory allocation internally, whereas whilst C provides great precision over memory
+allocations, it also allows much more potential for memory handling errors. Python is more concise
+than C and as a higher level language should allow me to develop several prototypes without being
+impeded by focusing on details early on.
+
+Also as my project is a network application, it should be mainly IO bound rather than CPU bound.
+This means that the speed of the implementation language should not be a concern, as the speed
+limitations of the implementation are unlikely to affect the performance of the project compared
+to the limitations of the network.
+
+\subsection{Module Dependencies}
+
+Twisted is a Python framework used for event driven network programming. It contains support for
+many different protocols, making writing efficient networking code a lot easier.  It is single
+threaded, which means I will not have to worry about concurrency issues in my project. Twisted is
+licensed under the MIT license so there are no license issues in using it for my project.
+
+The other module I decided to use is PyParsing, a Python module for programmatically creating a
+parser in Python. I decided to use this for parsing input SQL, as it will make the task
+substantially simpler. I have already used PyParsing briefly, so I have a small amount of
+familiarity with it. PyParsing is also distributed under the MIT license.
+
+\subsection{Version Control and Backup}
+
+Version control is a necessity in any software project. I decided to use a decentralised version
+control system (DVCS) for a number of reasons. DVCSs have a distributed structure rather than
+using a central or master server. This makes it possible to commit changes locally to a checkout
+without needing a connection to any server. DVCSs also have advanced branching and merging tools,
+making it easier to branch to develop experimental features, and then merge the feature in later.
+
+Another advantage is being able to ``push'' the repository to any number of remote locations, as
+an online copy or backup. In fact I used this as my backup strategy, keeping everything related to
+my project in my repository and pushing every few hours to two different servers. This became very
+helpful when my laptop broke and was unusable for a week. While it was being repaired I was still
+able to work on my project without any difficulties. I simply cloned the repository from the
+server copy onto the PWF computers and continued working.
+
+While most DVCSs are very similar, I chose Git as it is the version control system I have the most
+familiarity with.
+
+\subsection{Testing}
+
+In order to ensure I can have confidence that my project works correctly I will need to write
+tests. I will write unit tests for the main modules of my project that will test its
+functionality, both for expected input and also that it handles bad and malformed input correctly
+and as expected. Tests are also useful for expressing the API usage of the different modules of
+the project and checking that the interfaces connect sensibly. I will make sure I implement
+regression testing, that is, every time there I fix a bug I will add a test ensuring any
+regression causing the bug again will make the test fail.
+
+I will run tests every time I make a commit, as they are quick to run and are a good confirmation
+that the project is working as expected. Twisted has a unit testing framework that I will use as
+it easily facilitates testing asynchronous programs, something that would be harder in other unit
+testing frameworks available in Python.
+
+\section{ACID}
+
+ACID is an acronym for a set of properties that nearly all databases provide. These properties
+provide certain guarantees about how the database handles transactions so that programmers using
+the database can be confident that their transactions will be processed reliably. Here I will go
+into some detail about what each of these properties mean.
+
+\subsection*{Atomic}
+
+Atomicity means that either an operation completes or it does not, there is no ``halfway'' state.
+This means that the programmer using the database does not need to worry about cleaning up after
+an operation, because if it does not succeed we can simply retry it without needing to worry about
+the state it has left the database in. Atomicity also applies to transactions in the same way --
+if we have a transaction as an operation composed of smaller single operations (for example, INCR
+B, READ A $\rightarrow$ X, WRITE X + 10 $\rightarrow$ A), we don't want some of the operations to
+complete and some not to. In this example, we may have the invariant $A = 10\times B$. If B was
+incremented but then the transaction failed before A was updated, we would leave the database in
+an invalid state.
+
+\subsection*{Consistent}
+
+Consistency is very closely related to atomicity, as consistency refers to a property of the
+database, and atomicity refers to a property of operations performed on the database. In the
+example used for atomicity, we had a constraint on the database (that $A = 10\times B$). We want
+operations (or transactions) to transform the database from one consistent state to another. This
+becomes more pertinent in distributed databases, as we may receive operations in one order at one
+node, and in a different order at another node. If we apply the operations in the order that we
+receive them, the two nodes are likely to be in inconsistent states.
+% XXX do i wanna change this?
+
+\subsection*{Isolated}
+
+Isolation is the property that ensures that if one transaction is in the process of completing,
+another transaction cannot see the intermediate state. It ensures that transactions that execute
+concurrently to each other are also invisible to each other -- a transaction cannot tell, and does
+not need to worry about, whether another transaction is executing or not.
+
+\subsection*{Durable}
+
+The durable property refers to the permanence of a transaction. Once a database reports that a
+transaction has been committed, it should persist in the database even in the face of power loss or
+crashes. This is typically achieved by using a write-ahead log that is append only, so that in the
+event of a crash, the database can reconstruct the state of all transactions reported as
+``committed''. Distributed systems have an added complication of co-ordinating this property
+across the network before the transaction can be reported as ``committed''.
+``as if they were executed sequentially''
 
 \section{Distributed Consensus Protocols}
 
@@ -707,128 +859,6 @@ In my project I chose an even simpler approach to running multiple rounds of Pax
 of Paxos runs independently in my application, unaware of any other instance. This is a simple and
 effective way of having multiple instances of Paxos running, although it does have drawbacks,
 which I will go into in my evaluation chapter.
-
-\section{ACID}
-
-\subsection*{Atomic}
-
-Atomicity means that either an operation completes or it does not, there is no ``halfway'' state.
-This means that the programmer using the database does not need to worry about cleaning up after
-an operation, because if it does not succeed we can simply retry it without needing to worry about
-the state it has left the database in. Atomicity also applies to transactions in the same way --
-if we have a transaction as an operation composed of smaller single operations (for example, INCR
-B, READ A $\rightarrow$ X, WRITE X + 10 $\rightarrow$ A), we don't want some of the operations to
-complete and some not to. In this example, we may have the invariant $A = 10\times B$. If B was
-incremented but then the transaction failed before A was updated, we would leave the database in
-an invalid state.
-
-\subsection*{Consistent}
-
-Consistency is very closely related to atomicity, as consistency refers to a property of the
-database, and atomicity refers to a property of operations performed on the database. In the
-example used for atomicity, we had a constraint on the database (that $A = 10\times B$). We want
-operations (or transactions) to transform the database from one consistent state to another. This
-becomes more pertinent in distributed databases, as we may receive operations in one order at one
-node, and in a different order at another node. If we apply the operations in the order that we
-receive them, the two nodes are likely to be in inconsistent states. XXX: define consistency in a
-distributed system.
-
-\subsection*{Isolated}
-
-Isolation is the property that ensures that if one transaction is in the process of completing,
-another transaction cannot see the intermediate state. It ensures that transactions that execute
-concurrently to each other are also invisible to each other -- a transaction cannot tell, and does
-not need to worry about, whether another transaction is executing or not.
-
-\subsection*{Durable}
-
-The durable property refers to the permanence of a transaction. Once a database reports that a
-transaction has been committed, it should persist in the database even in the face of power loss or
-crashes. This is typically achieved by using a write-ahead log that is append only, so that in the
-event of a crash, the database can reconstruct the state of all transactions reported as
-``committed''. Distributed systems have an added complication of co-ordinating this property
-across the network before the transaction can be reported as ``committed''.
-``as if they were executed sequentially''
-
-\section{Software Engineering}
-
-\subsection{Module Dependencies}
-
-% XXX
-Twisted is a large Python framework used for event driven network programming. It contains support
-for many different protocols, making writing efficient networking code a lot easier by writing
-short callbacks, which are called when network events happen. It is single threaded, which means I
-will not have to worry about concurrency issues in my project. Twisted is licensed under the MIT
-license so there are no license issues in using it for my project.
-
-I chose Twisted to make implementing the network code a lot simpler. Twisted is based on
-the event driven paradigm and this means that I can construct my code in terms of network events,
-rather than having to focus on writing network handling code. Twisted provides a lot of built in
-support for implementing protocols and helper classes etc. Also as I am using a state machine
-approach to implementing DBP and Paxos, Twisted's asynchronous system works very well with this
-approach.
-
-The other module I decided to use is PyParsing, a Python module for programmatically creating a
-parser in Python. I decided to use this for parsing input SQL, as it will make the task
-substantially simpler. I have already used PyParsing briefly, so I have a small amount of
-familiarity with it.
-
-\subsection{Programming Language}
-
-There were several options for which programming language to use for this project. C compiles to
-fast machine code and gives a lot of control over the behaviour of the whole system. As a systems
-programming language, it has a lot of potential for use in a distributed system. However it is very
-verbose, and I didn't feel it was appropriate for a development style which involved iterating
-from prototype to prototype, as the level of code churn would be too high, and development would
-take a lot longer than I had allocated. In the end I went with Python, a language I am very
-familiar with, and which it is very easy to prototype and do rapid development in.
-
-\section{Requirements Analysis}
-
-Requirements for my system:
-Transactions
-ACID properties
-
-\subsection{Software Development Process}
-
-There are several different software development models. Initially I considered using the
-waterfall model, but it has several drawbacks. The waterfall models is very rigid, and doesn't
-allow for any changes in requirements. However I
-
-didn't fit in with my requirement to do fast prototyping (as I needed to
-gain a better understanding of Paxos). I settled on the spiral model
-because of XXX:
-
-\subsection{Version Control and Backup Strategy}
-
-For version control I decided to use Git, as it is a system I am familiar with, and serves my need
-both as a VCS and as a remote backup. In my experience it is more usable than other DVCSs such as
-Bazaar, Darcs or Mercurial, and much faster than centralised VCSs such as CVS or SVN. Using Git I
-backed up my project both to bitbucket, an online repository service which provides free private
-repository hosting, and to my own server.
-
-For backups I use the PWF to develop my project on. As it is stored in Git I can back it up simply
-by pushing the repo to other hosts. I currently have it backed up to bitbucket and to my own
-server.
-
-\subsection{Testing}
-
-Testing is really important
-network
-lots of effects
-lots of subsystems
-
-\subsubsection{Unit Testing}
-
-unit testing really key
-regression testing
-testing different subsystems
-
-\subsubsection{Integration Testing}
-
-test program etc
-see simple change propagate across complex system
-
 
 
 \cleardoublepage

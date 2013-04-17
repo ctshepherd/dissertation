@@ -447,9 +447,10 @@ receive them, the two nodes are likely to be in inconsistent states.
 \subsection*{Isolated}
 
 Isolation is the property that ensures that if one transaction is in the process of completing,
-another transaction cannot see the intermediate state. It ensures that transactions that execute
-concurrently to each other are also invisible to each other -- a transaction cannot tell, and does
-not need to worry about, whether another transaction is executing or not.
+another transaction cannot see the intermediate state. Transactions should be processed as if they
+were executed sequentially. It ensures that transactions that execute concurrently to each other
+are also invisible to each other. This means a transaction should not be able to tell whether
+another transaction is executing or not.
 
 \subsection*{Durable}
 
@@ -459,7 +460,6 @@ crashes. This is typically achieved by using a write-ahead log that is append on
 event of a crash, the database can reconstruct the state of all transactions reported as
 ``committed''. Distributed systems have an added complication of co-ordinating this property
 across the network before the transaction can be reported as ``committed''.
-``as if they were executed sequentially''
 
 \section{Distributed Consensus Protocols}
 

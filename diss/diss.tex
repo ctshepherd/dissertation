@@ -802,15 +802,19 @@ to make progress until the partition is resolved, at which point it can learn th
 by the half of the partition that was able to make progress.
 
 \begin{enumerate}
-\item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors, but is only
+\item \msg{Prepare(1):} The Proposer sends a \msg{Prepare} message to the Acceptors, but is only
 	able to successfully message one of them.
-\item \msg{Prepare(n):} A second Proposer simultaneously sends a \msg{Prepare} message to the
+\item \msg{Prepare(2):} A second Proposer simultaneously sends a \msg{Prepare} message to the
 	Acceptors, and is able to reach a quorum.
-\item \msg{Promise(n):} The Acceptor on the left side of the split replies with a \msg{Promise},
-	but does not make up a quorum so...
+\item \msg{Promise(1):} The Acceptor on the left side of the split replies with a \msg{Promise},
+	but does not make up a quorum.
 \item the first Proposer times out. It could restart with a higher proposal number, but in this
 	case it will be unable to make any progress until the partition is resolved.
-\item \msg{AcceptNotify(n, v):} The Acceptors make up a quorum so are able to proceed through to
+\item \msg{Promise(2):} The Acceptors on the right side of the split both reply with a
+	\msg{Promise}, making a quorum.
+\item \msg{AcceptRequest(2, b):} The second Proposer asks the Acceptors to accept 'b' as the
+	value.
+\item \msg{AcceptNotify(2, b):} The Acceptors make up a quorum so are able to proceed through to
 	completion.
 \end{enumerate}
 

@@ -328,27 +328,33 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
     def recv_pong(self, msg, instance):
         """When we get a PONG from someone, remove them from the timeout pruning dictionary."""
         self.timeout_hosts.pop(msg['uid'], None)
-        self.write_notify(msg['uid'])
+        if config.STARTUP == "old":
+            self.write_notify(msg['uid'])
 
 
     # Network discovery methods
     def write_notify(self, uid):
         """Send a NOTIFY message with all the hosts we know about."""
+        self.check_startup_style("old")
         self.writeMessage(uid, Msg({"msg_type": "notify", "hosts": self.hosts, "instance_id": None}))
 
     def do_ehlo(self):
+        self.check_startup_style("old")
         for host in self.hosts:
             self.write_ehlo(host)
 
     def write_ehlo(self, uid):
+        self.check_startup_style("old")
         self.writeMessage(uid, Msg({"msg_type": "ehlo", "instance_id": None}))
 
     def recv_ehlo(self, msg, instance):
         """Reply to an EHLO message with a NOTIFY message."""
+        self.check_startup_style("old")
         self.write_notify(msg['uid'])
 
     def recv_notify(self, msg, instance):
         """Add any hosts we don't know about on receiving a NOTIFY message, and send them EHLOs too."""
+        self.check_startup_style("old")
         h = msg['hosts']
         for host in self.hosts:
             h.pop(host, None)
@@ -357,10 +363,59 @@ class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):
                 self.addHost(host, addr)
                 self.write_ehlo(msg['uid'])
 
+    @staticmethod
+    def check_startup_style(style):
+        if config.STARTUP != style:
+            raise Exception(style)
+
+    def recv_master(self, msg, instance):
+        self.check_startup_style("new")
+        m = msg['master']
+        self.master = m
+
+    def recv_hi_m(self, msg):
+        self.check_startup_style("new")
+        for host in self.hosts:
+            self.write_new(host, msg['uid'])
+        self.write_who(msg['uid'])
+
+    # def recv_hi_s(self, msg):
+    #     self.write_master(msg['uid'], self.master)
+
+    def recv_hi(self, msg, instance):
+        self.check_startup_style("new")
+        self.recv_hi_m(msg)
+
+    def recv_who(self, msg, instance):
+        self.check_startup_style("new")
+        self.hosts = msg['hosts']
+
+    def recv_new(self, msg, instance):
+        self.check_startup_style("new")
+        u = msg['new_uid']
+        a = msg['new_address']
+        self.hosts[u] = a
+
+    def write_new(self, n_uid, t_uid):
+        self.check_startup_style("new")
+        self.writeMessage(t_uid, Msg({"msg_type": "new", "new_uid": n_uid, "new_address": self.hosts[n_uid], "instance_id": None}))
+
+    def write_who(self, uid):
+        self.check_startup_style("new")
+        self.writeMessage(uid, Msg({"msg_type": "who", "hosts": self.hosts, "instance_id": None}))
+
     def discoverNetwork(self):
-        if self.bootstrap is not None:
-            m = Msg({"msg_type": "ehlo", "uid": self.uid, "instance_id": None})
-            self.transport.write(m.serialize(), self.bootstrap)
+        if config.STARTUP == "old":
+            if self.bootstrap is not None:
+                m = Msg({"msg_type": "ehlo", "uid": self.uid, "instance_id": None})
+                self.transport.write(m.serialize(), self.bootstrap)
+        else:
+            if self.bootstrap is not None:
+                m = Msg({"msg_type": "hi", "uid": self.uid, "instance_id": None})
+                self.transport.write(m.serialize(), self.bootstrap)
+            else:
+                self.master = ("localhost", self.transport.getHost().port)
+                self.hosts[self.uid] = self.master
 
     def addHost(self, uid, host):
         dbprint("Adding node %s (%s)" % (uid, host), level=3)

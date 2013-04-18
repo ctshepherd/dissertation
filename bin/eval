@@ -231,6 +231,8 @@ def main():
                       help="type of metric to measure [valid options are lat,thru]")
     parser.add_option("-o", "--ops", action="store", type="int",
                       help="number of operations to run per node")
+    parser.add_option("-N", "--nacks", action="store", type="int",
+                      help="nack level (0,1,2)")
     parser.add_option("-n", "--nodes", action="store", type="int",
                       help="number of nodes to run")
     parser.add_option("-f", "--file", action="store", default="eval.csv",
@@ -275,6 +277,10 @@ def main():
 
     if options.writers > options.nodes:
         parser.error("Writer percentage must be less than or equal to number of nodes")
+
+    if options.nacks not in (0, 1, 2):
+        parser.error("Need to specify a valid NACK level (0,1,2)")
+        config.NACKS_ENABLED = options.nacks
 
     util.DEBUG = options.debug
 

@@ -1,6 +1,7 @@
 from uuid import uuid4
 from dbp.util import dbprint
-from dbp.config import NODE_TIMEOUT, PROPOSER_TIMEOUT, NACKS_ENABLED
+from dbp import config
+from dbp.config import NODE_TIMEOUT, PROPOSER_TIMEOUT
 from dbp.paxos.message import Msg, parse_message, InvalidMessageException
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet import reactor, defer
@@ -34,13 +35,13 @@ class Acceptor(object):
                                   }))
             instance['acceptor_prepare_prop_num'] = msg.prop_num
         else:
-            if NACKS_ENABLED:
+            if config.NACKS_ENABLED:
                 d = {
                     'msg_type': 'nack_promise',
                     'prop_num': msg['prop_num'],
                     'instance_id': instance['instance_id'],
                 }
-                if NACKS_ENABLED == 2:
+                if config.NACKS_ENABLED == 2:
                     d['prev_prop_num'] = instance['acceptor_cur_prop_num']
                     d['prev_prop_value'] = instance['acceptor_cur_prop_value']
                 self.writeMessage(msg['uid'], Msg(d))
@@ -67,13 +68,13 @@ class Acceptor(object):
                 "instance_id": instance['instance_id']
             }))
         else:
-            if NACKS_ENABLED:
+            if config.NACKS_ENABLED:
                 d = {
                     'msg_type': 'nack_acceptrequest',
                     'prop_num': msg['prop_num'],
                     'instance_id': instance['instance_id'],
                 }
-                if NACKS_ENABLED == 2:
+                if config.NACKS_ENABLED == 2:
                     d['prev_prop_num'] = instance['acceptor_cur_prop_num']
                     d['prev_prop_value'] = instance['acceptor_cur_prop_value']
                 self.writeMessage(msg['uid'], Msg(d))
@@ -172,7 +173,11 @@ class Proposer(object):
             #     self.send_acceptrequest(msg['uid'], msg['prop_num'], value, instance)
 
     def recv_nack_promise(self, msg, instance):
-        self.handle_reject(instance)
+        if 'prev_prop_num' in msg and 'prev_prop_value' in msg:
+            p = msg['prev_prop_num']
+        else:
+            p = None
+        self.handle_reject(instance, p)
 
     def poll(self, instance, prop_num):
         instance['status'] = "polling"
@@ -246,12 +251,16 @@ class Proposer(object):
             #     return
             self.handle_reject(instance)
 
-    def handle_reject(self, instance):
-            v = instance['our_val']
-            l = instance['last_tried'][0]
-            r = instance['restart']
-            self.proposer_init_instance(instance)
-            self.proposer_start(instance, v, prop_num=l+1, restart=r)
+    def handle_reject(self, instance, p=None):
+        if new is None:
+            old = instance['last_tried']
+        else:
+            old = p
+        v = instance['our_val']
+        l = old[0]
+        r = instance['restart']
+        self.proposer_init_instance(instance)
+        self.proposer_start(instance, v, l+1, restart=r)
 
 
 class NodeProtocol(DatagramProtocol, Proposer, Acceptor, Learner):

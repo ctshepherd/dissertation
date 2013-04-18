@@ -231,7 +231,7 @@ def main():
                       help="type of metric to measure [valid options are lat,thru]")
     parser.add_option("-o", "--ops", action="store", type="int",
                       help="number of operations to run per node")
-    parser.add_option("-N", "--nacks", action="store", type="int",
+    parser.add_option("-N", "--nacks", action="store", type="int", default=0,
                       help="nack level (0,1,2)")
     parser.add_option("-n", "--nodes", action="store", type="int",
                       help="number of nodes to run")

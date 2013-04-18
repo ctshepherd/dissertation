@@ -252,7 +252,7 @@ class Proposer(object):
             self.handle_reject(instance)
 
     def handle_reject(self, instance, p=None):
-        if new is None:
+        if p is None:
             old = instance['last_tried']
         else:
             old = p

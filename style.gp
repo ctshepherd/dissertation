@@ -1,6 +1,6 @@
 #set term post eps size 320,240 font "Gill Sans" fsize 9 rounded dashed
-#set terminal post eps font "Gill Sans,9" linewidth 4 rounded
-set terminal pdfcairo color font "Gill Sans,9" linewidth 4 rounded
+set terminal post eps enhanced color font "Gill Sans,9" linewidth 4 rounded
+#set terminal pdfcairo color font "Gill Sans,9" linewidth 4 rounded
 
 # Line style for axes
 set style line 80 lt 0

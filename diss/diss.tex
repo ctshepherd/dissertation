@@ -1274,10 +1274,33 @@ the instance ID and learnt value.
 
 \subsection{NACKs Improvement}
 
+% tie this back in
+
 As a potential improvement to the protocol I added support for \msg{NACK} messages, which is
 configurable at run time. This was relatively simple to implement, I first abstracted out the
 timeout behaviour into its own method, then whenever a \msg{NACK} is received, this method is
 called, initiating the timeout behaviour without having to wait for an actual timeout.
+
+\subsection{Startup Improvement}
+
+A clear problem during testing was the effect of the network size on the amount of time and the
+amount of bandwidth used to bootstrap the network. Increasing the size beyond a certain number of
+nodes led to large slow downs in the network, that in the real world would have serious practical
+implications on the efficacy of the network.
+
+I investigated an improvement to this by designating a master node and delegating all network
+membership co-ordination to this node. Obviously this is the opposite extreme of every node
+handling network membership and leads to the problem that if the master node goes down the network
+breaks.
+
+For large peer-to-peer networks there are several mature techniques that could be used to manage a
+network of scale efficiently. One of these is using ``supernodes'' -- nodes designated either
+through bandwidth or chosen randomly to co-ordinate their child nodes, reducing the message
+overhead from $N^2$ to $S^2$ where $S$ is the number of supernodes. Another technique is the use
+of Distributed Hashing Tables (DHTs) to manage nodes. This involves computing a measure or
+pseudo-measure of ``distance'' to other nodes, then having nodes only contact their
+``neighbours'', rather than the entire network. However I did not have time to investigate these
+options.
 
 \section{Database Design}
 
@@ -1295,14 +1318,14 @@ A basic operation is one that occupies a single slot of the operation log.
 
 % XXX: this will all be wrong - what do we do?
 
-\begin{tabular}{ | c | p{7cm} | }
-  \hline
-  {\bf Operation} & {\bf Meaning} \\ \hline
-  NOP & Do nothing \\ \hline
-  ASSIGN(k, v) & Set \verb+k := v+ in the database. \\ \hline
-  ATTEMPTLOCK & Attempt to take the TX lock. \\ \hline
-  UNLOCK & Release the TX lock. \\ \hline
-\end{tabular}
+% \begin{tabular}{ | c | p{7cm} | }
+%   \hline
+%   {\bf Operation} & {\bf Meaning} \\ \hline
+%   NOP & Do nothing \\ \hline
+%   ASSIGN(k, v) & Set \verb+k := v+ in the database. \\ \hline
+%   ATTEMPTLOCK & Attempt to take the TX lock. \\ \hline
+%   UNLOCK & Release the TX lock. \\ \hline
+% \end{tabular}
 
 \subsection{The Operation Log}
 
@@ -1365,6 +1388,7 @@ it will learn the value already obtained by consensus in the network and try and
 \caption{\label{fig:op-log-slow-read-2}After a slow read}
 \end{figure}
 
+% too many dashes
 In figure~\ref{fig:op-log-slow-read-2} we see the situation at time $t_2$ - the \op{NOP} has been
 inserted at OID 3 - from this $N$ can tell that at $t_2$ the latest operation in the op-log is OID
 3 - the slow read it just performed.
@@ -1397,17 +1421,17 @@ $B$ tries to perform a different assignment, but as it does not hold the lock, t
 not performed. $A$ now releases the lock with an \op{UNLOCK} operation (OID 7). Finally, $B$
 retries its assignment, which can finally be performed as no-one now holds the lock.
 
-\subsubsection{Two Phase Locking}
-
-I improved
-
-used two phase locking
-take locks in schema order to avoid deadlock and livelock
-restart transaction if locks taken out of order
-
-use strict 2PL to avoid cascading aborts
-
-potential further locking schemes?
+% \subsubsection{Two Phase Locking}
+%
+% I improved
+%
+% used two phase locking
+% take locks in schema order to avoid deadlock and livelock
+% restart transaction if locks taken out of order
+%
+% use strict 2PL to avoid cascading aborts
+%
+% potential further locking schemes?
 
 \section{Database Implementation}
 
@@ -1463,14 +1487,14 @@ would be parsed into the tree represented by figure~\ref{fig:where-ast}.
 %
 % Talk about laptop breaking
 
-\section{Testing}
-
-I started off implementing unit tests for the
-
-\subsection{Commandline Tools}
-
-I implemented several commandline tools to interface with the main body of code. As I implemented
-Paxos
+% \section{Testing}
+%
+% I started off implementing unit tests for the
+%
+% \subsection{Commandline Tools}
+%
+% I implemented several commandline tools to interface with the main body of code. As I implemented
+% Paxos
 
 \cleardoublepage
 \chapter{Evaluation}
@@ -1528,8 +1552,8 @@ constraints did not allow further exploration of this evaluation method.
 
 \subsection{Ratelimiting}
 
-talk about ratelimiting
-networking delay
+% talk about ratelimiting
+% networking delay
 
 Unfortunately, my application had no congestion control or flow control built into the protocol.
 While this would be a potential advantage of TCP, other features of TCP would be unnecessary, as
@@ -1537,7 +1561,6 @@ Paxos is decided to deal with message loss, and TCP provides reliable message de
 potential improvement would be to build Paxos on top of another protocol built on UDP, which
 provides congestion control and flow control on the layer underneath, but without providing
 unnecessary features such as reliable message delivery.
-
 
 \subsection{Gathering and Formatting Results}
 
@@ -1604,8 +1627,7 @@ correlation.
 \caption{\label{fig:lat-20}Latency for 20 Nodes}
 \end{figure}
 
-I repeated this experiment with a network of 20 nodes
-
+I repeated this experiment with a network of 20 nodes.
 
 In figure~\ref{fig:lat-20} we can see that the throughput of the network decreases
 exponentially with the number of concurrent writers in the system. We can also see that while
@@ -1681,16 +1703,11 @@ expensive
 \end{figure}
 
 
-\begin{figure}[htb]
-\centering
-\lwincludegraphics[scale=2]{figs/start2.eps}
-\caption{\label{fig:start2}Start 2}
-\end{figure}
-
-
-\subsubsection{$N^2$}
-
-\subsubsection{Sublinear}
+% \begin{figure}[htb]
+% \centering
+% \lwincludegraphics[scale=2]{figs/start2.eps}
+% \caption{\label{fig:start2}Start 2}
+% \end{figure}
 
 
 
@@ -1722,60 +1739,69 @@ operations to the database.
 
 \section{Changes with hindsight}
 
-If I was to do the project again, there are several large changes that I would make. These mainly
-are design choices more than anything else. One big design choice I made was to use an
-asynchronous programming paradigm. I chose this because I thought it would make the project
-simpler and quicker to write, by leveraging Twisted's network stack. However I didn't allow for
-the difficulty of understanding and designing Paxos, or a database, or Paxos and a database under
-a new programming paradigm.
+If I was to do the project again, there are several potential changes that I could make.
 
-Another design problem was that I started with a key/value database prototype, and later
-refactored it into a row based database. I then added an SQL interface and layered transactions on
-top. This was a reasonable choice, as I started small and then worked bigger, but in retrospect
-the system should have been row-based from the start. The SQL interface should have been more
-tightly integrated rather than less tightly, and transactions should have been the core aspect of
-my system, rather than a layering of operations. However it is difficult to predict how the
-project would have turned out with this plan, it is not necessarily as easy to implement as it
-sounds and I believe my choices were very reasonable at the time.
+% Although my project is built in an asynchronous manner and used Twisted, with the knowledge I have
+% gained from implementing it, a potential change would be to write it in a synchronous style.
+% Decoupling from Twisted may allow further opportunities for optimisation and
+% These mainly
+% are design choices more than anything else. One big design choice I made was to use an
+% asynchronous programming paradigm. I chose this because I thought it would make the project
+% simpler and quicker to write, by leveraging Twisted's network stack. However I didn't allow for
+% the difficulty of understanding and designing Paxos, or a database, or Paxos and a database under
+% a new programming paradigm.
 
-Another possibility is that I should have started with smaller prototypes of the complete system,
-rather than prototypes of both of them that were then joined. A disadvantage of my approach was
-that as my understanding of how the design would work progressed, the API interface between the
-two components changed significantly and repeated. This led to problems with testing, and with
-having to rewrite various user interfaces repeatedly. An alternative approach could have been to
-use an agile programming strategy, rather than an iterative one. A quote that summarises my
-experience with my project is by Fred Brooks: ``plan to throw one away; you will, anyhow''.
+One design choice I made was to start with a key/value database prototype and later
+refactor it into a row based database. I then added an SQL interface and layered transactions on
+top. This was a reasonable choice, as I started small and then worked bigger. However if I was to
+do the project again using my knowledge from my first implementation, I would be able to
+design the system as row-based from the start.
 
-\subsection*{Twisted}
+% Also, in my project the SQL interface is built as a layer on top of the database. This makes it
+% easy to extendThe SQL interface should have been more
+% tightly integrated rather than less tightly, and transactions should have been the core aspect of
+% my system, rather than a layering of operations. However it is difficult to predict how the
+% project would have turned out with this plan, it is not necessarily as easy to implement as it
+% sounds and I believe my choices were very reasonable at the time.
 
-In retrospect, if I was to do the project again I would probably not use Twisted. Twisted provided
-me with a powerful framework for building an asynchronous network application, but it had
-disadvantages as well as advantages, which I will briefly outline.
+% Another possibility is that I should have started with smaller prototypes of the complete system,
+% rather than prototypes of both of them that were then joined. A disadvantage of my approach was
+% that as my understanding of how the design would work progressed, the API interface between the
+% two components changed significantly and repeated. This led to problems with testing, and with
+% having to rewrite various user interfaces repeatedly. An alternative approach could have been to
+% use an agile programming strategy, rather than an iterative one. A quote that summarises my
+% experience with my project is by Fred Brooks: ``plan to throw one away; you will, anyhow''.
 
-I had to learn a lot for this project. I had to learn and understand how how Paxos works and
-design a protocol that implements it. I also had to learn and understand the basics of building a
-database, and on top of that - a distributed database. Twisted has a high learning curve, and I
-ended up investing a lot of time understanding how to work with Twisted and in some cases working
-against it. I spent lots of time interfacing with it, some of which was unnecessary.
-
-It is difficult to know how much networking code Twisted saved me writing, however
-the message requirements of paxos are quite simple, and I think that with a few days work making
-some helper network classes much of the complexity of using and interfacing with Twisted could
-have been avoided. Certainly there are cases when debugging would have been easier, and I feel my
-project would have been less ``heavy-weight'', particularly when it came to unit tests, another
-problem I will discuss later.
-
-As I worked through several prototype versions, Twisted became cumbersome to use. I had to keep
-learning new parts of it, which was frustrating to have to keep delving into the innards of it,
-particularly as I started to feel that it hadn't helped me as much as I had anticipated.
-
-Using the asynchronous paradigm initially helped me reason about Paxos and how I would design my
-system, however later on I felt the asynchronous model was unnecessary, and Twisted became
-superfluous. Certainly my project would have been very different without the decision to use it.
+% \subsection*{Twisted}
+%
+% In retrospect, if I was to do the project again I would probably not use Twisted. Twisted provided
+% me with a powerful framework for building an asynchronous network application, but it had
+% disadvantages as well as advantages, which I will briefly outline.
+%
+% I had to learn a lot for this project. I had to learn and understand how how Paxos works and
+% design a protocol that implements it. I also had to learn and understand the basics of building a
+% database, and on top of that - a distributed database. Twisted has a high learning curve, and I
+% ended up investing a lot of time understanding how to work with Twisted and in some cases working
+% against it. I spent lots of time interfacing with it, some of which was unnecessary.
+%
+% It is difficult to know how much networking code Twisted saved me writing, however
+% the message requirements of paxos are quite simple, and I think that with a few days work making
+% some helper network classes much of the complexity of using and interfacing with Twisted could
+% have been avoided. Certainly there are cases when debugging would have been easier, and I feel my
+% project would have been less ``heavy-weight'', particularly when it came to unit tests, another
+% problem I will discuss later.
+%
+% As I worked through several prototype versions, Twisted became cumbersome to use. I had to keep
+% learning new parts of it, which was frustrating to have to keep delving into the innards of it,
+% particularly as I started to feel that it hadn't helped me as much as I had anticipated.
+%
+% Using the asynchronous paradigm initially helped me reason about Paxos and how I would design my
+% system, however later on I felt the asynchronous model was unnecessary, and Twisted became
+% superfluous. Certainly my project would have been very different without the decision to use it.
 
 \subsection*{Testing}
 
-Unit tests became a problem as I progressed through the project.  They became a hindrance, as I
+Unit tests became a problem as I progressed through the project. They became a hindrance, as I
 was refactoring my code base often, they were not that effective. Test Driven Development may have
 been a better choice, as I wrote my unit tests after I had written the code, I would often write
 the code, write the tests, it would all work. Then I would refactor the code, rewrite the tests --
@@ -1783,16 +1809,16 @@ every refactoring would invalidate large numbers of tests. This was also due to 
 coupled my code was with Twisted. This is another reason I would reconsider my decision to use
 Twisted if I were to redo the project.
 
-\section{Summary}
+% \section{Summary}
 
-In summary, my project had clear successes but also some clear drawbacks. I effectively
-implemented Paxos, and built an ACID distributed database on top, with support for transactions. I
-made some improvements to my design, but ultimately there are still many more clear avenues for
-improvement. The project suffers from inefficiency, and is slow, but is an effective prototype
-that gives valuable insight into the performance ramifications of different design decisions of a
-distributed database. My project was limited not just by the limited amount of time I had, but
-also by my lack of expertise in the area, and I have gained valuable insights into my decisions
-and how I would improve the project if I were to implement it again.
+% In summary, my project had clear successes but also some clear drawbacks. I effectively
+% implemented Paxos, and built an ACID distributed database on top, with support for transactions. I
+% made some improvements to my design, but ultimately there are still many more clear avenues for
+% improvement. The project suffers from inefficiency, and is slow, but is an effective prototype
+% that gives valuable insight into the performance ramifications of different design decisions of a
+% distributed database. My project was limited not just by the limited amount of time I had, but
+% also by my lack of expertise in the area, and I have gained valuable insights into my decisions
+% and how I would improve the project if I were to implement it again.
 
 
 \cleardoublepage
@@ -1858,21 +1884,8 @@ paging, would be a high priority given more time.
 
 \subsection{Network Hierarchy}
 
-A clear problem during evaluation was the effect of the network size on the amount of time and the
-amount of bandwidth used to bootstrap the network. Increasing the size beyond a certain number of
-nodes led to large slow downs in the network, that in the real world would have serious practical
-implications on the efficacy of the network.
-
-For large peer-to-peer networks there are several mature techniques that could be used to manage a
-network of scale efficiently. One of these is using ``supernodes'' -- nodes designated either
-through bandwidth or chosen randomly to co-ordinate their child nodes, reducing the message
-overhead from $N^2$ to $S^2$ where $S$ is the number of supernodes. Another technique is the use
-of Distributed Hashing Tables (DHTs) to manage nodes. This involves computing a measure or
-pseudo-measure of ``distance'' to other nodes, then having nodes only contact their
-``neighbours'', rather than the entire network.
-
-Either of these would be much more efficient to manage the network than the current $N^2$ na\"ive
-approach.
+Other mature techniques used to manage large networks efficiently could be investigated, such as
+using ``supernodes'' or Distributed Hashing Tables.
 
 \subsection{SQL}
 

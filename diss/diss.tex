@@ -151,14 +151,23 @@ Acknowledge various people
 
 \section{Overview}
 
-% S comment: Discuss paper a little, short quote?
+``The Paxos algorithm, when presented in plain English, is very simple.'' \cite{lamport01}. \\
+Despite this assertion, Paxos has a reputation for being hard to implement. Both
+\emph{Paxos Made Live} \cite{chandra07} and \emph{Paxos Made Moderately Complex} \cite{renesse11}
+repeatedly show how intricate implementing a Paxos actually is.
 
-I set out to build a distributed database with ACID properties, based on the Paxos protocol. Paxos
-was first described in Leslie Lamport's paper \emph{The Part Time Parliament} \cite{lamport98}.
+With this in mind I set out to build a distributed database based on the Paxos protocol.
+
+% Paxos is a consensus algorithm for distributed systems. It was first described in Leslie Lamport's
+% paper \emph{The Part Time Parliament} \cite{lamport98}. It has been used by Google and Yahoo in
+% their internal services as the basis of large scale distributed systems.
 
 \section{Motivation}
 
-% XXX: finish!
+Paxos is a complex protocol, and one that is notoriously subtle. I took on the challenge of not
+only implementing it, but also designing and coding a database layer on top. I wanted this
+database to be functional, and have the properties expected of a standard database solution. This
+includes SQL, transactions and ACID properties.
 
 \section{Distributed Consensus Problem}
 

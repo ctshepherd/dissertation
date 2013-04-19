@@ -1509,8 +1509,8 @@ against each other.
 \section{Method}
 
 There were a number of metrics I used to evaluate the system. The two main metrics were the
-latency of an operation -- how long it took to complete after being issued, and the throughput of
-the system -- how many operations could be completed in unit time. I also measured how the
+latency of an operation (how long it took to complete after being issued), and the throughput of
+the system (how many operations could be completed in unit time). I also measured how the
 bandwidth used varied in different situations.
 
 \subsection{Simulation}
@@ -1522,12 +1522,13 @@ I discuss the limitations of this in the section below. There were a number of r
 necessary to simulate the network on a single machine.
 
 Firstly, it is impractical to create an actual network on a number of computers. Co-ordinating
-tests between a large number of machines is difficult, and even being able to use that amount of
-resources would be impractical.
+tests between a large number of machines is difficult, and the amount of resources required was
+not available.
 
 Also, as the number of nodes increases, it becomes increasingly difficult to get meaningful
 results from nodes run on a physical network, due to other factors such as networking delay. It
-also makes results inconsistent and difficult to reproduce on several runs.
+also makes results inconsistent and difficult to reproduce on several runs. As my results are
+dependant upon network characteristics, I wanted to control those characteristics.
 
 \subsubsection*{Assumptions}
 
@@ -1537,9 +1538,9 @@ being CPU bound. IO bound means that the application spends most of the time wai
 this case network IO -- sending and receiving messages, as opposed to CPU bound, which means the
 application spends most of its time running on the CPU. It is necessary for the application to be
 IO bound in order for the simulation to be valid - if it is in fact CPU bound, running multiple
-nodes on the same machine will lead to increased CPU load which will mean that the simulation
+nodes on the same machine will lead to increased CPU load. This will mean that the simulation
 becomes invalid, as the performance of the simulated nodes deviates from the performance of a real
-network.
+network, due to the performance depending on the CPU rather than the network.
 
 However, as I am simulating a network on one computer, this assumption does begin to
 break down as the number of nodes increases. This problem is exacerbated because Python is
@@ -1590,9 +1591,9 @@ consistently.
 
 \section{Contention}
 
-I started off by measuring how the network responds to contention in the network. This means that
-measuring how the latency and throughput of the network change in response to the number of nodes
-in the network which are writing.
+I started off by measuring how the network responded to contention. This means measuring how
+the latency and throughput changed in response to the number of nodes in the network
+which are writing.
 
 \subsection{Latency}
 

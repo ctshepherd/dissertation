@@ -38,7 +38,7 @@ class NodeManager(object):
         self.master = make_lmt_node(self.start_port)
         self.nodes = [self.master]
         for x in xrange(1, node_num):
-            n = make_lmt_node(self.start_port + x, ("localhost", self.start_port + x - 1))
+            n = make_lmt_node(self.start_port + x, ("localhost", self.start_port))
             self.nodes.append(n)
 
     def collate(self):
@@ -67,7 +67,7 @@ def main():
     NodeManager.start_port = options.port
     m = NodeManager(options.nodes)
 
-    reactor.callLater(7, m.collate)
+    reactor.callLater(500, m.collate)
     reactor.run()
 
     print ','.join(str(x) for x in m.counts)

@@ -22,7 +22,8 @@ FIGS = figs/op-log.eps \
        figs/thru_rev.eps \
        figs/lat_5.eps \
        figs/lat_20.eps \
-       figs/lat_rev.eps
+       figs/lat_rev.eps \
+       figs/start.eps
 
 DISS = diss.tex \
        refs.bib \

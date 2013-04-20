@@ -1628,12 +1628,10 @@ correlation.
 \caption{\label{fig:lat-20}Latency for 20 Nodes}
 \end{figure}
 
-I repeated this experiment with a network of 20 nodes.
-
-In figure~\ref{fig:lat-20} we can see that the throughput of the network decreases
-exponentially with the number of concurrent writers in the system. We can also see that while
-there is little overhead from using the database layer over the top of Paxos, there is substantial
-overhead performing multiple transactions.
+I repeated this experiment with a network of 20 nodes. In figure~\ref{fig:lat-20} we can see that
+the latency of the network continues to increase linearly with the number of concurrent writers in
+the system. We can also see that there is still little overhead from using the database layer over
+the top of Paxos, there is substantial overhead performing multiple transactions.
 
 \paragraph{Network Size}
 
@@ -1694,15 +1692,11 @@ overhead performing multiple transactions.
 
 \subsection{Start up costs}
 
-As the size of the network increases the cost of bootstrapping the network becomes prohibitively
-expensive
-
 \begin{figure}[htb]
 \centering
 \lwincludegraphics[scale=2]{figs/start.eps}
 \caption{\label{fig:start}Start}
 \end{figure}
-
 
 % \begin{figure}[htb]
 % \centering
@@ -1710,7 +1704,9 @@ expensive
 % \caption{\label{fig:start2}Start 2}
 % \end{figure}
 
-
+As the size of the network increases the cost of bootstrapping the network becomes prohibitively
+expensive. We can see in figure~\ref{fig:start} that using a master node to co-ordinate the
+network decreases bandwidth costs at the start significantly.
 
 \section{Limitations}
 

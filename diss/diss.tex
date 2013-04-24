@@ -563,8 +563,8 @@ safety and liveness properties:
 \paragraph{Safety Guarantees}
 
 \begin{itemize}
-\item Integrity - every correct process decides at most one value, and if it decides some value v,
-	then v must have been proposed by some process.
+\item Integrity - every correct process decides at most one value, and if it decides some value
+	$v$, then $v$ must have been proposed by some process.
 \item Agreement - Every correct process must agree on the same value.
 \item Non-triviality - Only a value that has been proposed can be chosen.
 \end{itemize}
@@ -687,7 +687,7 @@ If the Proposer receives  replies from a quorum of acceptors, $Q$,
 to its \msg{Prepare(n)} message, it sends the message \msg{AcceptRequest(n, v)} to all
 $q \in Q$, where $v$ is defined as follows. If the message set $M$ is defined as
 ${(n, v) for all \msg{Promise(n, v)}}$, $v$ is defined as
-$(n', v) \in M. \forall (n'', v'') \in M.  n' >= n''$.
+$(n', v) \in M. \forall (n'', v'') \in M.  n' \ge n''$.
 Informally, $v$ the value of the maximum \msg{Promise(n, v)} received.
 
 \subsubsection*{Acceptor}
@@ -731,7 +731,7 @@ decision by sending an \msg{AcceptNotify(n, v)} message to them.
 Learners must store a map of proposal numbers $\rightarrow$ acceptor IDs. When a Learner receives a
 message \msg{AcceptNotify(n, v)} from an Acceptor $A$, it must add $A$ to the set of Acceptors who
 have accepted proposal $n$. When this set becomes a quorum (ie, the size of the set $S$ becomes
-greater than $N / 2$, where $N$ is the size of the network), the Learner can ``learn'' the $v$ as
+greater than $\frac{N}{2}$, where $N$ is the size of the network), the Learner can ``learn'' the $v$ as
 the value decided on for that instance of Paxos. Because of the properties of Paxos, once a quorum
 of acceptors has accepted the proposal ($n$, $v$), the value of that instance will never change.
 
@@ -754,7 +754,7 @@ until the proposed value is learnt.
 
 \begin{enumerate}
 \item \msg{Prepare(n):} The Proposer sends a \msg{Prepare} message to the Acceptors.
-\item \msg{Promise(n):} The Acceptors all promise to accept proposals numbered $>= n$, as they
+\item \msg{Promise(n):} The Acceptors all promise to accept proposals numbered $\ge n$, as they
 	have not seen any \msg{Prepare} requests yet and therefore trivially cannot have promised
 	to accept a proposal higher than $n$.
 \item \msg{AcceptRequest(n, v):} The Proposer sends a value $v$, with the proposal number $n$, to
@@ -821,7 +821,7 @@ by the half of the partition that was able to make progress.
 	case it will be unable to make any progress until the partition is resolved.
 \item \msg{Promise(2):} The Acceptors on the right side of the split both reply with a
 	\msg{Promise}, making a quorum.
-\item \msg{AcceptRequest(2, b):} The second Proposer asks the Acceptors to accept 'b' as the
+\item \msg{AcceptRequest(2, b):} The second Proposer asks the Acceptors to accept \verb+'b'+ as the
 	value.
 \item \msg{AcceptNotify(2, b):} The Acceptors make up a quorum so are able to proceed through to
 	completion.
@@ -839,18 +839,18 @@ subsequent \msg{AcceptRequest} message to a quorum of Acceptors, consensus will 
 \begin{enumerate}
 \item \msg{Prepare(1):} The Proposer sends a \msg{Prepare} message to the Acceptors as usual.
 \item \msg{Prepare(1):} The Acceptors respond with a \msg{Promise} to only accept proposals
-	numbered $>= 1$.
+	numbered $\ge 1$.
 \item \msg{Prepare(2):} Before the first Proposer sends an \msg{AcceptRequest} message, another
 	Proposer sends a \msg{Prepare} message to the Acceptors asking them to only accept
-	proposals $>= 2$.
+	proposals $\ge 2$.
 \item \msg{Promise(2):} The Acceptors promise to do so.
 \item \msg{AcceptRequest(1, a):} The first Proposer sends an \msg{AcceptRequest} message to the
-	Acceptors, but they cannot accept as they have promised to only accept proposals $>= 2$.
+	Acceptors, but they cannot accept as they have promised to only accept proposals $\ge 2$.
 \item \msg{Nack(2):} The Acceptors inform the Proposer they cannot accept with a \msg{Nack}
 	message. This step is not strictly necessary as the Proposer would retry with a higher
 	proposal number after a timeout, but is included for clarity.
 \item \msg{Prepare(3):} The Proposer sends another \msg{Prepare} message to the Acceptors...
-\item \msg{Promise(3):} and they promise not to accept proposals $>= 3$
+\item \msg{Promise(3):} and they promise not to accept proposals $\ge 3$
 \end{enumerate}
 
 % XXX
@@ -1115,14 +1115,14 @@ Below is a table outlining which message types are delegated to which mixin clas
 \begin{tabular}{ | c | c | p{7cm} | }
   \hline
   {\bf Message type} & {\bf Handler Class} & {\bf Message action} \\ \hline
-  AcceptRequest & Acceptor & Respond with AcceptNotify (if valid) and accept Proposal. \\ \hline
-  AcceptNotify & Learner & Record response and if a quorum has accepted that proposal, learn it. \\ \hline
   EHLO & Node & Respond with notify. \\ \hline
   Notify & Node & Add hosts to host list. \\ \hline
   Ping & Node & Send pong.  \\ \hline
   Pong & Node & Remove host from timeout list. \\ \hline
-  Prepare & Acceptor & Respond with Promise (if valid). \\ \hline
   Promise & Proposer & Respond with AcceptRequest and deal with timeouts. \\ \hline
+  AcceptRequest & Acceptor & Respond with AcceptNotify (if valid) and accept Proposal. \\ \hline
+  Prepare & Acceptor & Respond with Promise (if valid). \\ \hline
+  AcceptNotify & Learner & Record response and if a quorum has accepted that proposal, learn it. \\ \hline
 \end{tabular}
 
 \subsubsection{Instance Handling}
@@ -1231,6 +1231,7 @@ The Acceptor role is a fairly simple class that only stores three variables in e
 The implementation is a near-direct version of the description of the algorithm in the Preparation
 section.
 
+% XXX!!!!
 When an acceptor receives a \msg{Prepare(n)} if $n > $
 If an acceptor $A$ receives a message , and $n > \rho$, then it replies with the
 message \msg{Promise(n, $\bm{\eta}$, $\bm{\nu}$)}, meaning that it will not accept any proposals
@@ -1653,7 +1654,7 @@ database operation throughput and database transaction throughput.
 
 I measured the throughput by measuring how long it took to commit 5 operations to the network with
 a given number of writers. I did this 5 times for each writer and then took the average and
-standard deviation of each point. I then plotted $5/x$ for each point as the average throughput in
+standard deviation of each point. I then plotted $\frac{5}{x}$ for each point as the average throughput in
 \emph{operation seconds\superscript{-1}}.
 
 \paragraph{5 Nodes}

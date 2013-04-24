@@ -23,3 +23,7 @@ lat_rev.eps: lat_rev.csv plot_rev.gp ../style.gp
 	# sed -i -e 's/,/\t/g' *-*.csv
 	gnuplot plot_rev.gp
 	cp lat_rev.eps ../diss/figs/
+
+lat_nack.eps: lat_n0.csv lat_n1.csv lat_n2.csv plot_nack.gp ../style.gp
+	gnuplot plot_nack.gp
+	cp lat_nack.eps ../diss/figs/

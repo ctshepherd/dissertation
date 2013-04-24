@@ -23,6 +23,7 @@ FIGS = figs/op-log.eps \
        figs/lat_5.eps \
        figs/lat_20.eps \
        figs/lat_rev.eps \
+       figs/lat_nack.eps \
        figs/start.eps
 
 DISS = diss.tex \

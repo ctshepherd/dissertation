@@ -1,6 +1,6 @@
 TARGETS = figs diss
 
-.PHONY: figs diss
+.PHONY: figs diss count
 
 all: $(TARGETS)
 
@@ -11,3 +11,6 @@ figs:
 
 diss:
 	$(MAKE) -C diss
+
+count:
+	$(MAKE) -C diss count

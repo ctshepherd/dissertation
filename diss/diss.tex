@@ -79,7 +79,7 @@ Name:               & \bf Charlie Shepherd                        \\
 College:            & \bf Churchill College                     \\
 Project Title:      & \bf PDB: A Distributed Database Based on Paxos \\
 Examination:        & \bf Computer Science Tripos, July 2013        \\
-Word Count:         & \bf wordcount \\
+Word Count:         & \bf 13019 \\
 Project Originator: & Charlie Shepherd                    \\
 Supervisor:         & Stephen Cross                    \\
 \end{tabular}
@@ -135,7 +135,11 @@ has already been used to any substantial extent for a comparable purpose.
 \newpage
 \section*{Acknowledgements}
 
-Acknowledge various people
+I would like to thank my supervisor Stephen Cross for his invaluable assistance, this project
+could not have been successful without him. \\
+My DoS, Dr John Fawcett, for his help and support over the last three years. \\
+Ed and Nick for their help. \\
+Talal, Lizzie and Joe for always lending a friendly ear.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % now for the chapters
@@ -151,10 +155,14 @@ Acknowledge various people
 
 \section{Overview}
 
-``The Paxos algorithm, when presented in plain English, is very simple.'' \cite{lamport01}. \\
-Despite this assertion, Paxos has a reputation for being hard to implement. Both
-\emph{Paxos Made Live} \cite{chandra07} and \emph{Paxos Made Moderately Complex} \cite{renesse11}
-repeatedly show how intricate implementing a Paxos actually is.
+\begin{quote}
+``The Paxos algorithm, when presented in plain English, is very simple.'' \\
+Leslie Lamport - \emph{Paxos Made Simple}
+\end{quote}
+Despite this assertion, Paxos has a reputation for being hard to implement.
+
+Both \emph{Paxos Made Live} \cite{chandra07} and \emph{Paxos Made Moderately Complex}
+\cite{renesse11} repeatedly show how intricate implementing Paxos actually is.
 
 With this in mind I set out to build a distributed database based on the Paxos protocol.
 
@@ -199,12 +207,23 @@ Preparation chapter I will go into detail about the types of failure that my dat
 
 \subsection*{2 Phase Commit}
 
-% S comment: too detailed, move to preparation and discuss what 2pc tries to achieve and its flaws
-% rather than details
+2 Phase Commit is one of the simplest protocols that aims to solve the Distributed consensus
+problem. The co-ordinator asks each node in the cohort to agree to commit the operation. If all
+nodes agree then it asks each member to commit, if they do not all agree then it aborts the
+operation.
 
-2 Phase Commit is one of the simplest protocols that aims to solve the Distributed con
+The problem with the protocol is that it is a synchronous protocol. These means if a node fails
+the co-ordinator is blocked waiting for them to respond.
+% XXX
 
 \subsection*{3 Phase Commit}
+
+3 Phase Commit is a modification to 2 Phase Commit that adds another phase, splitting the commit
+into pre-commit and finalise. This makes it possible to define all behaviour no matter what
+node fails, and turns the protocol from a synchronous one into an asynchronous one.
+
+However, 3PC also suffers from a flaw --- it cannot recover from network partition. If the network
+is partition
 
 
 \subsection*{Paxos}
@@ -237,6 +256,9 @@ failures, it only handles \emph{fail-stop} failures, not \emph{fail-recover} fai
 unfortunate, as computer networks are asynchronous networks, and can therefore be modelled using a
 fail-recover model to account for arbitrary delays from messages being sent to being received
 (fail-stop would mean messages can only be dropped, not delayed for an arbitrary length of time).
+
+It was developed by Leslie Lamport at Microsoft
+research when he was trying to disprove its existence. 
 
 Paxos relies on the fact that any majority $M$ has at least one member in common. Therefore if we
 enforce the constraint that any decision must be made by a majority, then once a decision is made,
@@ -305,12 +327,11 @@ Paxos has recently become a very popular algorithm for ensuring distributed
 consensus. One good example is Google using Paxos for a distributed lock
 service called ``Chubby'' \cite{chandra07}. This underpins their BigTable
 distributed database which is used across Google.
+% explain engineering etc
 
 Apache Zookeeper, a centralised service for providing distributed services such
 as synchronisation, naming and configuration management, also uses a Paxos
 based protocol called ZAB.
-
-% S comment: try to expand this section, giving more details about the implementation
 
 \cleardoublepage
 
@@ -365,7 +386,7 @@ this case.
 
 There are many languages this project could be implemented in, but the two main choices were the
 two languages I have the most experience in: C and Python. They are reasonably different languages
--- C is a compiled low-level language, while Python is an interpreted high level language. I
+--- C is a compiled low-level language, while Python is an interpreted high level language. I
 decided to use Python for a variety of reasons.
 
 Python handles memory allocation internally, whereas whilst C provides great precision over memory
@@ -435,7 +456,7 @@ into some detail about what each of these properties mean.
 Atomicity means that either an operation completes or it does not, there is no ``halfway'' state.
 This means that the programmer using the database does not need to worry about cleaning up after
 an operation, because if it does not succeed we can simply retry it without needing to worry about
-the state it has left the database in. Atomicity also applies to transactions in the same way --
+the state it has left the database in. Atomicity also applies to transactions in the same way ---
 if we have a transaction as an operation composed of smaller single operations (for example, INCR
 B, READ A $\rightarrow$ X, WRITE X + 10 $\rightarrow$ A), we don't want some of the operations to
 complete and some not to. In this example, we may have the invariant $A = 10\times B$. If B was
@@ -551,8 +572,7 @@ the cost of lack of availability in a network partition.
 
 \subsection{Introduction}
 
-Paxos is a distributed consensus algorithm. It was developed by Leslie Lamport at Microsoft
-research when he was trying to disprove its existence. Paxos is failure tolerant for up to $F$
+Paxos is a distributed consensus algorithm. Paxos is failure tolerant for up to $F$
 simultaneous failures in a network of $2F + 1$ nodes.
 % S comment: Explain why this is true (ie, showing some working)
 
@@ -830,7 +850,7 @@ by the half of the partition that was able to make progress.
 \subsubsection*{Duelling Proposers}
 
 Figure~\ref{fig:paxos-duelling} shows the worst case scenario
-for Paxos -- duelling Proposers. This is the pathological case for Paxos where it is possible for
+for Paxos --- duelling Proposers. This is the pathological case for Paxos where it is possible for
 it to never make progress. However this eventuality is unlikely because the messages from the proposers
 must interleave so that there is no contiguous sequence of \msg{Prepare} and \msg{AcceptRequest}
 messages. This means that if any single Proposer manages to send a \msg{Prepare} message followed by a
@@ -864,7 +884,7 @@ value. A distributed application needs a series of values rather than a single v
 several ways to achieve this. The way outlined in \emph{Paxos Made Simple} \cite{lamport01}, known
 as MultiPaxos, is by a form of leader election. The Proposer who proposed the successful value in
 the last round of Paxos becomes the leader, and is only required to send a \msg{AcceptRequest}
-message in the subsequent instance to have a value accepted -- by winning the last round there is
+message in the subsequent instance to have a value accepted --- by winning the last round there is
 an implicit Phase 1. If this \msg{AcceptRequest} fails for whatever reason, the instance degrades
 into a standard instance of Paxos.
 
@@ -1295,7 +1315,7 @@ handling network membership and leads to the problem that if the master node goe
 breaks.
 
 For large peer-to-peer networks there are several mature techniques that could be used to manage a
-network of scale efficiently. One of these is using ``supernodes'' -- nodes designated either
+network of scale efficiently. One of these is using ``supernodes'' --- nodes designated either
 through bandwidth or chosen randomly to co-ordinate their child nodes, reducing the message
 overhead from $N^2$ to $S^2$ where $S$ is the number of supernodes. Another technique is the use
 of Distributed Hashing Tables (DHTs) to manage nodes. This involves computing a measure or
@@ -1350,7 +1370,7 @@ guarantee about the OID the statement would have. This made for a cleaner abstra
 between the database and Paxos. The database code now only needed to pass the Paxos layer a
 statement/op, and it would receive a callback when that statement was finally entered into the
 transaction log, along with the OID it was entered as (which would be the instance ID, as there is
-a one-to-one correspondence of OIDs -- instance IDs).
+a one-to-one correspondence of OIDs --- instance IDs).
 
 \subsection{Reads}
 
@@ -1536,7 +1556,7 @@ dependant upon network characteristics, I wanted to control those characteristic
 For my simulation to be a valid measure of how the network responds, I made certain assumptions.
 As a distributed application, I would expect my application to be mainly IO bound, rather than
 being CPU bound. IO bound means that the application spends most of the time waiting for IO, in
-this case network IO -- sending and receiving messages, as opposed to CPU bound, which means the
+this case network IO --- sending and receiving messages, as opposed to CPU bound, which means the
 application spends most of its time running on the CPU. It is necessary for the application to be
 IO bound in order for the simulation to be valid - if it is in fact CPU bound, running multiple
 nodes on the same machine will lead to increased CPU load. This will mean that the simulation
@@ -1649,7 +1669,7 @@ displayed in figure~\ref{fig:latency-rev}.
 \subsection{Throughput}
 
 Next I measured the throughput of the network. This is the number of operations per second that
-can be processed by the network. Again I plotted three lines for each graph -- paxos throughput,
+can be processed by the network. Again I plotted three lines for each graph --- paxos throughput,
 database operation throughput and database transaction throughput.
 
 I measured the throughput by measuring how long it took to commit 5 operations to the network with
@@ -1810,7 +1830,7 @@ design the system as row-based from the start.
 Unit tests became a problem as I progressed through the project. They became a hindrance, as I
 was refactoring my code base often, they were not that effective. Test Driven Development may have
 been a better choice, as I wrote my unit tests after I had written the code, I would often write
-the code, write the tests, it would all work. Then I would refactor the code, rewrite the tests --
+the code, write the tests, it would all work. Then I would refactor the code, rewrite the tests ---
 every refactoring would invalidate large numbers of tests. This was also due to how tightly
 coupled my code was with Twisted. This is another reason I would reconsider my decision to use
 Twisted if I were to redo the project.

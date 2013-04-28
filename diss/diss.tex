@@ -159,8 +159,9 @@ Talal, Lizzie and Joe for always lending a friendly ear.
 
 % XXX
 \begin{myquote}
-``The Paxos algorithm, when presented in plain English, is very simple.'' \\
-Leslie Lamport - \emph{Paxos Made Simple} \cite{lamport01}
+``... all working protocols for asynchronous consensus we have so far encountered have Paxos at their
+core ...'' \\
+Mike Burrows \cite{burrows06}
 \end{myquote}
 
 Consensus in a distributed system is a difficult problem to solve. There are multiple protocols
@@ -1294,20 +1295,19 @@ other useful information in the state.
 
 As a potential improvement to the protocol I added support for \msg{NACK} messages (as described
 in section~\ref{sec:nacks}). I abstracted out the timeout behaviour into its own method
-\verb|handle_reject|, then called this method whenever a \msg{NACK} is received, thus initiating
+\verb|handle_reject|. Whenever a \msg{NACK} is received this method is called, initiating
 the timeout behaviour without having to wait for an actual timeout.
 
 \subsection{Startup Improvement}
 
 A clear problem during testing was the effect of the network size on the amount of time and the
 amount of bandwidth used to bootstrap the network. Increasing the size beyond a certain number of
-nodes led to large slow downs in the network, that in the real world would have serious practical
-implications on the efficacy of the network.
+nodes led to large slow downs in the network, which would have serious practical implications on
+the efficacy of the network in the real world.
 
-I investigated an improvement to this by designating a master node and delegating all network
-membership co-ordination to this node. Obviously this is the opposite extreme of every node
-handling network membership and leads to the problem that if the master node goes down the network
-breaks.
+I improved this by designating a master node and delegating all network membership co-ordination
+to this node. Obviously this is the opposite extreme of distributing network membership management
+to every node and leads to the network becoming dependant on a single master node.
 
 For large peer-to-peer networks there are several mature techniques that could be used to manage a
 network of scale efficiently. One of these is using ``supernodes'' --- nodes designated either
@@ -1321,26 +1321,13 @@ these options for my project.
 
 \subsection{Basic Operations}
 
-The database is implemented as a datastructure that can have operations performed on it. These
-operations can be \emph{serialised} and \emph{deserialised}. This involves converting the objects
-in memory into an \emph{on-the-wire} format that can be sent over the network and converted back
-into a Python object at the receiving node.
+The database is implemented as a row based datastructure that can have operations performed on it.
+These operations can be \emph{serialised} and \emph{deserialised}. This involves converting the
+objects in memory into an \emph{on-the-wire} format that can be sent over the network and
+converted back into a Python object at the receiving node.
 
-The main problem for designing a distributed database then becomes deciding on an order for these
-operations that is consistent across every node.
-
-A basic operation is one that occupies a single slot of the operation log.
-
-% XXX: this will all be wrong - what do we do?
-
-% \begin{tabular}{ | c | p{7cm} | }
-%   \hline
-%   {\bf Operation} & {\bf Meaning} \\ \hline
-%   NOP & Do nothing \\ \hline
-%   ASSIGN(k, v) & Set \verb+k := v+ in the database. \\ \hline
-%   ATTEMPTLOCK & Attempt to take the TX lock. \\ \hline
-%   UNLOCK & Release the TX lock. \\ \hline
-% \end{tabular}
+The main problem for the database is then to decide on an order for these operations that is
+consistent across every node.
 
 \subsection{The Operation Log}
 
@@ -1350,32 +1337,36 @@ A basic operation is one that occupies a single slot of the operation log.
 \caption{\label{fig:op-log}Operation Log}
 \end{figure}
 
-Deciding on a serialisation for operations is done by the operation log. This associates an
-``Operation ID'' (OID) with a particular operation. In order to decide on an OID for an operation,
-the code picks the next highest instance ID it hasn't seen before and starts a new round of Paxos
-for that instance, trying to assert that \verb$OID := <op>$. OIDs are integers and refer to
-indexes into an ordered table - the operation log.
+The operation log enforces a serialisation for operations. It associates an ``Operation ID'' (OID)
+with a particular operation. OIDs are integers and refer to indexes into the operation log. To
+enter an operation into the log, the code picks the next highest instance ID it hasn't seen
+before and starts a new round of Paxos for that instance, trying to assert that
+\verb$OID := <operation>$.
 
-I tried a number of different techniques for retrying in the event that the OID was associated
-with another operation. Initially I put the retry logic in the database, however it became clear
-that it made more sense to create the specification such that once a statement was submitted to
-Paxos, it would be entered into the operation log, but at submit time the code could make no
-guarantee about the OID the statement would have. This made for a cleaner abstraction interface
-between the database and Paxos. The database code now only needed to pass the Paxos layer a
-statement/op, and it would receive a callback when that statement was finally entered into the
-transaction log, along with the OID it was entered as (which would be the instance ID, as there is
-a one-to-one correspondence of OIDs --- instance IDs).
+I tried a number of different techniques for retrying an insertion in the event that the OID was
+associated with another operation. Initially I put the retry logic in the database. However it
+became clear that it made more sense to delegate the responsibilty for retrying to Paxos.
+
+This meant that at submit time the code could make no guarantee about the OID the statement would
+have but there was the guarantee that once a statement was submitted to Paxos, it would eventually
+be entered into the operation log.
+
+This made for a cleaner interface between the database and Paxos, as the database now only needed
+to pass the Paxos layer an operation and it would receive a callback when that statement was
+finally entered into the transaction log with the OID it was entered as.\footnote{This would be
+the same as the instance ID, as there is a one-to-one correspondence of OIDs $\leftrightarrow$
+instance IDs).}
 
 \subsection{Reads}
 
-For a distributed database there is the concept of \emph{fast reads} and \emph{slow reads}. A fast
+A distributed database has the concept of both \emph{fast reads} and \emph{slow reads}. A fast
 read is a read that only examines the state of the database locally, without sending anything over
 the network.  A slow read involves inserting an operation into the operation log in order to
 ensure that the local copy of the database is up to date, then reading from that state.
 
 A fast read has very low latency, as it does not need to send messages to any other nodes, but it
-may return out of date data. A slow read forces us to actually examine the current state of the
-database by inserting an operation, to ensure we have obtained all transactions issued
+may return out of date data. A slow read forces the database to actually examine the current state
+of the network by inserting an operation to ensure it has obtained all transactions issued
 prior to the slow read.
 
 In fact, I chose to use a \op{NOP} operation rather than a \op{READ} operation, although they
@@ -1388,14 +1379,14 @@ better represented the operation being sent (do nothing).
 \caption{\label{fig:op-log-slow-read-1}Performing a slow read}
 \end{figure}
 
-We can see this from figure~\ref{fig:op-log-slow-read-1}. This is the situation as seen by a node
-$N$ at time $t_1$. At time $t_1$ $N$ has only received OID 1 - the \op{ASSIGN} in OID 2 has been
-learnt by the network but not by $N$. In order to make sure $N$ is up to date with the network, it
-tries to insert a \op{NOP} at OID 2.
+Figure~\ref{fig:op-log-slow-read-1} shows the situation as seen by a node $N$ at time $t_1$, it
+has only received OID 1, as the \op{ASSIGN} in OID 2 has been learnt by the network but not by
+$N$. In order to make sure $N$ is up to date with the network, it performs a slow read by trying
+to insert a \op{NOP} at OID 2.
 
-As the network has already reached consensus on OID 2, when $N$ tries to set it to a \op{NOP}, the
-it will learn the value already obtained by consensus in the network and try and set OID 3 to
-\op{NOP} instead. As OID 3 has not had any value set, $N$ succeeds in setting OID 3 to \op{NOP}.
+As the network has already learnt a value for OID 2, when $N$ tries to set it to a \op{NOP}, it
+learns the value already decided by the network and retries with OID 3 instead. As no value has
+been learnt for OID 3, $N$ succeeds in setting it to \op{NOP}.
 
 \begin{figure}[htb]
 \centering
@@ -1403,10 +1394,9 @@ it will learn the value already obtained by consensus in the network and try and
 \caption{\label{fig:op-log-slow-read-2}After a slow read}
 \end{figure}
 
-% too many dashes
-In figure~\ref{fig:op-log-slow-read-2} we see the situation at time $t_2$ - the \op{NOP} has been
-inserted at OID 3 - from this $N$ can tell that at $t_2$ the latest operation in the op-log is OID
-3 - the slow read it just performed.
+Figure~\ref{fig:op-log-slow-read-2} show the situation at time $t_2$ --- the \op{NOP} has been
+inserted at OID 3 and from this $N$ knows that at $t_2$ the latest operation in the op-log the
+slow read it just performed, i.e., it is up to date.
 
 \subsection{Transactions}
 
@@ -1420,13 +1410,16 @@ inserted at OID 3 - from this $N$ can tell that at $t_2$ the latest operation in
 
 % XXX: add brackets to diagram indicating lock holding
 
-My first implementation of transactions was a very na\"ive global lock. In order to start a
-transaction, a node inserts the \op{ATTEMPTLOCK} operation. If, when the operation is inserted, the
-number of \op{ATTEMPTLOCK}s is well-bracketed (i.e., there is an equal number of lock takes and
-releases), then the node was successful in taking the lock. While a node holds the lock, no other
-node can perform an operation (the operations are inserted in the transaction log but ignored).
+I implemented transactions with a simple global lock.
+% XXX: explain this decsision
 
-As an example, in figure~\ref{fig:op-log-trylock} we can see an operation log with two nodes
+In order to start a transaction, a node inserts the \op{ATTEMPTLOCK} operation. If, when the
+operation is inserted, the number of preceeding \op{ATTEMPTLOCK}s is well-bracketed (i.e., there
+is an equal number of lock takes and releases), then the node was successful in taking the lock.
+While a node holds the lock, no other node can perform an operation (the operations are inserted
+in the transaction log but ignored).
+
+As an example, figure~\ref{fig:op-log-trylock} shows an operation log with two nodes
 performing operations, nodes $A$ and $B$. In OIDs 1 and 2 neither node owns the global lock, so both
 nodes are able to freely perform operations. Both try to take the lock and $A$ gets it operation
 inserted first as OID 3, so now owns the lock. $B$'s operation is inserted as OID 4, so it has the
@@ -1467,13 +1460,14 @@ construct simple grammars. Using this I constructed a grammar of the form:
 The grammar for the WHERE clause (marked as \verb+<where-clause>+ above) is more complicated and
 is presented below in production rules:
 \begin{enumerate}
-\item \verb+B -> AND | OR+
-\item \verb+T -> f op f | ( C )+
-\item \verb+C -> T B T | T+
-\item \verb+S -> C EOL+
+\item \verb+op -> == | != | < | > | <= | >=+
+\item \verb+B  -> AND | OR+
+\item \verb+T  -> f op f | ( C )+
+\item \verb+C  -> T B T | T+
+\item \verb+S  -> C EOL+
 \end{enumerate}
 
-In the above production rules \verb+f+ is either a fieldname, string or integer and \verb+EOL+
+In the above production rules \verb+f+ is either a fieldname, a string or an integer and \verb+EOL+
 refers to the end of the string.
 
 \subsubsection{Recursive Descent Parser}
@@ -1530,72 +1524,72 @@ bandwidth used varied in different situations.
 
 \subsection{Simulation}
 
-In order to evaluate the database I decided to simulate the network on a single machine. Initially
-I created a separate program for each node, but for all but the most simple network scenarios it
-became necessary to run all nodes in the same Python script to programmatically generate results.
-I discuss the limitations of this in the section below. There were a number of reasons why it was
-necessary to simulate the network on a single machine.
+In order to evaluate the database I simulated the network on a single machine. This was necessary
+for a number of reasons.
 
 Firstly, it is impractical to create an actual network on a number of computers. Co-ordinating
-tests between a large number of machines is difficult, and the amount of resources required was
-not available.
+tests between a large number of machines is difficult, and resources required were unavailable.
 
 Also, as the number of nodes increases, it becomes increasingly difficult to get meaningful
 results from nodes run on a physical network, due to other factors such as networking delay. It
 also makes results inconsistent and difficult to reproduce on several runs. As my results are
 dependant upon network characteristics, I wanted to control those characteristics.
 
+Initially I spawned a separate instance of the test program for each node, but it became necessary
+to run all nodes in the same script in order to control complex scenarios. I discuss the
+limitations of this in the section below.
+
 \subsubsection*{Assumptions}
 
 For my simulation to be a valid measure of how the network responds, I made certain assumptions.
 As a distributed application, I would expect my application to be mainly IO bound, rather than
 being CPU bound. IO bound means that the application spends most of the time waiting for IO, in
-this case network IO --- sending and receiving messages, as opposed to CPU bound, which means the
-application spends most of its time running on the CPU. It is necessary for the application to be
-IO bound in order for the simulation to be valid - if it is in fact CPU bound, running multiple
-nodes on the same machine will lead to increased CPU load. This will mean that the simulation
-becomes invalid, as the performance of the simulated nodes deviates from the performance of a real
-network, due to the performance depending on the CPU rather than the network.
+this case network IO (sending and receiving messages), as opposed to CPU bound, which means the
+application spends most of its time running on the CPU. The application must be IO bound for the
+simulation to be valid -- if it is in fact CPU bound, running multiple nodes on the same machine
+will lead to increased CPU load. This makes the simulation invalid, as the performance of the
+simulated nodes will deviate from the performance of a real network due to the performance
+depending on the CPU rather than the network.
 
-However, as I am simulating a network on one computer, this assumption does begin to
-break down as the number of nodes increases. This problem is exacerbated because Python is
-limited to only using one core without explicit parallelism, and Twisted's event loop runs
-for not just one node but for all the nodes in the network. A potential fix to would be to spawn
-different threads for each node and then join the results when the simulation is done. In this way
-the simulation could utilise the full resources of the simulating machine, instead of being
-artificially. While this is possible in Twisted, it is not straightforward, and unfortunately time
-constraints did not allow further exploration of this evaluation method.
+However, as I simulated a network on one computer, this assumption did begin to break down as the
+number of nodes increased. This problem was exacerbated because Python is limited to only using
+one core without explicit parallelism, and Twisted's event loop ran for all the nodes in the
+network. A potential fix would be to spawn different threads for each node and then join the
+results when the simulation is done. In this way the simulation could utilise the full resources
+of the simulating machine, instead of being artificially constrained by the resource limits of the
+simulating machine. While this is possible in Twisted, it is not straightforward, and
+unfortunately time constraints did not allow further exploration of this evaluation method.
 
 \subsection{Ratelimiting}
 
-% talk about ratelimiting
-% networking delay
+% XXX: flesh out or cut
 
 Unfortunately, my application had no congestion control or flow control built into the protocol.
-While this would be a potential advantage of TCP, other features of TCP would be unnecessary, as
-Paxos is decided to deal with message loss, and TCP provides reliable message delivery. So a
-potential improvement would be to build Paxos on top of another protocol built on UDP, which
+While this would be a potential advantage of TCP, other features of TCP would be unnecessary.  For
+instance, TCP provides reliable message delivery, but Paxos is designed to deal with message loss.
+So a potential improvement would be to build Paxos on top of another protocol built on UDP, which
 provides congestion control and flow control on the layer underneath, but without providing
 unnecessary features such as reliable message delivery.
 
 \subsection{Gathering and Formatting Results}
 
-To generate the results, I ran a simulation of the network and generated the data points
-necessary. I then performed some simple statistical methods on it, and output it to a datafile. I
-then used gnuplot to format the data into a graph which I could then embed in my dissertation. I
-used this method so that it was very straightforward to regenerate the graph automatically,
-without having to perform manual tweaking, which would be very time consuming.
+To generate the results, I simulated the network and generated the data points necessary. I then
+performed some simple statistical methods on it, and output it to a datafile. Finally I used gnuplot
+to format the data into a graph which could be embedded in my dissertation. This made it
+straightforward to regenerate the graph automatically, without having to perform
+manual tweaking, which would be very time consuming.
 
-I wrote a script that performed the actual simulation and output the data. It took a number of
-commandline parameters, specifying the number of nodes in the network, the number of writers, the
-number of operations to perform and the type of operations. It then constructed this network and
-bootstrapped it. It could not immediately run the operations, but had to wait for every node in
-the network to be aware of other nodes in the network. This start up time was not reflected in the
+I wrote a script that performed the actual simulation and output the data. The script took a
+number of commandline parameters specifying the number of nodes in the network, the number of
+writers, the number of operations to perform and the type of operations. It then constructed this
+network and bootstrapped it. In order for the simulation to generate reliable results, the
+operations could not immediately be run, but the script had to wait for every node in the network
+to be aware of every other node in the network. This start up time was not reflected in the
 results. After the network bootstrapped, the script started the required number of nodes writing,
 and recorded the relevant metric in a CSV file.
 
 I ran this script 5 times for each statistic, and then calculated the average and standard
-deviation for each point using another script. The output of this was then put in a datafile
+deviation for each point. The output of this was then put in a datafile
 suitable for gnuplot to process.
 
 Finally I ran a gnuplot script which generated a graph for the datafile. It handled formatting and
@@ -1606,9 +1600,9 @@ consistently.
 
 \section{Contention}
 
-I started off by measuring how the network responded to contention. This means measuring how
+I started off by measuring how the network responded to contention. This meant measuring how
 the latency and throughput changed in response to the number of nodes in the network
-which are writing.
+which were writing.
 
 \subsection{Latency}
 
@@ -1745,7 +1739,7 @@ nodes have failed. However if the nodes leave slowly enough for the network quor
 will be fine.
 
 Another drawback is that the network struggles to function as its size increases - the way I have
-implemented Paxos is easy to debug but is very ``chatty''. Using a more efficient variant such as
+implemented Paxos is easy to debug but is very verbose. Using a more efficient variant such as
 MultiPaxos would decrease the bandwidth requirements of the system. Alternatively using a variant
 such as FastPaxos would decrease the latency.
 

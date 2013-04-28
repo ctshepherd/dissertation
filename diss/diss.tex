@@ -8,6 +8,7 @@
 \usepackage{graphicx}
 \usepackage{algorithm}
 \usepackage{bm}
+\usepackage{amssymb}
 
 \input{epsf}                            % to allow postscript inclusions
 
@@ -35,11 +36,12 @@
 \newcommand{\op}[1]  {{\bf #1}}         % \op  command for formatting database operations
 \newcommand{\superscript}[1]{\ensuremath{^{\textrm{#1}}}}
 \newcommand{\subscript}[1]{\ensuremath{_{\textrm{#1}}}}
+\newenvironment{myquote}{\list{}{\leftmargin=0.3in\rightmargin=0.3in}\item[]}{\endlist}
 
 
 \begin{document}
 
-\bibliographystyle{plain}
+\bibliographystyle{unsrt}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -153,24 +155,30 @@ Talal, Lizzie and Joe for always lending a friendly ear.
 
 \chapter{Introduction}
 
-\section{Overview}
-
-\begin{quote}
-``The Paxos algorithm, when presented in plain English, is very simple.'' \\
-Leslie Lamport - \emph{Paxos Made Simple}
-\end{quote}
-Despite this assertion, Paxos has a reputation for being hard to implement.
-
-Both \emph{Paxos Made Live} \cite{chandra07} and \emph{Paxos Made Moderately Complex}
-\cite{renesse11} repeatedly show how intricate implementing Paxos actually is.
-
-With this in mind I set out to build a distributed database based on the Paxos protocol.
-
-% Paxos is a consensus algorithm for distributed systems. It was first described in Leslie Lamport's
-% paper \emph{The Part Time Parliament} \cite{lamport98}. It has been used by Google and Yahoo in
-% their internal services as the basis of large scale distributed systems.
-
 \section{Motivation}
+
+% XXX
+\begin{myquote}
+``The Paxos algorithm, when presented in plain English, is very simple.'' \\
+Leslie Lamport - \emph{Paxos Made Simple} \cite{lamport01}
+\end{myquote}
+
+Consensus in a distributed system is a difficult problem to solve. There are multiple protocols
+developed that solve it but one of the most important is the Paxos protocol.
+
+Paxos was developed by Leslie Lamport and first described in his paper \emph{The Part Time
+Parliament} \cite{lamport98}.  The paper was first submitted for review in 1990 but its style,
+which portrayed the protocol as a physical voting system in Ancient Greece, meant that it was not
+published in a journal for a further eight years. Paxos has enjoyed a similarly colourful history.
+
+Lamport tried to disprove the existance of a protocol with its properties. Instead, he ended up
+developing Paxos.
+
+Despite his assertion in \emph{Paxos Made Simple} \cite{lamport01}, Paxos has a reputation for
+being hard to implement.  Both \emph{Paxos Made Live} \cite{chandra07} and \emph{Paxos Made
+Moderately Complex} \cite{renesse11} repeatedly show how intricate implementing Paxos actually is.
+
+With this in mind, I set out to build a distributed database based on the Paxos protocol.
 
 Paxos is a complex protocol, and one that is notoriously subtle. I took on the challenge of not
 only implementing it, but also designing and coding a database layer on top. I wanted this
@@ -207,24 +215,40 @@ Preparation chapter I will go into detail about the types of failure that my dat
 
 \subsection*{2 Phase Commit}
 
-2 Phase Commit is one of the simplest protocols that aims to solve the Distributed consensus
-problem. The co-ordinator asks each node in the cohort to agree to commit the operation. If all
-nodes agree then it asks each member to commit, if they do not all agree then it aborts the
-operation.
+2 Phase Commit is one of the simplest protocols that solves the Distributed Consensus problem. The
+co-ordinator asks each node in the cohort to commit the value it suggests\footnote{i.e. this is
+a binary decision, commit or abort. If a node wants a different value it must initiate its own
+round of 2PC.}. If all nodes agree then it sends a message telling each member to commit, otherwise
+it sends a message to each member telling them to abort. This is very efficient, with a message
+cost of $3n$ for a network of $n$ nodes.
 
-The problem with the protocol is that it is a synchronous protocol. These means if a node fails
-the co-ordinator is blocked waiting for them to respond.
-% XXX
+However, the problem with the 2PC protocol is its lack of tolerance to failures. Consider if the
+co-ordinator fails during the protocol: some nodes in the cohort will have received a message from
+the co-ordinator and voted and some may not. The nodes that have voted may be blocked, having
+taken out locks when they voted commit. In order to proceed, the protocol can fall back to a
+recovery node, which tries to complete the protocol by messaging all the nodes and gathering their
+responses, then making a decision to commit or abort and finishing the protocol by informing all
+nodes of the decision. However, if during that recovery, a member of the cohort crashes then
+recovery becomes impossible, as the recovery node cannot recreate the state of the network and
+therefore cannot make a decision to commit or abort.
 
 \subsection*{3 Phase Commit}
 
-3 Phase Commit is a modification to 2 Phase Commit that adds another phase, splitting the commit
-into pre-commit and finalise. This makes it possible to define all behaviour no matter what
-node fails, and turns the protocol from a synchronous one into an asynchronous one.
+3 Phase Commit is a modification to 2 Phase Commit that solves this problem by splitting the commit
+phase into two, the pre-commit phase and the finalise phase.
 
-However, 3PC also suffers from a flaw --- it cannot recover from network partition. If the network
-is partition
+If the co-ordinator crashes, the recovery node can now reconstruct the state from any node in the
+cohort. If a node is in the pre-commit phase, then every node must have voted commit and it is
+safe to finish the protocol by telling all nodes to commit. If any node is not in the pre-commit
+phase, then the operation has not been commited, as no node can have moved to the finalise phase
+if any node is not yet in the pre-commit phase.
 
+3PC still suffers from a flaw however in that it cannot recover from network partition. If the
+network is partitioned such that all nodes in the cohort that are the pre-commit phase are on one
+side of the partition and all nodes that are not are on the other side, then the first side of the
+partition will complete the recovery and the other side will abort the operation, leaving the
+network in an inconsistent state when the partition is resolved.
+% XXX: this sentence is too long
 
 \subsection*{Paxos}
 
@@ -251,28 +275,32 @@ is partition
 % is a pathological case where Paxos will not reach consensus, in accordance to
 % FLP, but this scenario is relatively easy to avoid in practice.
 
-Paxos is a generalisation of 2PC and 3PC that handles more failure modes. While 3PC can handle
-failures, it only handles \emph{fail-stop} failures, not \emph{fail-recover} failures. This is
-unfortunate, as computer networks are asynchronous networks, and can therefore be modelled using a
-fail-recover model to account for arbitrary delays from messages being sent to being received
-(fail-stop would mean messages can only be dropped, not delayed for an arbitrary length of time).
+Paxos is a generalisation of 2PC and 3PC that handles more failure modes\cite{gray2006}. While 3PC
+can handle failures, it only handles \emph{fail-stop} failures, not \emph{fail-recover} failures.
+This is unfortunate, as computer networks are asynchronous networks, and can therefore be modelled
+using a fail-recover model to account for arbitrary delays from messages being sent to being
+received (fail-stop would mean messages can only be dropped, not delayed for an arbitrary length
+of time).
 
-It was developed by Leslie Lamport at Microsoft
-research when he was trying to disprove its existence. 
+Paxos relies on the fact that any majority of nodes in a network has at least
+one member in common with any other majority. Therefore if we enforce the
+constraint that any decision must be made by a majority, then once a decision
+is made, in any subsequent decision there will be at least one member who was
+present in the previous decision. This is the central tenet of Paxos, where a
+majority is known as a \emph{quorum}.
 
-Paxos relies on the fact that any majority $M$ has at least one member in common. Therefore if we
-enforce the constraint that any decision must be made by a majority, then once a decision is made,
-in any subsequent decision there will be at least one member who was present in the previous
-decision. This is the central tenet of Paxos, where a majority is known as a \emph{quorum}.
+Brewer's CAP theorem\cite{brewer2000}\cite{gilbert2002} states that in the face of a
+network partition, a distributed system can only provide availability or consistency, but not
+both. A key advantage of Paxos is that it can guarantee consistency during a network partition.
+This is in contrast to 3PC, which provides availability.
 
-A key advantage of Paxos is that it can guarantee consistency during network partitions,
-unlike 3PC which gives availability instead.
-
-However, a potential drawback is that Paxos has a pathological case where it will not make
+However, a potential drawback to this is that Paxos does sacrifice availability. This is in the
+form of a pathological case where it will not make
 progress, ie, there is no upper bound on the time it will take to achieve consensus (it may never
 terminate). This is due to the FLP impossibility proof \cite{fischer85}, which states that it is
 impossible to guarantee liveness in an asynchronous network where there is at least one failure.
 In practice it is a situation that is relatively easy to avoid, and is not a serious concern.
+% XXX: elaborate in a footnote or something?
 
 \section{Databases}
 
@@ -345,7 +373,8 @@ goals which can easily be objectively verified against the finished project.
 
 \subsection*{Paxos}
 \paragraph{Correctness} Above all, the implementation of Paxos must be correct. This means that it
-must conform to the description of the algorithm specified in \emph{The Part Time Parliament}.
+must conform to the description of the algorithm specified in \emph{The Part Time Parliament}
+\cite{lamport98}.
 \paragraph{Dynamic node membership} The implementation of Paxos must be able to support nodes
 joining and leaving dynamically without losing correctness.
 
@@ -355,11 +384,11 @@ top of the API provided by the Paxos module.
 \paragraph{Distributed} The database must be distributed. Any node in the network must have the
 same capabilities as any other node in the network.
 % homogenous
-\paragraph{Transactions} The database must support transactions, which can be aborted, returning
-the database to the state before the transaction was started. Transactions must operate in
-isolation with each other.
-\paragraph{ACID} The database must provide ACID properties. These are Atomicity, Consistency,
-Isolation and Durability.
+\paragraph{Transactions} The database must support transactions, that is, composite groups of operations.
+\paragraph{ACID} The database must provide ACID properties through these transactions. ACID
+properties are Atomicity, Consistency, Isolation and Durability. This means transactions can be
+aborted, returning the database to the state before the transaction was started. Transactions must
+also operate in isolation with each other.
 \paragraph{SQL} The interface to the database must be SQL. It may be a limited form of SQL, as the
 main priority of the project is the protocol and database design, rather than the interface.
 
@@ -415,16 +444,13 @@ familiarity with it. PyParsing is also distributed under the MIT license.
 
 Version control is a necessity in any software project. I decided to use a decentralised version
 control system (DVCS) for a number of reasons. DVCSs have a distributed structure rather than
-using a central or master server. This makes it possible to commit changes locally to a checkout
-without needing a connection to any server. DVCSs also have advanced branching and merging tools,
-making it easier to branch to develop experimental features, and then merge the feature in later.
+using a central or master server. This makes it possible to commit changes locally without needing
+a connection to any server. DVCSs also have advanced branching and merging tools, making it easier
+to branch to develop experimental features, and then merge the feature in later.
 
 Another advantage is being able to ``push'' the repository to any number of remote locations, as
-an online copy or backup. In fact I used this as my backup strategy, keeping everything related to
-my project in my repository and pushing every few hours to two different servers. This became very
-helpful when my laptop broke and was unusable for a week. While it was being repaired I was still
-able to work on my project without any difficulties. I simply cloned the repository from the
-server copy onto the PWF computers and continued working.
+an online copy or backup. I will use this as my backup strategy, keeping everything related to
+my project in my repository and pushing every few hours to two different servers.
 
 While most DVCSs are very similar, I chose Git as it is the version control system I have the most
 familiarity with.
@@ -435,9 +461,9 @@ In order to ensure I can have confidence that my project works correctly I will 
 tests. I will write unit tests for the main modules of my project that will test its
 functionality, both for expected input and also that it handles bad and malformed input correctly
 and as expected. Tests are also useful for expressing the API usage of the different modules of
-the project and checking that the interfaces connect sensibly. I will make sure I implement
-regression testing, that is, every time there I fix a bug I will add a test ensuring any
-regression causing the bug again will make the test fail.
+the project and checking that the interfaces connect sensibly. I will perform regression testing,
+that is, every time there I fix a bug I will add a test ensuring any regression causing the bug
+again will make the test fail.
 
 I will run tests every time I make a commit, as they are quick to run and are a good confirmation
 that the project is working as expected. Twisted has a unit testing framework that I will use as
@@ -572,6 +598,7 @@ the cost of lack of availability in a network partition.
 
 \subsection{Introduction}
 
+% XXX make this more cohesive
 Paxos is a distributed consensus algorithm. Paxos is failure tolerant for up to $F$
 simultaneous failures in a network of $2F + 1$ nodes.
 % S comment: Explain why this is true (ie, showing some working)
@@ -703,12 +730,25 @@ be higher than any proposal numbers $P$ has sent for this instance of Paxos.
 
 \paragraph{Phase 2}
 
-If the Proposer receives  replies from a quorum of acceptors, $Q$,
+If the Proposer receives replies from a quorum of acceptors, $Q$,
 to its \msg{Prepare(n)} message, it sends the message \msg{AcceptRequest(n, v)} to all
 $q \in Q$, where $v$ is defined as follows. If the message set $M$ is defined as
-${(n, v) for all \msg{Promise(n, v)}}$, $v$ is defined as
-$(n', v) \in M. \forall (n'', v'') \in M.  n' \ge n''$.
-Informally, $v$ the value of the maximum \msg{Promise(n, v)} received.
+\begin{displaymath}
+M = \{(\eta, \nu)~|~\msg{Promise(n, \bm{\eta}, \bm{\nu})}~\textrm{received by}~P\}
+\end{displaymath}
+then $v$ is defined as
+\begin{displaymath}
+(\eta', v) \in M.~\forall~(\eta'', \nu'') \in M.~\eta' \ge \eta''
+\end{displaymath}
+That is, if $\sqsupset$ is an ordering over \msg{Promise} messages such that
+\begin{displaymath}
+	\msg{Promise(n, \bm{\eta_1}, \bm{\nu_1})} \sqsupset \msg{Promise(n, \bm{\eta_2}, \bm{\nu_2})}
+	\iff \eta_1 > \eta_2
+\end{displaymath}
+then informally, $v$ is the value of the maximum \msg{Promise(n, $\bm{\eta}$, $\bm{\nu}$)} received by
+$P$.\footnote{
+As this is all in response to $P$'s \msg{Prepare(n)} message, $n$ has the same value for
+every \msg{Promise} message in this phase.}
 
 \subsubsection*{Acceptor}
 
@@ -726,7 +766,7 @@ If an Acceptor $A$ receives a message \msg{Prepare(n)}, and $n > \rho$, then it 
 message \msg{Promise(n, $\bm{\eta}$, $\bm{\nu}$)} and sets $\rho$ to $n$. This means it will not
 accept any proposals numbered less than $n$. If it has not accepted any proposals yet then $\eta$
 and $\nu$ will still be set to their initial values.
-% XXX
+% XXX: does this need review?
 
 \paragraph{Phase 2}
 
@@ -747,7 +787,6 @@ decision by sending an \msg{AcceptNotify(n, v)} message to them.
 
 \subsubsection*{Learner}
 
-% XXX: pseudo code?
 Learners must store a map of proposal numbers $\rightarrow$ acceptor IDs. When a Learner receives a
 message \msg{AcceptNotify(n, v)} from an Acceptor $A$, it must add $A$ to the set of Acceptors who
 have accepted proposal $n$. When this set becomes a quorum (ie, the size of the set $S$ becomes
@@ -873,7 +912,7 @@ subsequent \msg{AcceptRequest} message to a quorum of Acceptors, consensus will 
 \item \msg{Promise(3):} and they promise not to accept proposals $\ge 3$
 \end{enumerate}
 
-% XXX
+% XXX: elaborate on this a little
 This cycle can continue indefinitely, but the probability of it doing so becomes very small very
 quickly.
 
@@ -899,9 +938,11 @@ which I will go into in my evaluation chapter.
 
 \section{Event Driven Programming}
 
-Event Driven Programming is a paradigm that involves structuring the program flow around events
+structuring the program flow around events
 that occur. For a distributed application this mainly means in response to network packets
-arriving, but can also be caused by user input or by timers firing. Program flow is co-ordinated
+arriving, but can also be caused by user input or by timers firing.
+
+Event Driven Programming is a paradigm that involves an event handling loop. Program flow is co-ordinated
 by an event loop, which calls appropriate callbacks when events occur. When the event is handled,
 execution yields to the event loop again, which handles the next event. This means the code is not
 concurrent and does not need to be thread safe, which makes reasoning about it a lot simpler.
@@ -911,6 +952,11 @@ an interface and have a callback be passed events that occur.
 A useful class that Twisted provides is the Deferred class. This represents the ``promise'' of a
 value which has not actually been learnt yet. It can be passed around in place of the value, and
 callbacks added to it in a chain that will be called when the value is finally learnt.
+
+% XXX mention development etc
+This became very helpful when my laptop broke and was unusable for a week. While it was being
+repaired I was still able to work on my project without any difficulties. I simply cloned the
+repository from the server copy onto the PWF computers and continued working.
 
 \section{Module Design}
 
@@ -937,25 +983,18 @@ sure how to implement in code various concepts outlined in the academic papers I
 \emph{Paxos Made Simple} \cite{lamport01}), I wanted to iterate from one prototype of the protocol
 to another quickly, adding features as I began to understood how the protocol worked better.
 
-My initial prototype was a synchronous model that sent messages internally. I quickly decided to
-change to Twisted, as I hoped the support it would give me would make writing the protocol easier.
-
 \subsubsection*{Messages}
 
 \label{sec:message-serialization}
 
-I initially decided to use a class hierarchy to define messages, and to use a simple
-serialization/deserialization technique, transmitting messages in the form
-\verb+"<message type>":<proposal serialization>+. I decided to send messages as simple strings
+I eventually moved to sending a dictionary in plain string format over the network. This allowed
+me to specify arbitrary key/value pairs without having to add in extra support for them.
+
+I decided to send messages as simple strings
 over the network for a number of reasons - for a prototype implementation speed was not my primary
 concern, iterating towards the most complete and correct solution in a reasonable period of time
 was. Furthermore, even if my priority was speed, optimising the message format felt like a
 premature optimisation, and using a binary format would vastly hinder my debugging.
-
-In hindsight restricting messages to only a combination of message type and proposal attributes
-was unnecessarily restrictive. An advantage of constructing them in this way was to prevent typos
-in creating messages (cf. \verb+send(Msg({"msg_type": "accept_requst", ...}))+
-and \verb+send(Msg({"msg_type": "accept_request", ...}))+).
 
 Although security was not a major concern for this project, I wanted to be able to serialize
 arbitrary objects without allowing remote code execution on a host running my software - even
@@ -964,22 +1003,6 @@ has a builtin function called \verb+literal_eval+ which only evaluates literals 
 lists and dictionaries), and nothing unsafe (classes, functions) which could be used to run
 arbitrary code.
 
-I eventually moved to sending a dictionary in plain string format over the network. This allowed
-me to specify arbitrary key/value pairs without having to add in extra support for them (a
-limitation I initially struggled with before moving to this format). This greatly simplified a lot
-of logic, at the cost of trusting that messages received are well formed.  However, this is not
-too problematic for several reasons - firstly, if the message is not well formed, the code will
-throw an exception, which will be caught by the message handler and discarded. Paxos allows for
-any message to be ignored or dropped and still guarantees correctness (it must do this in order to
-work if a packet is dropped in the network or delayed indefinitely). If correctness of the message
-needed to be verified, it would be relatively easy to add a checksum of some kind, a very simple
-form of this is found in the \emph{netstring} format (defined by DJB at
-\verb+http://cr.yp.to/proto/netstrings.txt+). This is easily added to my classes by making them
-inherit from \verb+NetstringReceiver+ rather than \verb+DatagramProtocol+, and using
-the \verb+stringReceived+ callback rather than the \verb+datagramReceived+ callback. In any case,
-it is beyond the scope of this project to deal with malicious nodes, so I did not spend a
-significant amount of time considering this problem.
-
 \subsubsection*{Hosts}
 
 I first used a tuple of \verb+(IP Address, Port Num)+ to identify hosts. However there turned out
@@ -987,8 +1010,8 @@ to be a number of problems with this. Firstly as an identifying scheme it is not
 interfaces. Also there is a significant problem if a node needs to identify itself (a pertinent
 example is for the \op{ATTEMPTLOCK} operation). After I changed the message format to a generic
 dictionary format, I wanted to add an attribute specifying the sender. This is difficult to do
-using tuple format, as it is non-trivial for a host to obtain its own IP address, it may be on a
-local network or behind a NAT for example.
+using the tuple format, as it is non-trivial for a host to obtain its own IP address since, for
+example, it may be on a local network or behind a NAT.
 
 For this reason, I updated the code to use a \emph{globally unique identifier} (GUID). This is
 better than using a tuple for the reasons identified above - the host is now aware of its own
@@ -1000,7 +1023,6 @@ request. This is a more pertinent problem because I am using UDP, which is easie
 TCP. Although a fully secure implementation is beyond the scope of this project, one potential
 solution would be to sign or authenticate messages, and include this signature or MAC with the
 message.
-
 
 \subsection{Protocol Extras}
 
@@ -1037,6 +1059,7 @@ discussed later on.
 
 \subsubsection{Heartbeat}
 
+% XXX: several pings?
 In order to identify when a node leaves the network, when a node initialises it starts a timer on
 a configurable timeout and sends a \msg{Ping} message to every node in its \verb+hosts+ attribute.
 It then copies the \verb+hosts+ set to a \verb+timeout_hosts+ set. As it receives a reply from a
@@ -1077,8 +1100,6 @@ if $p_1$ has crashed, $p_2$ must go through $\varphi_2 - \varphi_1$ messages, an
 (\varphi_2 - \varphi_1)$ seconds before it gets a response ($p_2$ will know $A$ still exists
 because it will still respond to \msg{PING} messages).
 
-% XXX split this into NACK, and NACK + p_2
-
 A faster method is to introduce a new message type \msg{NACK}. If $A$ sends $p_2$ a \msg{NACK}
 message containing the $\varphi_2$, $p_2$ can update its current proposal number to $\varphi_2 +
 1$, and not even have to wait for one timeout period before receiving a \msg{Promise} message. A
@@ -1091,8 +1112,6 @@ between Proposer and Acceptor until the Proposer catches up with the Acceptor. W
 message bounce by adding information to the \msg{NACK} message specifying the proposal number the
 Acceptor has accepted, allowing the Proposer to update the proposal number it tries immediately.
 This is ``NACK version 2''.
-
-% can speed up even further by adding information (correct answer)
 
 With either of these versions of the extension, the protocol still has protection from dropped or
 lost messages (the safety and liveness properties are still preserved), but in the case of a
@@ -1168,10 +1187,6 @@ implemented encapsulated in the mixin class.
 
 \subsubsection{Proposer}
 
-% XXX: Should this be psuedo code?
-% XXX: state diagram
-% XXX: variables saved in instance state?
-
 \begin{tabular}{ | c | p{7cm} | }
   \hline
   {\bf Variable} & {\bf Usage} \\ \hline
@@ -1182,7 +1197,6 @@ implemented encapsulated in the mixin class.
   \verb+proposer_prev_prop_num+ & highest proposal number accepted by any acceptor in \verb+quorum+ \\ \hline
   \verb+proposer_prev_prop_value+  & value corresponding to \verb+proposer_prev_prop_num+ \\ \hline
 \end{tabular}
-
 
 The Proposer mixin is the most complicated out of the three roles. It is a simple state
 machine with 3 states: ``idle'', ``trying'' and ``polling''. The Proposer initialises the state to
@@ -1250,17 +1264,20 @@ The Acceptor role is a fairly simple class that only stores three variables in e
 
 The implementation is a near-direct version of the description of the algorithm in the Preparation
 section.
+due to event programming and way algorithm works
 
-% XXX!!!!
-When an acceptor receives a \msg{Prepare(n)} if $n > $
-If an acceptor $A$ receives a message , and $n > \rho$, then it replies with the
-message \msg{Promise(n, $\bm{\eta}$, $\bm{\nu}$)}, meaning that it will not accept any proposals
-numbered less than $n$.
+\paragraph{Phase 1}
+
+% XXX: review
+When an acceptor receives a message \msg{Prepare(n)} from a Proposer $P$, if $n > \verb|acceptor_prepare_prop_num|$
+then it updates \verb|acceptor_prepare_prop_num| to $n$ and
+% sends a reply of the form \msg{Promise(n, \verb+acceptor_cur_prop_num+, \verb+acceptor_cur_prop_value+)}.
 
 \paragraph{Phase 2}
 
-If an acceptor receives a message \msg{AcceptRequest(n, v)}, if $n > \rho$ it accepts the
-proposal, settings $\eta := n$ and $\nu := v$. It also notifies Learners in the network of its
+If an Acceptor receives a message \msg{AcceptRequest(n, v)}, if $n > \verb|acceptor_prepare_prop_num|$
+it accepts the proposal. This involves setting $\verb|acceptor_cur_prop_num| := n$ and
+$\verb|acceptor_cur_prop_value| := v$. It also notifies Learners in the network of its
 decision by sending an \msg{AcceptNotify(n, v)} message to them.
 
 % XXX: is this PMS or PTP??
@@ -1274,6 +1291,8 @@ resilient to failures, and therefore the one I have chosen to implement. By cont
 method generates $A + L$ messages, and the second generates $D\times A + L$ messages, where $D$ is
 the size of the set of distinguished Learners.
 
+% XXX: finish
+proposer messages own acceptor
 
 \subsubsection{Learner}
 

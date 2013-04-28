@@ -171,7 +171,7 @@ Parliament} \cite{lamport98}.  The paper was first submitted for review in 1990 
 which portrayed the protocol as a physical voting system in Ancient Greece, meant that it was not
 published in a journal for a further eight years. Paxos has enjoyed a similarly colourful history.
 
-Lamport tried to disprove the existance of a protocol with its properties. Instead, he ended up
+Lamport tried to disprove the existence of a protocol with its properties. Instead, he ended up
 developing Paxos.
 
 Despite his assertion in \emph{Paxos Made Simple} \cite{lamport01}, Paxos has a reputation for
@@ -240,7 +240,7 @@ phase into two, the pre-commit phase and the finalise phase.
 If the co-ordinator crashes, the recovery node can now reconstruct the state from any node in the
 cohort. If a node is in the pre-commit phase, then every node must have voted commit and it is
 safe to finish the protocol by telling all nodes to commit. If any node is not in the pre-commit
-phase, then the operation has not been commited, as no node can have moved to the finalise phase
+phase, then the operation has not been committed, as no node can have moved to the finalise phase
 if any node is not yet in the pre-commit phase.
 
 3PC still suffers from a flaw however in that it cannot recover from network partition. If the
@@ -296,7 +296,7 @@ This is in contrast to 3PC, which provides availability.
 
 However, a potential drawback to this is that Paxos does sacrifice availability. This is in the
 form of a pathological case where it will not make
-progress, ie, there is no upper bound on the time it will take to achieve consensus (it may never
+progress, i.e., there is no upper bound on the time it will take to achieve consensus (it may never
 terminate). This is due to the FLP impossibility proof \cite{fischer85}, which states that it is
 impossible to guarantee liveness in an asynchronous network where there is at least one failure.
 In practice it is a situation that is relatively easy to avoid, and is not a serious concern.
@@ -343,7 +343,7 @@ is easier to maintain the integrity of data on a centralised database, as there 
 In contrast, distributed databases are more resilient and scalable than centralised databases.
 There is no longer a single point of failure, and they can be extended by adding nodes, although
 this will have a point of diminishing returns. Distributed databases are often more complex in
-design, as they have to ensure consistency between nodes \footnote{although there is a recent trend to
+design, as they have to ensure consistency between nodes \footnote{Although there is a recent trend to
 relax this constraint in certain ``NoSQL'' databases. Here I will only consider traditional RDBMS
 systems.} In particular, distributed databases can be slow accessing non local data.
 
@@ -971,7 +971,7 @@ are passed through the different layers. The DBP Core class is the main event ha
 operations down to Paxos through the Manager class to be committed to the network. The Manager
 class receives operations from Paxos in the order they are learnt. It then passes operations up to
 the DBP Core class in order, as they become available. An operation is available if the operation
-that precedes it has been received, ie, every operation before it is also available. The DBP Core
+that precedes it has been received, i.e., every operation before it is also available. The DBP Core
 class then interfaces with the database, which is a simple row-based table.
 
 \section{Paxos Design}
@@ -1049,13 +1049,12 @@ architecture this can be any node, however in a different model it may be a spec
 Evaluation chapter for more details involving scaling. When a node $N$ connects to the bootstrap
 node $B$, it sends an \msg{EHLO} message. $B$ replies with a \msg{Notify} message containing all the
 hosts $B$ is aware of. $N$ then sends each of these in turn \msg{EHLO} message, making each of them
-aware of its presence, and getting a \msg{Notify} message from each othem. This is repeated until
-there are no nodes it has not learned of. $N$ is then fully integrated into the network.
-
+aware of its presence, and getting a \msg{Notify} message from each of them. This is repeated until
+there are no nodes it has not learned of. $N$ is then fully integrated into the network.\footnote{
 Note that this bootstrap method is $N^2$ in the number of messages sent. There are other ways to
 do bootstrap that are more efficient in the number of messages sent (for instance a DHT or a
 supernode hierarchy). While this architecture is out of the scope of this project these options are
-discussed later on.
+discussed later on.}
 
 \subsubsection{Heartbeat}
 
@@ -1073,7 +1072,7 @@ The simple way MultiPaxos is implemented is multiple instances of Paxos operatin
 Paxos is implemented as a state machine, with the instance state as a Python dictionary and
 transitions as methods. A simple way to implement MultiPaxos is to have every transition method
 take an instance dictionary as an argument and operate on that. One problem with this approach is
-that if any initial messages (\msg{Prepare}, \msg{AcceptRequest}, etc) are not received, the
+that if any initial messages (\msg{Prepare}, \msg{AcceptRequest}, etc.) are not received, the
 initial state is not constructed.
 
 For certain messages that are not linked to any particular instance of Paxos, the message
@@ -1084,6 +1083,9 @@ in their message dictionary.
 
 \subsection{Implementing NACKS}
 
+\label{sec:nacks}
+
+% XXX: no mixin!
 Paxos is designed to be preserve its safety and liveness properties even when messages are dropped
 or lost. In order to account for messages being lost, the algorithm must retry when there is a
 timeout (see explanation of Proposer mixin). This is done with timeouts. In fact, the simplest
@@ -1239,7 +1241,7 @@ the quorum then the Proposer is free to set its own value for that instance. Thi
 the Proposer has been directed to set a value $v_1$ and is forced by the protocol to set a
 different value $v_2$, as $v_2$ has already been accepted by a node in the network, it starts a
 new instance of Paxos with $v_1$ as the value, to ensure $v_1$ is eventually committed to the
-network. This restart may be skipped if we are merely ``chasing up'' a value, ie there is a gap in
+network. This restart may be skipped if we are merely ``chasing up'' a value, i.e. there is a gap in
 the operation log and we need to ascertain the value.
 
 
@@ -1300,7 +1302,7 @@ The Learner agent is the simplest out of the three agents. Its only state is a d
 each proposal number to a set of Acceptors who have accepted that proposal.
 
 When the Learner receives an \msg{AcceptNotify} message, it adds it to the set of Acceptors for
-that proposal number. It then checks whether the set constitutes a quorum (ie, is a majority of
+that proposal number. It then checks whether the set constitutes a quorum (i.e., is a majority of
 Acceptors). If so, it sets the \verb+status+ variable to \verb+"completed"+ and sets the
 \verb+value+ variable to the value of the proposal. It finally calls the instance callback with
 the instance data itself, this is so the upper layer can handle the ``learned'' information in a
@@ -1314,12 +1316,10 @@ the instance ID and learnt value.
 
 \subsection{NACKs Improvement}
 
-% tie this back in
-
-As a potential improvement to the protocol I added support for \msg{NACK} messages, which is
-configurable at run time. This was relatively simple to implement, I first abstracted out the
-timeout behaviour into its own method, then whenever a \msg{NACK} is received, this method is
-called, initiating the timeout behaviour without having to wait for an actual timeout.
+As a potential improvement to the protocol I added support for \msg{NACK} messages (as described
+in section~\ref{sec:nacks}). I abstracted out the timeout behaviour into its own method
+\verb|handle_reject|, then called this method whenever a \msg{NACK} is received, thus initiating
+the timeout behaviour without having to wait for an actual timeout.
 
 \subsection{Startup Improvement}
 
@@ -1335,12 +1335,11 @@ breaks.
 
 For large peer-to-peer networks there are several mature techniques that could be used to manage a
 network of scale efficiently. One of these is using ``supernodes'' --- nodes designated either
-through bandwidth or chosen randomly to co-ordinate their child nodes, reducing the message
-overhead from $N^2$ to $S^2$ where $S$ is the number of supernodes. Another technique is the use
-of Distributed Hashing Tables (DHTs) to manage nodes. This involves computing a measure or
+through bandwidth or chosen randomly to co-ordinate their child nodes.  Another technique is the
+use of Distributed Hashing Tables (DHTs) to manage nodes. This involves computing a measure or
 pseudo-measure of ``distance'' to other nodes, then having nodes only contact their
-``neighbours'', rather than the entire network. However I did not have time to investigate these
-options.
+``neighbours'', rather than the entire network. Unfortunately I did not have time to investigate
+these options for my project.
 
 \section{Database Design}
 
@@ -1447,7 +1446,7 @@ inserted at OID 3 - from this $N$ can tell that at $t_2$ the latest operation in
 
 My first implementation of transactions was a very na\"ive global lock. In order to start a
 transaction, a node inserts the \op{ATTEMPTLOCK} operation. If, when the operation is inserted, the
-number of \op{ATTEMPTLOCK}s is well-bracketed (ie, there is an equal number of lock takes and
+number of \op{ATTEMPTLOCK}s is well-bracketed (i.e., there is an equal number of lock takes and
 releases), then the node was successful in taking the lock. While a node holds the lock, no other
 node can perform an operation (the operations are inserted in the transaction log but ignored).
 
@@ -1923,7 +1922,7 @@ effective in a network with low contention.
 \subsection{Durability}
 
 A large part of contemporary database design involves ensuring that database operations persist
-ie, durability - the ``D'' from ACID. My project did not support stable storage as a means of
+i.e., durability - the ``D'' from ACID. My project did not support stable storage as a means of
 ensuring durability and extending this, through the use of write-ahead logs (WAL) and or shadow
 paging, would be a high priority given more time.
 

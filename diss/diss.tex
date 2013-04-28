@@ -774,25 +774,15 @@ If an Acceptor receives a message \msg{AcceptRequest(n, v)}, if $n > \rho$ it ac
 proposal, setting $\eta := n$ and $\nu := v$. It also notifies Learners in the network of its
 decision by sending an \msg{AcceptNotify(n, v)} message to them.
 
-% % XXX: is this PMS or PTP??
-% \emph{Paxos Made Simple} \cite{lamport01} describes several different ways of notifying Learners
-% of accepted proposals. One way is to specify a \emph{distinguished Learner}, who then notifies
-% other Learners when a quorum of Acceptors has accepted a proposal. This can also be extended to specify several
-% distinguished Learners. or we can broadcast all \msg{AcceptRequest} messages to all Learners.
-% While this method generates $L\times A$ messages (where $L$ is the number of Learners in the
-% network and $A$ is the number of Acceptors in the network), it is the simplest and the most
-% resilient to failures, and therefore the one I have chosen to implement. By contrast, the first
-% method generates $A + L$ messages, and the second generates $D\times A + L$ messages, where $D$ is
-% the size of the set of distinguished Learners.
-
 \subsubsection*{Learner}
 
-Learners must store a map of proposal numbers $\rightarrow$ acceptor IDs. When a Learner receives a
-message \msg{AcceptNotify(n, v)} from an Acceptor $A$, it must add $A$ to the set of Acceptors who
-have accepted proposal $n$. When this set becomes a quorum (ie, the size of the set $S$ becomes
-greater than $\frac{N}{2}$, where $N$ is the size of the network), the Learner can ``learn'' the $v$ as
-the value decided on for that instance of Paxos. Because of the properties of Paxos, once a quorum
-of acceptors has accepted the proposal ($n$, $v$), the value of that instance will never change.
+For each proposal number, Learners must store a set containing the GUIDs of all Acceptors who have
+accepted that proposal. When a Learner receives a message \msg{AcceptNotify(n, v)} from an
+Acceptor $A$, it must add $A$ to the set of Acceptors who have accepted proposal $n$. When this
+set becomes a quorum (ie, the size of the set $S$ becomes greater than $\frac{N}{2}$, where $N$ is
+the size of the network), the Learner can ``learn'' the $v$ as the value decided on for that
+instance of Paxos. Because of the properties of Paxos, once a quorum of acceptors has accepted the
+proposal ($n$, $v$), the value of that instance will never change.
 
 \subsection*{Examples}
 
@@ -938,22 +928,17 @@ which I will go into in my evaluation chapter.
 
 \section{Event Driven Programming}
 
-structuring the program flow around events
-that occur. For a distributed application this mainly means in response to network packets
-arriving, but can also be caused by user input or by timers firing.
+% XXX: round out
+Event Driven Programming is a programming paradigm in which program flow is determined by events
+that occur. Program flow is co-ordinated by an event handling loop, which calls appropriate
+callbacks when the events they are registered for occur.
 
-Event Driven Programming is a paradigm that involves an event handling loop. Program flow is co-ordinated
-by an event loop, which calls appropriate callbacks when events occur. When the event is handled,
-execution yields to the event loop again, which handles the next event. This means the code is not
-concurrent and does not need to be thread safe, which makes reasoning about it a lot simpler.
 Twisted provides the event loop and network interfaces, so it is relatively trivial to listen on
 an interface and have a callback be passed events that occur.
 
-A useful class that Twisted provides is the Deferred class. This represents the ``promise'' of a
-value which has not actually been learnt yet. It can be passed around in place of the value, and
-callbacks added to it in a chain that will be called when the value is finally learnt.
+\section{Development}
 
-% XXX mention development etc
+% XXX: development etc
 This became very helpful when my laptop broke and was unusable for a week. While it was being
 repaired I was still able to work on my project without any difficulties. I simply cloned the
 repository from the server copy onto the PWF computers and continued working.
@@ -967,17 +952,19 @@ repository from the server copy onto the PWF computers and continued working.
 \end{figure}
 
 Figure~\ref{fig:module-layout} shows the basic design for the code, illustrated with how objects
-are passed through the different layers. The DBP Core class is the main event handler, passing
-operations down to Paxos through the Manager class to be committed to the network. The Manager
-class receives operations from Paxos in the order they are learnt. It then passes operations up to
-the DBP Core class in order, as they become available. An operation is available if the operation
-that precedes it has been received, i.e., every operation before it is also available. The DBP Core
-class then interfaces with the database, which is a simple row-based table.
+are passed through the different layers. The Database Controller passes operations down to Paxos
+through the Ordered Transport class to be committed to the network. The Ordered Transport class
+also receives operations from Paxos in the order they are learnt. It then passes operations up to
+the Database Controller in order, as they become available. An operation is available if the
+operation that precedes it has been received, i.e., every operation before it is also available.
+The Database Controller class then interfaces with the Row Store, which contains the current
+version of the database.
 
 \section{Paxos Design}
 
 \subsection{Protocol Design}
 
+% XXX: reword
 As I found initially found the concept of Paxos and how it works reasonably confusing, and wasn't
 sure how to implement in code various concepts outlined in the academic papers I read (mainly
 \emph{Paxos Made Simple} \cite{lamport01}), I wanted to iterate from one prototype of the protocol
@@ -1059,7 +1046,7 @@ discussed later on.}
 \subsubsection{Heartbeat}
 
 % XXX: several pings?
-In order to identify when a node leaves the network, when a node initialises it starts a timer on
+To identify when a node has left the network, when a node initialises it starts a timer on
 a configurable timeout and sends a \msg{Ping} message to every node in its \verb+hosts+ attribute.
 It then copies the \verb+hosts+ set to a \verb+timeout_hosts+ set. As it receives a reply from a
 host it removes that host from the \verb+timeout_hosts+ set. When the timeout fires, any nodes who
@@ -1068,122 +1055,108 @@ the \verb+hosts+ set.
 
 \subsection{MultiPaxos}
 
-The simple way MultiPaxos is implemented is multiple instances of Paxos operating in parallel.
-Paxos is implemented as a state machine, with the instance state as a Python dictionary and
-transitions as methods. A simple way to implement MultiPaxos is to have every transition method
-take an instance dictionary as an argument and operate on that. One problem with this approach is
-that if any initial messages (\msg{Prepare}, \msg{AcceptRequest}, etc.) are not received, the
-initial state is not constructed.
-
-For certain messages that are not linked to any particular instance of Paxos, the message
-attribute \verb+"instance_id"+ is sent with value \verb+None+, for all other messages the instance
-id is an integer referring to the OID of the instance of Paxos running. For example, all messages
-corresponding to OID 2 in the operation log would have the attribute \verb+"instance_id": 2+ set
-in their message dictionary.
+MultiPaxos is implemented by running multiple instances of Paxos in parallel. Every message
+handler method takes an instance state dictionary as an argument and operates on it.
+% XXX: expand
 
 \subsection{Implementing NACKS}
 
 \label{sec:nacks}
 
-% XXX: no mixin!
-Paxos is designed to be preserve its safety and liveness properties even when messages are dropped
-or lost. In order to account for messages being lost, the algorithm must retry when there is a
-timeout (see explanation of Proposer mixin). This is done with timeouts. In fact, the simplest
-implementation of Paxos uses ignored packets to communicate between nodes - if a message doesn't
-\emph{require} a response it just ignores it.
+Paxos is designed to preserve its safety and liveness properties even when messages are dropped or
+lost. In fact, the most basic implementation of Paxos simples ignores messages if they do not
+require a response, as the protocol detects a timeout and acts accordingly (this often means
+retrying with a higher proposal number).
 
-An example where this happens in cases such as if an Acceptor $A$ has accepted a proposal
-$\mathcal{P}_1$ from Proposer $p_1$, with a proposal number of $\varphi_1$. $A$ then receives a
-\msg{Prepare} message $M$ from Proposer $p_2$. $M$ has proposal $\mathcal{P}_2$, such that
-$\mathcal{P}_2$ has proposal number $\varphi_2$ and $\varphi_1 > \varphi_2$. In my original
-implementation of Paxos, $A$ would simply drop the message $M$, and leave it until the timeout $t$
-for $p_2$ to resend $M$ with a higher proposal number. This has the significant disadvantage that
-if $p_1$ has crashed, $p_2$ must go through $\varphi_2 - \varphi_1$ messages, and $t\times
-(\varphi_2 - \varphi_1)$ seconds before it gets a response ($p_2$ will know $A$ still exists
-because it will still respond to \msg{PING} messages).
+For example consider when an Acceptor $A$ accepts a proposal $\mathcal{P}_1$ from Proposer $p_1$
+with a proposal number of $\varphi_1$. $A$ then receives a \msg{Prepare} message $M$ from Proposer
+$p_2$. $M$ has proposal $\mathcal{P}_2$, such that $\mathcal{P}_2$ has proposal number $\varphi_2$
+and $\varphi_1 > \varphi_2$. In my original implementation of Paxos, $A$ would simply drop the
+message $M$ and $p_2$ would only resend $M$ with a higher proposal number after the timeout period
+$t$.  This has the significant disadvantage that if $p_1$ has crashed, $p_2$ must go through
+$\varphi_2 - \varphi_1$ messages, and $t\times (\varphi_2 - \varphi_1)$ seconds before it gets a
+response.\footnote{$p_2$ will know $A$ is still part of the network because it will still respond
+to \msg{PING} messages.}
 
-A faster method is to introduce a new message type \msg{NACK}. If $A$ sends $p_2$ a \msg{NACK}
-message containing the $\varphi_2$, $p_2$ can update its current proposal number to $\varphi_2 +
-1$, and not even have to wait for one timeout period before receiving a \msg{Promise} message. A
-disadvantage of this extension to the protocol is that it can increase the probability of duelling
-proposers, and therefore increase the latency of the protocol. I shall discuss this in my
-evaluation.
+By introducing a new message type \msg{NACK} $p_2$ can reach this state a lot faster. If $A$ sends
+$p_2$ a \msg{NACK} message containing the $\varphi_2$, $p_2$ can update its current proposal
+number to $\varphi_2 + 1$, and not even have to wait for one timeout period before receiving a
+\msg{Promise} message. A disadvantage of this extension to the protocol is that it can increase
+the probability of duelling proposers, and therefore increase the latency of the protocol. I shall
+discuss this in my evaluation.
 
 However, this still exhibits ``ping pong'' behaviour, with \msg{NACK}s and \msg{Prepare}s bouncing
-between Proposer and Acceptor until the Proposer catches up with the Acceptor. We can remove this
-message bounce by adding information to the \msg{NACK} message specifying the proposal number the
+between Proposer and Acceptor until the Proposer catches up with the Acceptor. This message bounce
+can be removed by adding information to the \msg{NACK} message specifying the proposal number the
 Acceptor has accepted, allowing the Proposer to update the proposal number it tries immediately.
 This is ``NACK version 2''.
 
 With either of these versions of the extension, the protocol still has protection from dropped or
-lost messages (the safety and liveness properties are still preserved), but in the case of a
+lost messages (as the safety and liveness properties are still preserved), but in the case of a
 crashed Proposer, the recovery should be far quicker.
 
 \section{Paxos Implementation}
 
 \subsection{Node}
 
-The \verb+Node+ class is the manager class for a Paxos node, and co-ordinates between the three
-role mixins. It handles message dispatch and instance handling as explained below, as well as
-managing the quorum size, which needs to be managed accurately for decisions made by both the
-Proposer and Learner roles, through heartbeat and network discovery.
+The \verb+Node+ class handles message dispatch and instance handling for each Paxos node. It also
+manages the size of a quorum in the network by keeping track of which nodes are still members of
+the network. This needs to be tracked accurately for decisions made by both the Proposer and
+Learner roles to be valid.
 
 \subsubsection{Message Dispatch}
 
 As mentioned in Section~\ref{sec:how-paxos-works}, the actions of a node can be split into three
 roles. I implemented Paxos by splitting the responsibilities into the three roles. I then made a
 handler class for each role that only implemented the functionality required for that role
-(\verb+Proposer+, \verb+Acceptor+, \verb+Learner+). Each class implements methods to handle a
-message type. The \verb+Node+ class then inherits from all three mixin classes, and delegates to
-each of them as appropriate. It does this by checking the \verb+msg_type+ attribute on a message,
-and then looking up a method called \verb+recv_<msg_type>+ on itself.
+(\verb+Proposer+, \verb+Acceptor+, \verb+Learner+). Each class implemented message handlers for
+the
+message type it is responsible for. The \verb+Node+ class then inherits from all three role classes and delegates to
+each class as appropriate, by checking the \verb+msg_type+ attribute on each message received
+and calling the method \verb+recv_<msg_type>+.
 
 For example, the \verb+Proposer+ class implements the \verb+recv_prepare+ method. When a node
 receives a \msg{Prepare} message, the \verb+msg_type+ attribute is set to \verb+"prepare"+. The
-\verb+datagramReceived+ callback is called by Twisted with the datagram as a string. The method
-parses the string serialization into a dictionary (as described in
-Section~\ref{sec:message-serialization}), checks the \verb+msg_type+ attribute, which is
-\verb+prepare+. It then looks up the \verb+"recv_prepare"+ method on itself, which is implemented
-by the \verb+Proposer+ subclass. It then calls \verb+self.recv_prepare+, passing in the message,
-and also the Paxos instance dictionary (described in section~\ref{sec:paxos-instance}). If an
-message is received with an unknown message type it is dropped, and a message is logged.
+\verb+datagramReceived+ callback is called by the event handler with the datagram as a string
+argument. The callback parses the message serialization into a dictionary and checks the
+\verb+msg_type+ attribute, which is \verb+prepare+. It then calls the \verb+"recv_prepare"+
+method, which is implemented by the \verb+Proposer+ superclass. It calls \verb+self.recv_prepare+
+with the message and the relevant instance dictionary. If a message is received with an unknown
+message type it is dropped and an error is logged.
 
-Once the instance's status is set to \verb+complete+, all messages for this instance are dropped -
-this prevents delayed messages restarting or affecting completed instances.
+Once the instance's status is set to \verb+complete+, all messages for this instance are dropped,
+preventing delayed messages from restarting or affecting completed instances.
 
-Below is a table outlining which message types are delegated to which mixin classes. \\
+Below is a table outlining which message types are delegated to which roles. \\
 
 \begin{tabular}{ | c | c | p{7cm} | }
   \hline
   {\bf Message type} & {\bf Handler Class} & {\bf Message action} \\ \hline
-  EHLO & Node & Respond with notify. \\ \hline
-  Notify & Node & Add hosts to host list. \\ \hline
-  Ping & Node & Send pong.  \\ \hline
-  Pong & Node & Remove host from timeout list. \\ \hline
-  Promise & Proposer & Respond with AcceptRequest and deal with timeouts. \\ \hline
-  AcceptRequest & Acceptor & Respond with AcceptNotify (if valid) and accept Proposal. \\ \hline
-  Prepare & Acceptor & Respond with Promise (if valid). \\ \hline
-  AcceptNotify & Learner & Record response and if a quorum has accepted that proposal, learn it. \\ \hline
+  \msg{EHLO} & Node & Respond with \msg{Notify}. \\ \hline
+  \msg{Notify} & Node & Add hosts to host list. \\ \hline
+  \msg{Ping} & Node & Send \msg{Pong}.  \\ \hline
+  \msg{Pong} & Node & Remove host from timeout list. \\ \hline
+  \msg{Promise} & Proposer & Respond with \msg{AcceptRequest} if sufficient \msg{Promises} received. \\ \hline
+  \msg{AcceptRequest} & Acceptor & Respond with \msg{AcceptNotify} (if valid) and accept Proposal. \\ \hline
+  \msg{Prepare} & Acceptor & Respond with \msg{Promise} (if valid). \\ \hline
+  \msg{AcceptNotify} & Learner & Record response and if a quorum has accepted that proposal, learn it. \\ \hline
 \end{tabular}
 
 \subsubsection{Instance Handling}
 
 \label{sec:paxos-instance}
 
-As noted in the previous section, message handlers are called with the message to be handled, but
-also with an instance dictionary with state information of the current instance of Paxos running.
-If the node running initiated the instance of Paxos, then when it initiated the instance it will
-have created an instance dictionary, but otherwise the first the node knows about the instance is
-when it receives the first message about it (likely to be a \msg{Prepare} message, but may not be
-due to dropped messages or not being include in the quorum of Acceptors).
+As noted in the previous section, message handlers are not only called with the message to be
+handled, but also with an instance dictionary with state information of the relevant instance of
+Paxos.  If the node running initiated the instance of Paxos, then it will have created an instance
+dictionary when it initiated the instance. Otherwise the first the node knows about the instance
+is when it receives the first message pertaining to it.
 
-When this happens, the datagram callback detects that the node has not encountered any instances
-with that instance ID before, and creates a new instance, storing it in the instance dictionary.
-To create a new instance state dictionary, it calls the \verb+create_instance+ method, which
-creates a new instance state. This contains a callback to be fired when a value is learnt for that
-instance of Paxos, and then calls a method from each of the three mixin classes, so they can add
-any variables that class uses to the instance state. This keeps knowledge of how each role is
-implemented encapsulated in the mixin class.
+When this happens, the message handler creates a new instance state by calling the
+\verb+create_instance+ method, and stores this in the instance dictionary.  The state contains a
+callback which is fired when a value is learnt for that instance. Each role class also initialises
+its own variables in the instance state, keeping each role implementation encapsulated in its own
+class.
 
 \subsection{Role Mixins}
 
@@ -1200,15 +1173,24 @@ implemented encapsulated in the mixin class.
   \verb+proposer_prev_prop_value+  & value corresponding to \verb+proposer_prev_prop_num+ \\ \hline
 \end{tabular}
 
-The Proposer mixin is the most complicated out of the three roles. It is a simple state
-machine with 3 states: ``idle'', ``trying'' and ``polling''. The Proposer initialises the state to
-the ``idle'' state. It then transitions to the ``trying'' state and sends \msg{Prepare} messages
-with a proposal number \verb+(p, <GUID>)+, where $p$ is normally 1, but may be different if we
-have reached the ``trying'' state from the timeout handler (described below). The \msg{Prepare}
-messages are sent to the Acceptors in the network which in my design is any node, as any node in
-the network can act as an Acceptor because the network is homogenous. It also stores the proposal
-number in the instance dictionary. It then schedules a timer to fire after the timeout period,
-which is specified in a configuration module.
+\begin{figure}[htb]
+\centering
+\lwincludegraphics[scale=0.5]{figs/proposer-state-machine.eps}
+\caption{\label{fig:proposer-state-machine}Proposer State Machine}
+\end{figure}
+
+The Proposer role is the most complicated of the three. It is implemented as a state machine with
+3 states: ``idle'', ``trying'' and ``polling'' (see figure~\ref{fig:proposer-state-machine}). The
+state machine starts in the ``idle'' state. It then transitions to the ``trying'' state and sends
+\msg{Prepare} messages to the Acceptors in the network. In my design this is any node as the
+network is homogenous.
+
+% XXX: finish
+It also stores the proposal number in the instance dictionary. It then
+schedules a timer to fire after the timeout period, which is specified in a configuration module.
+
+with a proposal number \verb+(p, <GUID>)+, where $p$ is normally 1, but may
+be different if we have reached the ``trying'' state from the timeout handler (described below).
 
 When the timer fires, Twisted will call the timeout function, \verb+handle_proposer_timeout+. We
 can specify the arguments we want Twisted to call \verb+handle_proposer_timeout+ with when we
@@ -1244,17 +1226,11 @@ new instance of Paxos with $v_1$ as the value, to ensure $v_1$ is eventually com
 network. This restart may be skipped if we are merely ``chasing up'' a value, i.e. there is a gap in
 the operation log and we need to ascertain the value.
 
-
-\begin{figure}[htb]
-\centering
-\lwincludegraphics[scale=0.5]{figs/proposer-state-machine.eps}
-\caption{\label{fig:proposer-state-machine}Proposer State Machine}
-\end{figure}
-
 \subsubsection{Acceptor}
 
 The Acceptor role is a fairly simple class that only stores three variables in each instance:
-
+\\
+\\
 \begin{tabular}{ | c | p{7cm} | }
   \hline
   {\bf Variable} & {\bf Usage} \\ \hline
@@ -1263,51 +1239,51 @@ The Acceptor role is a fairly simple class that only stores three variables in e
   \verb+acceptor_cur_prop_num+ & The current accepted Proposal - $\eta$ \\ \hline
   \verb+acceptor_cur_prop_value+ & The value of Proposal $\eta$, corresponds to $\nu$ \\ \hline
 \end{tabular}
-
+\\
+\\
 The implementation is a near-direct version of the description of the algorithm in the Preparation
 section.
-due to event programming and way algorithm works
 
 \paragraph{Phase 1}
 
 % XXX: review
-When an acceptor receives a message \msg{Prepare(n)} from a Proposer $P$, if $n > \verb|acceptor_prepare_prop_num|$
-then it updates \verb|acceptor_prepare_prop_num| to $n$ and
-% sends a reply of the form \msg{Promise(n, \verb+acceptor_cur_prop_num+, \verb+acceptor_cur_prop_value+)}.
+When an acceptor receives a message \msg{Prepare(n)} from a Proposer $P$, if $n >
+\verb|acceptor_prepare_prop_num|$ then \verb|acceptor_prepare_prop_num| is updated to $n$ and the
+Acceptor sends a reply of the form \msg{Promise(n, }\verb+acceptor_cur_prop_num+{\bf,}
+\verb+acceptor_cur_prop_value+{\bf)}.
 
 \paragraph{Phase 2}
 
-If an Acceptor receives a message \msg{AcceptRequest(n, v)}, if $n > \verb|acceptor_prepare_prop_num|$
-it accepts the proposal. This involves setting $\verb|acceptor_cur_prop_num| := n$ and
-$\verb|acceptor_cur_prop_value| := v$. It also notifies Learners in the network of its
-decision by sending an \msg{AcceptNotify(n, v)} message to them.
+When an Acceptor receives a message \msg{AcceptRequest(n, v)}, it accepts the proposal if $n >
+\verb|acceptor_prepare_prop_num|$. Accepting the proposal means setting $\verb|acceptor_cur_prop_num| := n$ and
+$\verb|acceptor_cur_prop_value| := v$, and then notifying Learners in the network of its decision by
+sending an \msg{AcceptNotify(n, v)} message to them.
 
 % XXX: is this PMS or PTP??
-\emph{Paxos Made Simple} \cite{lamport01} describes several different ways of notifying Learners
-of accepted proposals - we can specify a \emph{distinguished Learner}, who then notifies
-other Learners when a quorum of Acceptors has accepted a proposal, we can specify several
-distinguished Learners, or we can broadcast all \msg{AcceptRequest} messages to all Learners.
-While this method generates $L\times A$ messages (where $L$ is the number of Learners in the
-network and $A$ is the number of Acceptors in the network), it is the simplest and the most
-resilient to failures, and therefore the one I have chosen to implement. By contrast, the first
-method generates $A + L$ messages, and the second generates $D\times A + L$ messages, where $D$ is
-the size of the set of distinguished Learners.
+% \emph{Paxos Made Simple} \cite{lamport01} describes several different ways of notifying Learners
+% of accepted proposals - we can specify a \emph{distinguished Learner}, who then notifies
+% other Learners when a quorum of Acceptors has accepted a proposal, we can specify several
+% distinguished Learners, or we can broadcast all \msg{AcceptRequest} messages to all Learners.
+% While this method generates $L\times A$ messages (where $L$ is the number of Learners in the
+% network and $A$ is the number of Acceptors in the network), it is the simplest and the most
+% resilient to failures, and therefore the one I have chosen to implement. By contrast, the first
+% method generates $A + L$ messages, and the second generates $D\times A + L$ messages, where $D$ is
+% the size of the set of distinguished Learners.
 
 % XXX: finish
-proposer messages own acceptor
+% proposer messages own acceptor
 
 \subsubsection{Learner}
 
-The Learner agent is the simplest out of the three agents. Its only state is a dictionary mapping
+The Learner role is the simplest of the three. Its only state is a dictionary mapping
 each proposal number to a set of Acceptors who have accepted that proposal.
 
 When the Learner receives an \msg{AcceptNotify} message, it adds it to the set of Acceptors for
 that proposal number. It then checks whether the set constitutes a quorum (i.e., is a majority of
 Acceptors). If so, it sets the \verb+status+ variable to \verb+"completed"+ and sets the
 \verb+value+ variable to the value of the proposal. It finally calls the instance callback with
-the instance data itself, this is so the upper layer can handle the ``learned'' information in a
-flexible way (for example, outputting which nodes formed the majority), as well as merely learning
-the instance ID and learnt value.
+all the data for that instance, allowing the upper layer to process the ``learned'' value and any
+other useful information in the state.
 
 % when set size > quorum size:
 %   sets status := complete

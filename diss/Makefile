@@ -24,6 +24,8 @@ FIGS = figs/op-log.eps \
        figs/lat_20.eps \
        figs/lat_rev.eps \
        figs/lat_nack.eps \
+       figs/churn_lat.eps \
+       figs/churn_thru.eps \
        figs/start.eps
 
 DISS = diss.tex \

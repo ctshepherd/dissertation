@@ -1,7 +1,7 @@
 load "../style.gp"
 
-set title "Contention vs Latency with 20 nodes"
-set xlabel "Number of writers"
+set title "Latency vs Network Size"
+set xlabel "Number of nodes"
 set ylabel "Latency (s)"
 set output "lat_rev.eps"
 plot "lat_rev-p.csv" using 1:2 title "Paxos" with points, \

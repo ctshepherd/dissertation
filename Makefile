@@ -8,6 +8,7 @@ figs:
 	$(MAKE) -C lat
 	$(MAKE) -C thru
 	$(MAKE) -C start
+	$(MAKE) -C churn
 
 diss:
 	$(MAKE) -C diss

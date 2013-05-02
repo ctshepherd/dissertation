@@ -255,12 +255,18 @@ therefore cannot make a decision to commit or abort.
 3 Phase Commit is a modification to 2 Phase Commit that solves this problem by splitting the commit
 phase into two, the pre-commit phase and the finalise phase.
 
-% XXX: rewrite
-If the co-ordinator crashes, the recovery node can now reconstruct the state from any node in the
-cohort. If a node is in the pre-commit phase, then every node must have voted commit and it is
-safe to finish the protocol by telling all nodes to commit. If any node is not in the pre-commit
-phase, then the operation has not been committed, as no node can have moved to the finalise phase
-if any node is not yet in the pre-commit phase.
+As nodes only transition from one phase to the next when every node has replied to the previous
+message, the case where it is not possible for one node to commit but another has already
+committed the transaction cannot occur. If a node cannot commit, the furthest any other node in
+the network can proceed is the pre-commit phase, while if a node has already committed then other
+nodes must have at least reached the pre-commit phase.
+
+This means if the co-ordinator crashes, the recovery node can reconstruct the state of the
+transaction by querying any node in the
+cohort. If that node is in the pre-commit phase, then every node must have voted commit and it is
+safe to finish the protocol by telling all nodes to commit. If the node is not yet in the pre-commit
+phase, then the operation has not been committed and it is safe to abort or restart the
+transaction.
 
 3PC still suffers from a flaw, however, in that it cannot recover from network partition. If the
 network is partitioned such that all nodes in the cohort that are the pre-commit phase are on one
@@ -300,12 +306,11 @@ using a fail-recover model to account for arbitrary delays from messages being s
 received (fail-stop would mean messages can only be dropped, not delayed for an arbitrary length
 of time).
 
-Paxos relies on the fact that any majority of nodes in a network has at least
-one member in common with any other majority. Therefore if we enforce the
-constraint that any decision must be made by a majority, then once a decision
-is made, in any subsequent decision there will be at least one member who was
-present in the previous decision. This is the central tenet of Paxos, where a
-majority is known as a \emph{quorum}.
+Paxos relies on the fact that any majority of nodes in a network has at least one member in common
+with any other majority. Therefore if the constraint that any decision must be made by a majority
+of nodes is enforced then, once a decision is made, in any subsequent decision there will be at
+least one member who was present in the previous decision. This is the central tenet of Paxos,
+where a majority is known as a \emph{quorum}.
 
 Brewer's CAP theorem\cite{brewer2000}\cite{gilbert2002} states that in the face of a
 network partition, a distributed system can only provide availability or consistency, but not
@@ -313,12 +318,11 @@ both. A key advantage of Paxos is that it can guarantee consistency during a net
 This is in contrast to 3PC, which provides availability.
 
 However, a potential drawback to this is that Paxos does sacrifice availability. This is in the
-form of a pathological case where it will not make
-progress, i.e., there is no upper bound on the time it will take to achieve consensus (it may never
-terminate). This is due to the FLP impossibility proof \cite{fischer85}, which states that it is
-impossible to guarantee liveness in an asynchronous network where there is at least one failure.
-In practice it is a situation that is relatively easy to avoid, and is not a serious concern.
-% XXX: elaborate in a footnote or something?
+form of a pathological case where it will not make progress, i.e., there is no upper bound on the
+time it will take to achieve consensus (it may never terminate). This is due to the FLP
+impossibility proof \cite{fischer85}, which states that it is impossible to guarantee liveness in
+an asynchronous network where there is at least one failure.  In practice it is a situation that
+is relatively easy to avoid, and is not a serious concern.
 
 \section{Databases}
 
@@ -360,16 +364,17 @@ design, as a distributed database is a generalisation of centralised one.
 \subsection*{Existing Paxos databases}
 
 Paxos has recently become a very popular algorithm for ensuring distributed consensus. One good
-example is Google using it for `Chubby', their  distributed lock service described in
+example is Google using it for `Chubby', their distributed lock service described in both
+\emph{The Chubby lock service for loosely-coupled distributed systems}\cite{burrows06} and
 \emph{Paxos Made Live}\cite{chandra07}. This underpins their BigTable distributed database which
 is used across Google.
 
-The paper says ``While Paxos can be described with a page of pseudo-code, our complete
-implementation contains several thousand lines of C++ code'', which gives an indication of how
-intricate implementing Paxos actually is.  The paper described the difficulty of producing a
-production-ready system in practice. Moving from a theoretical perspective to a practical one
-presented several problems.  These included an imprecise specification of the system and faults
-Paxos cannot deal with.
+\emph{Paxos Made Live}\cite{chandra07} says ``While Paxos can be described with a page of
+pseudo-code, our complete implementation contains several thousand lines of C++ code'', which
+gives an indication of how intricate implementing Paxos actually is.  The paper described the
+difficulty of producing a production-ready system in practice, and how moving from a theoretical
+perspective to a practical one presented several problems. These included an imprecise
+specification of the system and several real world faults that Paxos cannot deal with.
 
 % \emph{Paxos Made Moderately Complex}\cite{renesse11} is another paper describing an implementation
 % of Paxos by Robbert van Renesse at Cornell University.
@@ -495,23 +500,23 @@ into some detail about what each of these properties mean.
 
 Atomicity means that either an operation completes or it does not, there is no `halfway' state.
 This means that the programmer using the database does not need to worry about cleaning up after
-an operation, because if it does not succeed we can simply retry it without needing to worry about
+an operation, because if it does not succeed they can simply retry it without needing to worry about
 the state it has left the database in. Atomicity also applies to transactions in the same way ---
-if we have a transaction as an operation composed of smaller single operations (for example, INCR
-B, READ A $\rightarrow$ X, WRITE X + 10 $\rightarrow$ A), we don't want some of the operations to
-complete and some not to. In this example, we may have the invariant $A = 10\times B$. If B was
-incremented but then the transaction failed before A was updated, we would leave the database in
-an invalid state.
+When a transaction, composed of smaller single operations (for example, INCR
+B, READ A $\rightarrow$ X, WRITE X + 10 $\rightarrow$ A), is executing, it would be indesirable
+for some of the operations to complete and some not to. In this example, if the database has the
+invariant $A = 10\times B$ and B was incremented but then the transaction failed before A was
+updated, the database would be left in an invalid state.
 
 \subsection*{Consistent}
 
 Consistency is very closely related to atomicity, as consistency refers to a property of the
 database, and atomicity refers to a property of operations performed on the database. In the
-example used for atomicity, we had a constraint on the database (that $A = 10\times B$). We want
-operations (or transactions) to transform the database from one consistent state to another. This
-becomes more pertinent in distributed databases, as we may receive operations in one order at one
-node, and in a different order at another node. If we apply the operations in the order that we
-receive them, the two nodes are likely to be in inconsistent states.
+example used for atomicity, the database had the constraint that $A = 10\times B$. Operations and
+transactions should transform the database from one consistent state to another. This becomes more
+pertinent in distributed databases, as operations may be received in one order at one node and in
+a different order at another node. If they are applied in the order that they were received then
+the two nodes are likely to be in inconsistent states.
 
 \subsection*{Isolated}
 
@@ -555,18 +560,18 @@ basic message flow is shown in figure~\ref{fig:two-pc}. It has two phases:
 
 % S comment: split into 2 paragraphs and use footnotes
 
-2PC solves the consensus problem in a failure free network. However if we can have failures then
-the protocol can suffer from a number of limitations. If the co-ordinator crashes before sending
-any messages, we satisfy consensus trivially. However, if the co-ordinator crashes after sending
-$x$ messages, where $1 \le x < N$, the protocol cannot continue - it is blocked on the
+2PC solves the consensus problem in a failure free network. However the protocol can suffer from a
+number of limitations if failures are allowed. If the co-ordinator crashes before sending
+any messages, consensus is trivially satisfied. However, if the co-ordinator crashes after sending
+$x$ messages, where $1 \le x < N$, the protocol cannot continue -- it is blocked on the
 co-ordinator resuming, and if it never resumes then some members of the cohort are blocked
 permanently. In fact, once a node has sent a \msg{YES} message, it is blocked until it receives a
 response. This is a big disadvantage for a concurrent system. While there are extensions to
 resolve the problem of a crashing co-ordinator, these do not fix the fundamental problem of using
 a blocking protocol in an asynchronous network. \footnote{These extensions often involve a `watchdog' or
 `recovery' node. This is still not a satisfactory solution as the simultaneous crash of the
-co-ordinator and a cohort member means the state of the network is not recoverable (i.e., we cannot
-tell if the cohort member who crashed voted \msg{YES} or \msg{NO}.)}
+co-ordinator and a cohort member means the state of the network is not recoverable (i.e., it is
+not possible to tell if the cohort member who crashed voted \msg{YES} or \msg{NO}.)}
 
 \subsection*{3 Phase Commit}
 
@@ -577,7 +582,7 @@ tell if the cohort member who crashed voted \msg{YES} or \msg{NO}.)}
 \end{figure}
 
 3 Phase Commit (3PC) is a modification of 2PC that turns it from a synchronous protocol into an
-asynchronous protocol. This is done by adding a third phase, so that we can use timeouts to assert
+asynchronous protocol. This is done by adding a third phase, so that timeouts can be used to assert
 the state of the system at any point in time. Again the basic message flow is shown in
 figure~\ref{fig:three-pc}. The three phases are:
 
@@ -602,8 +607,8 @@ figure~\ref{fig:three-pc}. The three phases are:
 This fixes the problem of node failure, but still suffers from a significant problem. If there is
 a network partition, and all nodes who voted \msg{YES} are in one half and all nodes who voted
 \msg{NO} are in the other, both partitions will recover into different, inconsistent states.
-Brewer's CAP theorem \cite{gilbert2002} says that we cannot achieve both consensus and availability
-during a network partition - we must choose one. 3PC opts for availability, but for a distributed
+Brewer's CAP theorem \cite{gilbert2002} says that consensus and availability cannot both be
+achieved during a network partition --  only one. 3PC opts for availability, but for a distributed
 database with ACID properties it is preferable to have consensus. Paxos guarantees consensus at
 the cost of lack of availability in a network partition.
 
@@ -644,13 +649,6 @@ safety and liveness properties:
 \item If a value is chosen, a process eventually learns it
 \item Termination - Every correct process decides some value.
 \end{itemize}
-
-% \begin{enumerate}
-% 	\item Consistency: Only one value is chosen.
-% % XXX: wtf, how can we guarantee liveness, yet liveness is impossible??
-% 	\item Liveness: If a value is proposed, eventually some value is chosen.
-% 	\item Non-triviality: only proposed values may be chosen.
-% \end{enumerate}
 
 Paxos can tolerate certain kinds of failures. These are: messages being lost, delayed, repeated or
 delivered out of order. It is correct even with multiple leaders, and will reach consensus if
@@ -1055,19 +1053,22 @@ discussed later on.}
 
 \subsubsection{Heartbeat}
 
-% XXX: several pings?
-To identify when a node has left the network, upon initialisation a node starts a timer on
-a configurable timeout and sends a \msg{Ping} message to every node in its \verb+hosts+ attribute.
-It then copies the \verb+hosts+ set to a \verb+timeout_hosts+ set. As it receives a reply from a
-host it removes that host from the \verb+timeout_hosts+ set. When the timeout fires, any nodes who
-have not sent a \msg{Pong} in reply are left in the \verb+timeout_hosts+ set, and are removed from
-the \verb+hosts+ set.
+To identify when a node has left the network, upon initialisation a node starts a timer on a
+configurable timeout and sends a \msg{Ping} message to every node in its \verb+hosts+ attribute.
+It then copies the \verb+hosts+ set to a \verb+timeout_hosts+ dictionary mapping hosts to an
+integer count of pings missed. As it receives a reply from a host it removes that host from the
+\verb+timeout_hosts+ set. When the timeout fires, any nodes who have not sent a \msg{Pong} in
+reply have their `pings missed' count incremented. After this reaches a certain threshold (in my
+configuration I used 5 missed pings as the threshold) the host is removed from the \verb+hosts+
+s The timer is then scheduled again and the process repeats.et. The timer is then scheduled again and the process repeats.
 
 \subsection{MultiPaxos}
 
-MultiPaxos is implemented by running multiple instances of Paxos in parallel. Every message
-handler method takes an instance state dictionary as an argument and operates on it.
-% XXX: expand
+MultiPaxos is implemented by having multiple instances of Paxos operating at the same time. Each
+instance has all necessary state saved in a dictionary known as the \emph{instance state
+dictionary}. The appropriate state dictionary is loaded by the message dispatch callback and
+passed to the message handler. Every message handler method takes an instance state dictionary as
+an argument and operates on it, allowing several instances to operate simultaneously.
 
 \subsection{Implementing NACKS}
 
@@ -1105,6 +1106,18 @@ With either of these versions of the extension, the protocol still has protectio
 lost messages (as the safety and liveness properties are still preserved), but in the case of a
 crashed Proposer, the recovery should be far quicker.
 
+\subsection{Congestion Control and Flow Control}
+
+Unfortunately the protocol had no congestion control or flow control built into it.
+While TCP could have been used to provide this instead of building the protocol on UDP, the other
+features of TCP would be unnecessary; TCP provides reliable message delivery, but Paxos is
+designed to deal with message loss so the latency cost of using TCP would be an unnecessary
+overhead.  A potential improvement could be to build Paxos on top of another protocol which
+provides congestion control and flow control without providing unnecessary features such as
+reliable message delivery. SCTP is one such protocol, however support for SCTP on routers and
+operating systems is limited and as such it is unlikely to be a good fit for a real world
+implementation.
+
 \section{Paxos Implementation}
 
 \subsection{Node}
@@ -1120,10 +1133,9 @@ As mentioned in Section~\ref{sec:how-paxos-works}, the actions of a node can be 
 roles. I implemented Paxos by splitting the responsibilities into the three roles. I then made a
 handler class for each role that only implemented the functionality required for that role
 (\verb+Proposer+, \verb+Acceptor+, \verb+Learner+). Each class implemented message handlers for
-the
-message type it is responsible for. The \verb+Node+ class then inherits from all three role classes and delegates to
-each class as appropriate, by checking the \verb+msg_type+ attribute on each message received
-and calling the method \verb+recv_<msg_type>+.
+the message type it is responsible for. The \verb+Node+ class then inherits from all three role
+classes and delegates to each class as appropriate, by checking the \verb+msg_type+ attribute on
+each message received and calling the method \verb+recv_<msg_type>+.
 
 For example, the \verb+Proposer+ class implements the \verb+recv_prepare+ method. When a node
 receives a \msg{Prepare} message, the \verb+msg_type+ attribute is set to \verb+"prepare"+. The
@@ -1183,6 +1195,8 @@ class.
   \verb+proposer_prev_prop_value+  & value corresponding to \verb+proposer_prev_prop_num+ \\ \hline
 \end{tabular}
 
+~\\
+
 \begin{figure}[htb]
 \centering
 \lwincludegraphics[scale=0.5]{figs/proposer-state-machine.eps}
@@ -1192,31 +1206,26 @@ class.
 The Proposer role is the most complicated of the three. It is implemented as a state machine with
 3 states: `idle', `trying' and `polling' (see figure~\ref{fig:proposer-state-machine}). The
 state machine starts in the `idle' state. It then transitions to the `trying' state and sends
-\msg{Prepare} messages to the Acceptors in the network. In my design this is any node as the
-network is homogenous.
+\msg{Prepare} messages to the Acceptors in the network. As the network is homogenous in my design
+this means all nodes are sent \msg{Prepare} messages.
 
-% XXX: finish
-It also stores the proposal number in the instance dictionary. It then
-schedules a timer to fire after the timeout period, which is specified in a configuration module.
+Proposal numbers are a tuple of the form \verb+(p, <GUID>)+, where \verb+p+ is an integer. They
+are composed in this way so that each Proposer has a unique set of proposal numbers that no other
+Proposer will use. The integer component \verb+p+ is stored in the instance dictionary, so if the
+`trying' state is re-entered from the timeout handler a new \msg{Prepare} message can be sent with the
+proposal number in the instance dictionary incremented by 1.
 
-with a proposal number \verb+(p, <GUID>)+, where $p$ is normally 1, but may
-be different if we have reached the `trying' state from the timeout handler (described below).
-
-When the timer fires, Twisted will call the timeout function, \verb+handle_proposer_timeout+. We
-can specify the arguments we want Twisted to call \verb+handle_proposer_timeout+ with when we
-schedule the timer. \verb+handle_proposer_timeout+ is called with the instance state and the
-current state of the state machine. \verb+handle_proposer_timeout+ first checks if the Proposer is
-in this state, and if not, it does nothing. So if the Proposer has not transitioned into another
-state by the time the timeout fires, the timeout handler will retry the `trying' stage, with a
-higher proposal number. If the proposal number stored in the instance dictionary is of the form
-\verb+(p, <GUID>)+, the handler will retry with proposal number \verb$(p+1, <GUID>)$. It does this
-by calling \verb+proposer_start+ with the new proposal number.
+The Proposer schedules a timer to fire after a specified timeout period.  When the timer fires,
+the timeout function \verb+handle_proposer_timeout+ is called with the instance state.  It first
+checks if the Proposer has changed state, and if so it does nothing. However if the Proposer has
+not received enough replies to transition into the next state by the time the timeout fires, the
+timeout handler will retry the `trying' stage with higher proposal number \verb$(p+1, <GUID>)$ by
+calling \verb+proposer_start+ with the new proposal number.
 
 When the Proposer is in the `trying' state, it receives \msg{Promise} messages. If the proposal
-number is not the same as the proposal sent out most recently, this means the Acceptor has
-promised to accept a proposal we are no longer interested in. We can check the proposal number of
-the message against the \verb+last_tried+ state variable and if they are not the same then the
-message is dropped.
+number is not the same as the proposal sent out most recently, the Acceptor has promised to accept
+a proposal the Proposer is no longer interested in. The proposal number of the message can be
+tested against the \verb+last_tried+ state variable and if it is not the same then the message is dropped.
 
 As the Proposer receives \msg{Promise} messages, it keeps track of the \verb+prev_prop_num+ and
 \verb+prev_prop_value+ attributes of messages it has received. If \verb+prev_prop_num+ is larger
@@ -1233,8 +1242,8 @@ the quorum then the Proposer is free to set its own value for that instance. Thi
 the Proposer has been directed to set a value $v_1$ and is forced by the protocol to set a
 different value $v_2$, as $v_2$ has already been accepted by a node in the network, it starts a
 new instance of Paxos with $v_1$ as the value, to ensure $v_1$ is eventually committed to the
-network. This restart may be skipped if we are merely `chasing up' a value, i.e. there is a gap in
-the operation log and we need to ascertain the value.
+network. This restart may be skipped if Proposer is merely `chasing up' a value, i.e. there is a gap in
+the operation log and its value need to ascertained.
 
 \subsubsection{Acceptor}
 
@@ -1263,7 +1272,7 @@ When an Acceptor receives a message \msg{AcceptRequest(n, v)}, it accepts the pr
 $\verb|acceptor_cur_prop_value| := v$, and then notifying Learners in the network of its decision by
 sending an \msg{AcceptNotify(n, v)} message to them.
 
-% XXX: is this PMS or PTP??
+% is this PMS or PTP??
 % \emph{Paxos Made Simple} \cite{lamport01} describes several different ways of notifying Learners
 % of accepted proposals - we can specify a \emph{distinguished Learner}, who then notifies
 % other Learners when a quorum of Acceptors has accepted a proposal, we can specify several
@@ -1338,7 +1347,7 @@ consistent across every node.
 
 The operation log is a serial order of operations. It associates an `Operation ID' (OID)
 with a particular operation. OIDs are integers and refer to indexes into the operation log. To
-enter an operation into the log, the code picks the next highest instance ID it hasn't seen
+enter an operation into the log, the code picks the next highest instance ID that it has not seen
 before and starts a new round of Paxos for that instance, trying to assert that
 \verb$OID := <operation>$.
 
@@ -1406,10 +1415,9 @@ slow read it just performed, i.e., it is up to date.
 \caption{\label{fig:op-log-trylock}Transactions in the Operation Log}
 \end{figure}
 
-% XXX: add brackets to diagram indicating lock holding
-
-I implemented transactions with a simple global lock.
-% XXX: explain this decsision
+I implemented transactions with a simple global lock. This lock can only be held by one node at a
+time and when a node holds it, only that node can perform operations on the database, providing
+isolation for transactions.
 
 In order to start a transaction, a node inserts the \op{ATTEMPTLOCK} operation. If, when the
 operation is inserted, the number of preceeding \op{ATTEMPTLOCK}s is well-bracketed\footnote{There
@@ -1468,7 +1476,7 @@ refers to the end of the string.
 
 \subsubsection{Recursive Descent Parser}
 
-\begin{figure}[H]
+\begin{figure}[Hhtb]
 \centering
 \includegraphics[scale=0.5]{figs/where-ast.eps}
 \caption{\label{fig:where-ast}Example WHERE clause matching tree}
@@ -1529,7 +1537,7 @@ tests between a large number of machines is difficult, and resources required we
 Also, as the number of nodes increases, it becomes increasingly difficult to get meaningful
 results from nodes run on a physical network, due to other factors such as networking delay. It
 also makes results inconsistent and difficult to reproduce on several runs. As my results are
-dependant upon network characteristics, I wanted to control those characteristics.
+dependent upon network characteristics, I wanted to control those characteristics.
 
 Initially I spawned a separate instance of the test program for each node, but it became necessary
 to run all nodes in the same script in order to control complex scenarios. I discuss the
@@ -1555,17 +1563,6 @@ results when the simulation is done. In this way the simulation could utilise th
 of the simulating machine, instead of being artificially constrained by the resource limits of the
 simulating machine. While this is possible in Twisted, it is not straightforward, and
 unfortunately time constraints did not allow further exploration of this evaluation method.
-
-\subsection{Ratelimiting}
-
-% XXX: flesh out or cut
-
-Unfortunately, my application had no congestion control or flow control built into the protocol.
-While this would be a potential advantage of TCP, other features of TCP would be unnecessary.  For
-instance, TCP provides reliable message delivery, but Paxos is designed to deal with message loss.
-So a potential improvement would be to build Paxos on top of another protocol built on UDP, which
-provides congestion control and flow control on the layer underneath, but without providing
-unnecessary features such as reliable message delivery.
 
 \subsection{Gathering and Formatting Results}
 
@@ -1721,7 +1718,6 @@ network decreases bandwidth costs at the start significantly.
 
 \section{Limitations}
 
-% XXX: rewrite
 The main limitation of the system is its speed. In particular, transactions, a core component of
 any database, have a large cost.
 
@@ -1834,7 +1830,7 @@ Twisted if I were to redo the project.
 
 \section{Comparison with Requirements}
 
-The requirements described in Chapter 2 are a formal list of elements of the project to be
+The requirements are a formal list of elements of the project to be
 considered in evaluating its success. I will outline them here and discuss how each was realised,
 and to what extent.
 
@@ -1870,7 +1866,7 @@ contention.
 \paragraph{Durability}
 
 Supporting stable storage as a means of ensuring durability through the use of write-ahead logs
-(WAL) and or shadow paging.
+(WAL)\cite{burrows06} and/or shadow paging\cite{hitz94}.
 
 \paragraph{Network Hierarchy}
 

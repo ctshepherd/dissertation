@@ -17,10 +17,10 @@ FIGS = figs/op-log.eps \
        figs/two-pc.eps \
        figs/three-pc.eps \
        figs/where-ast.eps \
-       figs/thru_5.eps \
+       figs/thru_10.eps \
        figs/thru_20.eps \
        figs/thru_rev.eps \
-       figs/lat_5.eps \
+       figs/lat_10.eps \
        figs/lat_20.eps \
        figs/lat_rev.eps \
        figs/lat_nack.eps \

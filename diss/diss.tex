@@ -1593,9 +1593,9 @@ recording the time each operation took to complete.
 \begin{figure}[Hp]
 \centering
 %\lwincludegraphics[scale=2]{figs/lat_20.eps}
-\subfigure[Latency for 5 Nodes]{
-	\includegraphics[scale=0.75]{figs/lat_5.eps}
-	\label{fig:lat-5}
+\subfigure[Latency for 10 Nodes]{
+	\includegraphics[scale=0.75]{figs/lat_10.eps}
+	\label{fig:lat-10}
 }
 \subfigure[Latency for 20 Nodes] {
 	\includegraphics[scale=0.75]{figs/lat_20.eps}
@@ -1608,9 +1608,7 @@ recording the time each operation took to complete.
 \caption{Latency Measurements}
 \end{figure}
 
-\paragraph{5 Nodes}
-
-Firstly I measured the contention in a network with 5 nodes. Figure~\ref{fig:lat-5} shows how the
+Firstly I measured the contention in a network with 5 nodes. Figure~\ref{fig:lat-10} shows how the
 average latency of an operation was affected by the the number of writers in the system. Plotted
 on the graph are three different types of network operations: the latency of a pure Paxos
 operation, the latency of a single database operation and the latency of a database transaction.
@@ -1626,8 +1624,6 @@ A common trend in the graph is that the latency of committing an operation to th
 network increases linearly with the number of writers in the network with a strong
 correlation.
 
-\paragraph{20 Nodes}
-
 I repeated the simulation with a network of 20 nodes. Figure~\ref{fig:lat-20} shows
 the latency of the network continues to increase linearly with the number of concurrent writers in
 the system.
@@ -1642,9 +1638,9 @@ displayed in figure~\ref{fig:latency-rev}.
 
 \begin{figure}[Hp]
 \centering
-\subfigure[Throughput for 5 Nodes]{
-	\includegraphics[scale=0.75]{figs/thru_5.eps}
-	\label{fig:thruput-5}
+\subfigure[Throughput for 10 Nodes]{
+	\includegraphics[scale=0.75]{figs/thru_10.eps}
+	\label{fig:thruput-10}
 }
 \subfigure[Throughput for 20 Nodes]{
 	\includegraphics[scale=0.75]{figs/thru_20.eps}
@@ -1669,7 +1665,7 @@ standard deviation of each point. I then plotted $\frac{5}{x}$ for each point as
 \paragraph{5 Nodes}
 
 Again I initially did this for a network of 5 nodes. The results of this are in
-figure~\ref{fig:thruput-5}, which shows that the throughput of the network decreases with
+figure~\ref{fig:thruput-10}, which shows that the throughput of the network decreases with
 $\frac{1}{w}$, where $w$ is the number of concurrent writers in the system. Again the performance of
 Paxos and database operations is similar, with very similar throughputs. However there is still a
 big overhead to using transactions, as evidenced from the substantially reduced throughput,

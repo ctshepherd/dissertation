@@ -17,11 +17,11 @@ proposal.ps
 
 _trial_temp
 
-thru/thru_5-m.csv
-thru/thru_5-o.csv
-thru/thru_5-p.csv
-thru/thru_5.eps
-diss/figs/thru_5.eps
+thru/thru_10-m.csv
+thru/thru_10-o.csv
+thru/thru_10-p.csv
+thru/thru_10.eps
+diss/figs/thru_10.eps
 
 thru/thru_20-m.csv
 thru/thru_20-o.csv
@@ -35,11 +35,11 @@ thru/thru_rev-p.csv
 thru/thru_rev.eps
 diss/figs/thru_rev.eps
 
-lat/lat_5-m.csv
-lat/lat_5-o.csv
-lat/lat_5-p.csv
-lat/lat_5.eps
-diss/figs/lat_5.eps
+lat/lat_10-m.csv
+lat/lat_10-o.csv
+lat/lat_10-p.csv
+lat/lat_10.eps
+diss/figs/lat_10.eps
 
 lat/lat_20-m.csv
 lat/lat_20-o.csv

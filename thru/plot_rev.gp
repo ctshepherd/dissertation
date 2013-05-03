@@ -1,6 +1,6 @@
 load "../style.gp"
 
-set title "Throughput vs Network Size"
+set title "The effect of network size on throughput"
 set xlabel "Number of nodes"
 set ylabel "Throughput (ops/s)"
 set output "thru_rev.eps"

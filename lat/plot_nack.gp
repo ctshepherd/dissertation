@@ -1,6 +1,6 @@
 load "../style.gp"
 
-set title "Contention vs Latency with 20 nodes"
+set title "How different NACK implementations change the effect of contention on latency in a network of 20 nodes"
 set xlabel "Number of writers"
 set ylabel "Latency (s)"
 set output "lat_nack.eps"

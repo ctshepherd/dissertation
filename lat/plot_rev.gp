@@ -1,6 +1,6 @@
 load "../style.gp"
 
-set title "Latency vs Network Size"
+set title "The effect of network size on latency"
 set xlabel "Number of nodes"
 set ylabel "Latency (s)"
 set output "lat_rev.eps"

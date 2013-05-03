@@ -1,8 +1,8 @@
 load "../style.gp"
 
-set title "Start up cost"
+set title "How different start up implementations affect the initial bandwidth usage"
 set xlabel "Number of nodes"
 set ylabel "Bandwidth (Mb)"
 set output "start.eps"
-plot "start.csv" using 1:($2/1000000) title "Old" with points, \
-     "start2.csv" using 1:($2/1000000) title "New" with points
+plot "start.csv" using 1:($2/1000000) title "Peer-to-peer model" with points, \
+     "start2.csv" using 1:($2/1000000) title "Centralised model" with points

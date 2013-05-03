@@ -1,6 +1,6 @@
 load "../style.gp"
 
-set title "Contention vs Latency with 20 nodes"
+set title "The effect of contention on latency in a network of 20 nodes"
 set xlabel "Number of writers"
 set ylabel "Latency (s)"
 set xtics 1

@@ -1,6 +1,6 @@
 load "../style.gp"
 
-set title "Contention vs Throughput with 20 nodes"
+set title "The effect of contention on throughput in a network of 20 nodes"
 set xlabel "Number of writers"
 set ylabel "Throughput (ops/s)"
 set xtics 1

@@ -1605,6 +1605,7 @@ recording the time each operation took to complete.
 	\includegraphics[scale=0.75]{figs/lat_rev.eps}
 	\label{fig:latency-rev}
 }
+\caption{Latency Measurements}
 \end{figure}
 
 \paragraph{5 Nodes}
@@ -1653,6 +1654,7 @@ displayed in figure~\ref{fig:latency-rev}.
 	\includegraphics[scale=0.75]{figs/thru_rev.eps}
 	\label{fig:thruput-rev}
 }
+\caption{Throughput Measurements}
 \end{figure}
 
 Next I measured the throughput of the network. This is the number of operations per second that
@@ -1740,24 +1742,22 @@ any progress.
 
 \section{Limitations}
 
-The main limitation of the system is its speed. In particular, transactions, a core component of
-any database, have a large cost.
+A potential limitation is the lack of stable storage support in the database. The network supports
+durability in that, if a node leaves and then returns, the operation will persist in the network
+and if that node rejoins then it will see the transaction again. If a majority of nodes leave and
+rejoin, the database will lose its transactions, as it has no stable storage and a majority of
+nodes have failed. This is acceptable as the project is built on Paxos, which expects a majority
+of nodes to remain working. This worst case scenario only happens if a majority of nodes fail at
+once, if the nodes leave slowly enough for the network quorum to adjust then no data will be lost,
+so this is not a significant drawback.
 
-Another limitation is the lack of stable storage support in the database. Although it supports
-durability in that, if a node leaves, and then returns, the operation will persist in the network
-and if that node rejoins, then it will see the transaction again, if a majority of nodes leave and
-rejoin, the database will lose its transactions as it has no stable storage and a majority of
-nodes have failed. However if the nodes leave slowly enough for the network quorum to adjust it
-will be fine.
-
-Another drawback is that the network struggles to function as its size increases - the way I have
-implemented Paxos is easy to debug but is very verbose. Using a more efficient variant such as
-MultiPaxos would decrease the bandwidth requirements of the system. Alternatively using a variant
-such as FastPaxos would decrease the latency.
+Another limitation of the protocol is that although it is easy to debug but it is quite verbose.
+Using a more efficient variant such as MultiPaxos would decrease the bandwidth requirements of the
+system, or a variant such as FastPaxos would decrease the latency.
 
 Although I show an improvement to the startup cost of bootstrapping the network, my improvement
-only centralises the bootstrapping, losing all the advantages of using a distributed network. A
-complete solution would be to use a DHT or super-node hierarchy.
+only centralises the bootstrapping, which then loses the advantages of a distributed network. A
+complete solution would be to use a DHT or super-node hierarchy for managing the nodes.
 
 Due to time constraints I did not have time to implement all the SQL syntax that my requirements
 indicated. However this is not a significant concern as it is relatively easy to add new syntax and
@@ -1765,87 +1765,26 @@ operations to the database.
 
 \section{Changes with hindsight}
 
-If I was to do the project again, there are several potential changes that I could make.
+If I was to do the project again, there are several potential changes that I could make:
 
-% Although my project is built in an asynchronous manner and used Twisted, with the knowledge I have
-% gained from implementing it, a potential change would be to write it in a synchronous style.
-% Decoupling from Twisted may allow further opportunities for optimisation and
-% These mainly
-% are design choices more than anything else. One big design choice I made was to use an
-% asynchronous programming paradigm. I chose this because I thought it would make the project
-% simpler and quicker to write, by leveraging Twisted's network stack. However I didn't allow for
-% the difficulty of understanding and designing Paxos, or a database, or Paxos and a database under
-% a new programming paradigm.
+One design choice I made was to start with a key/value database prototype and later refactor it
+into a row based database. I then added an SQL interface and layered transactions on top. This was
+a reasonable design choice, as I started with a small prototype and then built on it.  Using my
+experience from this implementation, I could design the system as row-based from the start.
 
-One design choice I made was to start with a key/value database prototype and later
-refactor it into a row based database. I then added an SQL interface and layered transactions on
-top. This was a reasonable choice, as I started small and then worked bigger. However if I was to
-do the project again using my knowledge from my first implementation, I would be able to
-design the system as row-based from the start.
+As I progressed through the project, I began to struggle to keep unit tests up to date with the
+code due to refactoring often. After refactoring the code, I would need to rewrite the tests, as
+the refactoring would invalidate a number of them. This was because I had decided to write the
+unit tests after the code.  A strategy called Test Driven Development involves writing tests for
+an interface, then writing the code that satisfies the interface. Using this strategy may be a
+good choice for another project.
 
-% Also, in my project the SQL interface is built as a layer on top of the database. This makes it
-% easy to extendThe SQL interface should have been more
-% tightly integrated rather than less tightly, and transactions should have been the core aspect of
-% my system, rather than a layering of operations. However it is difficult to predict how the
-% project would have turned out with this plan, it is not necessarily as easy to implement as it
-% sounds and I believe my choices were very reasonable at the time.
-
-% Another possibility is that I should have started with smaller prototypes of the complete system,
-% rather than prototypes of both of them that were then joined. A disadvantage of my approach was
-% that as my understanding of how the design would work progressed, the API interface between the
-% two components changed significantly and repeated. This led to problems with testing, and with
-% having to rewrite various user interfaces repeatedly. An alternative approach could have been to
-% use an agile programming strategy, rather than an iterative one. A quote that summarises my
-% experience with my project is by Fred Brooks: `plan to throw one away; you will, anyhow'.
-
-% \subsection*{Twisted}
-%
-% In retrospect, if I was to do the project again I would probably not use Twisted. Twisted provided
-% me with a powerful framework for building an asynchronous network application, but it had
-% disadvantages as well as advantages, which I will briefly outline.
-%
-% I had to learn a lot for this project. I had to learn and understand how how Paxos works and
-% design a protocol that implements it. I also had to learn and understand the basics of building a
-% database, and on top of that - a distributed database. Twisted has a high learning curve, and I
-% ended up investing a lot of time understanding how to work with Twisted and in some cases working
-% against it. I spent lots of time interfacing with it, some of which was unnecessary.
-%
-% It is difficult to know how much networking code Twisted saved me writing, however
-% the message requirements of paxos are quite simple, and I think that with a few days work making
-% some helper network classes much of the complexity of using and interfacing with Twisted could
-% have been avoided. Certainly there are cases when debugging would have been easier, and I feel my
-% project would have been less `heavy-weight', particularly when it came to unit tests, another
-% problem I will discuss later.
-%
-% As I worked through several prototype versions, Twisted became cumbersome to use. I had to keep
-% learning new parts of it, which was frustrating to have to keep delving into the innards of it,
-% particularly as I started to feel that it hadn't helped me as much as I had anticipated.
-%
-% Using the asynchronous paradigm initially helped me reason about Paxos and how I would design my
-% system, however later on I felt the asynchronous model was unnecessary, and Twisted became
-% superfluous. Certainly my project would have been very different without the decision to use it.
-
-\subsection*{Testing}
-
-Unit tests became a problem as I progressed through the project. They became a hindrance, as I
-was refactoring my code base often, they were not that effective. Test Driven Development may have
-been a better choice, as I wrote my unit tests after I had written the code, I would often write
-the code, write the tests, it would all work. Then I would refactor the code, rewrite the tests ---
-every refactoring would invalidate large numbers of tests. This was also due to how tightly
-coupled my code was with Twisted. This is another reason I would reconsider my decision to use
-Twisted if I were to redo the project.
-
-% \section{Summary}
-
-% In summary, my project had clear successes but also some clear drawbacks. I effectively
-% implemented Paxos, and built an ACID distributed database on top, with support for transactions. I
-% made some improvements to my design, but ultimately there are still many more clear avenues for
-% improvement. The project suffers from inefficiency, and is slow, but is an effective prototype
-% that gives valuable insight into the performance ramifications of different design decisions of a
-% distributed database. My project was limited not just by the limited amount of time I had, but
-% also by my lack of expertise in the area, and I have gained valuable insights into my decisions
-% and how I would improve the project if I were to implement it again.
-
+In summary, I effectively implemented Paxos and built an ACID distributed database on top, with
+support for transactions. I made some improvements to my design, which showed how start optimising
+the project for different scenarios. The project is an effective prototype, giving valuable
+insight into the performance ramifications of different design decisions of a distributed
+database. Although my project was limited by the amount of time I had, I have gained valuable
+insights into my decisions and how I would improve the project if I were to implement it again.
 
 \cleardoublepage
 \chapter{Conclusion}

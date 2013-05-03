@@ -947,16 +947,14 @@ an interface and have a callback be passed events that occur.
 
 \section{Development}
 
-% XXX: development etc
-This became very helpful when my laptop broke and was unusable for a week. While it was being
-repaired I was still able to work on my project without any difficulties. I simply cloned the
-repository from the server copy onto the PWF computers and continued working.
+My development strategy worked well as, although the details of implementing Paxos were initially
+unclear, as I understood how the protocol worked more and more over time, I was able to build
+several prototypes, iterating towards the final version by adding features.
 
-% XXX: reword
-As I initially found the concept of Paxos and how it works reasonably confusing, and wasn't
-sure how to implement in code various concepts outlined in the academic papers I read (mainly
-\emph{Paxos Made Simple} \cite{lamport01}), I wanted to iterate from one prototype of the protocol
-to another quickly, adding features as I began to understood how the protocol worked better.
+Also when my laptop broke and was unusable for several weeks, my backup strategy became very
+helpful -- while it was being repaired I was still able to work on my project without any
+difficulties, by simply cloning the repository from the server copy onto the PWF computers and
+continuing work.
 
 \section{Module Design}
 
@@ -1684,15 +1682,24 @@ transactions.
 
 \subsection{NACK improvements}
 
-\begin{figure}[Hp]
+\begin{figure}[Hhtb]
 \centering
 \lwincludegraphics[scale=2]{figs/lat_nack.eps}
 \caption{\label{fig:nack}NACK improvement}
 \end{figure}
 
+Figure~\ref{fig:nack} shows how the different NACK implementations compare against each other in
+terms of latency. The increase in latency is linear with all implementations, but there is a clear
+improvement from using NACKs. As contention increases the number of Proposers competing for
+Acceptors to accept their proposals increases, so the latency would be expected to increase.
+Interestingly there is not a clear different between NACK `version 1' and not using NACKs. This
+may be due to the `ping pong' effect mentioned in the Implementation chapter. Although NACKs would
+reduce the amount of timeouts occuring, it may increase the contention between Proposers and the
+number of messages sent, without offering an increase in latency.
+
 \subsection{Start up costs}
 
-\begin{figure}[Hp]
+\begin{figure}[Hhtb]
 \centering
 \lwincludegraphics[scale=2]{figs/start.eps}
 \caption{\label{fig:start}Start}
@@ -1700,11 +1707,15 @@ transactions.
 
 As the size of the network increases the cost of bootstrapping the network becomes prohibitively
 expensive. Figure~\ref{fig:start} shows the effect of using a master node to co-ordinate the
-network decreases bandwidth costs at the start significantly.
+network instead of the initial peer-to-peer bootstrap design. The peer-to-peer design fits an
+$N^2$ curve as the number of nodes in the network increases, as expected, as every node messages
+every other node. In the centralised design, not only is the amount of bandwidth used at the start
+significantly decreased, but the increase as the number of nodes rises in linear, rather than
+$N^2$.
 
-\subsection{Churn}
+\subsection{Node Churn}
 
-\begin{figure}[H]
+\begin{figure}[Hhtb]
 \centering
 \subfigure[Latency vs Churn]{
 	\includegraphics[scale=0.75]{figs/churn_lat.eps}
@@ -1715,6 +1726,17 @@ network decreases bandwidth costs at the start significantly.
 	\label{fig:churn-thru}
 }
 \end{figure}
+
+Paxos is designed to remain fully functional as long as a majority of nodes remain in the network.
+I measured how the network responds to nodes leaving and joining the network.
+Figure~\ref{fig:churn-lat} shows how the latency of an operation is affected by nodes leaving and
+joining a network of 20 nodes. The churn has no effect until a majority of nodes start leaving the
+network, when the performance suddenly drops off.
+
+This can also be seen in figure~\ref{fig:churn-thru}, which shows how the throughput of the
+network is affected by churn, again in a network of 20 nodes. The result is similar -- the churn
+has no effect until a majority of nodes are affected, at which point the network is unable to make
+any progress.
 
 \section{Limitations}
 

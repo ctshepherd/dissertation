@@ -1593,90 +1593,88 @@ recording the time each operation took to complete.
 \begin{figure}[Hp]
 \centering
 %\lwincludegraphics[scale=2]{figs/lat_20.eps}
-\subfigure[Latency for 10 Nodes]{
+\subfigure[Contention in a network of 10 Nodes]{
 	\includegraphics[scale=0.75]{figs/lat_10.eps}
 	\label{fig:lat-10}
 }
-\subfigure[Latency for 20 Nodes] {
+\subfigure[Contention in a network of 20 Nodes] {
 	\includegraphics[scale=0.75]{figs/lat_20.eps}
 	\label{fig:lat-20}
 }
-\subfigure[Latency vs Network Size] {
+\subfigure[Network size effects] {
 	\includegraphics[scale=0.75]{figs/lat_rev.eps}
 	\label{fig:latency-rev}
 }
 \caption{Latency Measurements}
 \end{figure}
 
-Firstly I measured the contention in a network with 5 nodes. Figure~\ref{fig:lat-10} shows how the
-average latency of an operation was affected by the the number of writers in the system. Plotted
-on the graph are three different types of network operations: the latency of a pure Paxos
-operation, the latency of a single database operation and the latency of a database transaction.
-The first two lines are very close, this is expected as a database operation is simply a specific
-Paxos operation. The minor difference is due to the database processing overhead. As mentioned in
-the Method section, this overhead is expected to be minor, as the application is mainly IO bound
-rather than CPU bound. However, a small amount of added CPU latency is reasonable.  The latency of
-transactions is significantly more than that of database operations. This is also expected as
-executing a transaction involves waiting on several Paxos operations to be executed before it is
-committed.
+First I simulated a network of 10 nodes and measured how increasing the contention in the network
+affected the average latency of an operation. Figure~\ref{fig:lat-10} shows this for three
+different types of network operations: a pure Paxos operation, a single database operation and a
+database transaction.  The first two are very similar, as expected. This is because a database
+operation is simply a specific Paxos operation. The minor difference is due to the database
+processing overhead. This overhead is minor, as expected in the Implementation chapter, as the
+application is mainly IO bound rather than CPU bound. However a small amount of added CPU latency
+is reasonable.  The latency of transactions is significantly more than that of database
+operations. This is also expected as executing a transaction involves waiting on several Paxos
+operations to be executed before it is committed.
 
 A common trend in the graph is that the latency of committing an operation to the
 network increases linearly with the number of writers in the network with a strong
 correlation.
 
-I repeated the simulation with a network of 20 nodes. Figure~\ref{fig:lat-20} shows
-the latency of the network continues to increase linearly with the number of concurrent writers in
-the system.
+I repeated the simulation with a network of 20 nodes, shown in figure~\ref{fig:lat-20}.  This
+shows again that increasing the the number of concurrent writers in the system causes the latency
+of the network to increase linearly. However the graph shows that increasing the size of the
+network does not increase the effects of contention -- it increases the latency by the same factor
+as in the network of 10 nodes. This is important in terms of scalability, showing that scaling the
+network does not make contention more expensive.
 
-\paragraph{Network Size}
-
-I also measured how the network response time is affected by the number of nodes in the network.
-Using only a single writer, I measured the latency for networks of varying sizes. This is
-displayed in figure~\ref{fig:latency-rev}.
+Figure~\ref{fig:latency-rev} shows how the latency of a single writer was affected by the number
+of nodes in the network. This appears to increase with $N^2$, $N$ being the number of nodes in the
+network.
 
 \subsection{Throughput}
 
 \begin{figure}[Hp]
 \centering
-\subfigure[Throughput for 10 Nodes]{
+\subfigure[Contention in a network of 10 Nodes]{
 	\includegraphics[scale=0.75]{figs/thru_10.eps}
 	\label{fig:thruput-10}
 }
-\subfigure[Throughput for 20 Nodes]{
+\subfigure[Contention in a network of 20 Nodes]{
 	\includegraphics[scale=0.75]{figs/thru_20.eps}
 	\label{fig:thruput-20}
 }
-\subfigure[Throughput vs Network size]{
+\subfigure[Network size effects]{
 	\includegraphics[scale=0.75]{figs/thru_rev.eps}
 	\label{fig:thruput-rev}
 }
 \caption{Throughput Measurements}
 \end{figure}
 
-Next I measured the throughput of the network. This is the number of operations per second that
-can be processed by the network. Again I plotted three lines for each graph --- paxos throughput,
+The next metric measured was throughput. This is the number of operations per second that
+can be processed by the network. Again three operation types were measured: paxos throughput,
 database operation throughput and database transaction throughput.
 
-I measured the throughput by measuring how long it took to commit 5 operations to the network with
-a given number of writers. I did this 5 times for each writer and then took the average and
-standard deviation of each point. I then plotted $\frac{5}{x}$ for each point as the average throughput in
+I calculated the throughput by measuring how long it took to commit 5 operations to the network with
+a given number of writers. I then plotted $\frac{5}{x}$ for each point as the average throughput in
 \emph{operation seconds\superscript{-1}}.
 
-\paragraph{5 Nodes}
-
-Again I initially did this for a network of 5 nodes. The results of this are in
+Again this was initially done for a network of 10 nodes. The results of this are in
 figure~\ref{fig:thruput-10}, which shows that the throughput of the network decreases with
 $\frac{1}{w}$, where $w$ is the number of concurrent writers in the system. Again the performance of
 Paxos and database operations is similar, with very similar throughputs. However there is still a
 big overhead to using transactions, as evidenced from the substantially reduced throughput,
 reduced by nearly a factor of 5.
 
-\paragraph{20 Nodes}
-
-Figure~\ref{fig:thruput-20} shows the throughput of the network decreases exponentially with the
-number of concurrent writers in the system. Also while there is little overhead from using the
-database layer over the top of Paxos, there is substantial overhead performing multiple
-transactions.
+Figure~\ref{fig:thruput-20} shows this for a network of 20 nodes. The curves are very similar to
+figure~\ref{fig:thruput-10}, the only major difference is a reduction in the number of operations
+by a factor of around 3. This is due to the increased network size, rather than any contention
+effects. As with the latency, the graph shows that using a large network does not make the effects
+of contention worse. This is useful as the main advantage of a distributed network is its
+scalability, and this shows that scaling the network does not increase the cost of contention
+(although it does still affect performance).
 
 \subsection{NACK improvements}
 

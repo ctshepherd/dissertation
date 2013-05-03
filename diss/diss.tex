@@ -145,6 +145,8 @@ I, Charlie Shepherd of Churchill College, being a candidate for Part II of the C
 Tripos, hereby declare that this dissertation and the work described in it are my own work,
 unaided except as may be specified below, and that the dissertation does not contain material that
 has already been used to any substantial extent for a comparable purpose.
+I do not wish my dissertation to be made available in the archive area of
+the Laboratory's website.
 
 \bigskip
 \leftline{Signed: }
@@ -161,7 +163,7 @@ has already been used to any substantial extent for a comparable purpose.
 \newpage
 \section*{Acknowledgements}
 
-I would like to thank my supervisor Stephen Cross for his invaluable assistance, this project
+I would like to thank my supervisor Stephen Cross for his invaluable assistance; this project
 could not have been successful without him. \\
 My DoS, Dr John Fawcett, for his help and support over the last three years. \\
 Ed and Nick for their help. \\
@@ -385,7 +387,7 @@ specification of the system and several real world faults that Paxos cannot deal
 
 \section{Requirements Analysis}
 
-Given the brief to design and create a protocol and a database there is a huge amount of scope for
+Given the brief to design and create both a protocol and a database there is a huge amount of scope for
 variety in the project. Requirements Analysis narrows down the purpose of a project to formal
 goals which can easily be objectively verified against the finished project.
 
@@ -443,15 +445,15 @@ allocations, it also allows much more potential for memory handling errors.
 prototypes without being impeded by focusing on details early on.
 \end{itemize}
 
-Also as my project is a network application, it should be mainly IO bound rather than CPU bound.
-This means that the speed of the implementation language should not be a concern, as the speed
+As my project is a network application, it should be mainly IO bound rather than CPU bound.
+This means that the performance of the implementation language should not be a concern, as the
 limitations of the implementation are unlikely to affect the performance of the project compared
 to the limitations of the network.
 
 \subsection{Module Dependencies}
 
 Twisted is a Python framework used for event driven network programming. It contains support for
-many different protocols, making writing efficient networking code a lot easier.  It is single
+many different protocols, making it easier to write efficient networking code.  It is single
 threaded, which means I will not have to worry about concurrency issues in my project. Twisted is
 licensed under the MIT license so there are no license issues in using it for my project.
 
@@ -481,10 +483,10 @@ In order to ensure I can have confidence that my project works correctly I will 
 tests. I will write unit tests for the main modules of my project, both for expected input and
 also that it handles bad and malformed input correctly and as expected. Tests are also useful for
 expressing the API usage of the different modules of the project and checking that the interfaces
-connect sensibly. I will perform regression testing, that is, every time there I fix a bug I will
-add a test ensuring any regression causing the bug again will make the test fail.
+connect sensibly. I will perform regression testing; every time there I fix a bug I will
+add a test ensuring any regression (causing the bug) again will make the test fail.
 
-I will run tests every time I make a commit, as they are quick to run and confirm that the project
+Tests will be run every time I make a commit, to confirm that the project
 is working correctly. Twisted has a unit testing framework that I will use as it easily
 facilitates testing asynchronous programs, something that would be harder in other unit testing
 frameworks available in Python.
@@ -500,10 +502,10 @@ into some detail about what each of these properties mean.
 
 Atomicity means that either an operation completes or it does not, there is no `halfway' state.
 This means that the programmer using the database does not need to worry about cleaning up after
-an operation, because if it does not succeed they can simply retry it without needing to worry about
+an operation, because if it does not succeed they can simply retry, without needing to worry about
 the state it has left the database in. Atomicity also applies to transactions in the same way ---
-When a transaction, composed of smaller single operations (for example, INCR
-B, READ A $\rightarrow$ X, WRITE X + 10 $\rightarrow$ A), is executing, it would be indesirable
+when a transaction, composed of smaller single operations (for example, INCR
+B, READ A $\rightarrow$ X, WRITE X + 10 $\rightarrow$ A), is executing, it would be undesirable
 for some of the operations to complete and some not to. In this example, if the database has the
 invariant $A = 10\times B$ and B was incremented but then the transaction failed before A was
 updated, the database would be left in an invalid state.
@@ -608,7 +610,7 @@ This fixes the problem of node failure, but still suffers from a significant pro
 a network partition, and all nodes who voted \msg{YES} are in one half and all nodes who voted
 \msg{NO} are in the other, both partitions will recover into different, inconsistent states.
 Brewer's CAP theorem \cite{gilbert2002} says that consensus and availability cannot both be
-achieved during a network partition --  only one. 3PC opts for availability, but for a distributed
+achieved during a network partition. 3PC opts for availability, but for a distributed
 database with ACID properties it is preferable to have consensus. Paxos guarantees consensus at
 the cost of lack of availability in a network partition.
 
@@ -628,8 +630,8 @@ safety and liveness properties:
 \begin{itemize}
 \item Integrity - every correct process decides at most one value, and if it decides some value
 	$v$, then $v$ must have been proposed by some process.
-\item Agreement - Every correct process must agree on the same value.
-\item Non-triviality - Only a value that has been proposed can be chosen.
+\item Agreement - every correct process must agree on the same value.
+\item Non-triviality - only a value that has been proposed can be chosen.
 \end{itemize}
 
 % Consistency
@@ -647,7 +649,7 @@ safety and liveness properties:
 \begin{itemize}
 \item Some proposed value is eventually chosen
 \item If a value is chosen, a process eventually learns it
-\item Termination - Every correct process decides some value.
+\item Termination - every correct process decides some value.
 \end{itemize}
 
 Paxos can tolerate certain kinds of failures. These are: messages being lost, delayed, repeated or
@@ -747,10 +749,7 @@ M = \{(\eta, \nu)~|~\msg{Promise(n, \bm{\eta}, \bm{\nu})}~\textrm{received by}~P
 \end{displaymath}
 then $v$ is defined as
 \begin{displaymath}
-\exists~(\eta', v') \in M.~\forall~(\eta'', \nu'') \in M.~\eta' \ge \eta'' \\
-\end{displaymath}
-\begin{displaymath}
-v = v'
+\exists~(\eta', v') \in M.~\forall~(\eta'', \nu'') \in M.~\eta' \ge \eta'' \mathbin{\char`\^} v = v'
 \end{displaymath}
 That is, if $\sqsupset$ is an ordering over \msg{Promise} messages such that
 \begin{displaymath}
@@ -929,8 +928,8 @@ into a standard instance of Paxos.
 
 In my project I chose an even simpler approach to running multiple rounds of Paxos. Each instance
 of Paxos runs independently in my application, unaware of any other instance. This is a simple and
-effective way of having multiple instances of Paxos running, although it does have drawbacks,
-which I will go into in my evaluation chapter.
+effective way of having multiple instances of Paxos running. Other variants of Paxos, such as
+FastPaxos, have better performance but are also more complex to implement.
 
 
 \cleardoublepage
@@ -1058,7 +1057,7 @@ integer count of pings missed. As it receives a reply from a host it removes tha
 \verb+timeout_hosts+ set. When the timeout fires, any nodes who have not sent a \msg{Pong} in
 reply have their `pings missed' count incremented. After this reaches a certain threshold (in my
 configuration I used 5 missed pings as the threshold) the host is removed from the \verb+hosts+
-s The timer is then scheduled again and the process repeats.et. The timer is then scheduled again and the process repeats.
+set. The timer is then scheduled again and the process repeats.
 
 \subsection{MultiPaxos}
 
@@ -1112,9 +1111,9 @@ features of TCP would be unnecessary; TCP provides reliable message delivery, bu
 designed to deal with message loss so the latency cost of using TCP would be an unnecessary
 overhead.  A potential improvement could be to build Paxos on top of another protocol which
 provides congestion control and flow control without providing unnecessary features such as
-reliable message delivery. SCTP is one such protocol, however support for SCTP on routers and
-operating systems is limited and as such it is unlikely to be a good fit for a real world
-implementation.
+reliable message delivery. SCTP\footnote{http://www.ietf.org/rfc/rfc2960.txt} is one such
+protocol, however support for SCTP on routers and operating systems is limited and as such it is
+unlikely to be a good fit for a real world implementation.
 
 \section{Paxos Implementation}
 
@@ -1404,8 +1403,6 @@ inserted at OID 3 and from this $N$ knows that at $t_2$ the latest operation in 
 slow read it just performed, i.e., it is up to date.
 
 \subsection{Transactions}
-
-\subsubsection{Global Lock}
 
 \begin{figure}[htb]
 \centering
@@ -1750,8 +1747,8 @@ Using a more efficient variant such as MultiPaxos would decrease the bandwidth r
 system, or a variant such as FastPaxos would decrease the latency.
 
 Although I show an improvement to the startup cost of bootstrapping the network, my improvement
-only centralises the bootstrapping, which then loses the advantages of a distributed network. A
-complete solution would be to use a DHT or super-node hierarchy for managing the nodes.
+does centralises the bootstrapping. A more advanced solution would use a DHT or super-node
+hierarchy for managing the nodes.
 
 Due to time constraints I did not have time to implement all the SQL syntax that my requirements
 indicated. However this is not a significant concern as it is relatively easy to add new syntax and
@@ -1767,21 +1764,21 @@ a reasonable design choice, as I started with a small prototype and then built o
 experience from this implementation, I could design the system as row-based from the start.
 
 As I progressed through the project, I began to struggle to keep unit tests up to date with the
-code due to refactoring often. After refactoring the code, I would need to rewrite the tests, as
+code. After refactoring the code, I would need to rewrite the tests, as
 the refactoring would invalidate a number of them. This was because I had decided to write the
 unit tests after the code.  A strategy called Test Driven Development involves writing tests for
 an interface, then writing the code that satisfies the interface. Using this strategy may be a
-good choice for another project.
-
-In summary, I effectively implemented Paxos and built an ACID distributed database on top, with
-support for transactions. I made some improvements to my design, which showed how start optimising
-the project for different scenarios. The project is an effective prototype, giving valuable
-insight into the performance ramifications of different design decisions of a distributed
-database. Although my project was limited by the amount of time I had, I have gained valuable
-insights into my decisions and how I would improve the project if I were to implement it again.
+good choice for future projects.
 
 \cleardoublepage
 \chapter{Conclusion}
+
+I implemented Paxos and built an ACID distributed database on top, with support for transactions.
+I made some improvements to my design, which showed how to start optimising the project for
+different scenarios. The project is an effective prototype, giving valuable insight into the
+performance ramifications of different design decisions of a distributed database. Although my
+project was limited by the amount of time I had, I have gained valuable insights into my decisions
+and how I would improve the project if I were to implement it again.
 
 \section{Comparison with Requirements}
 

@@ -105,14 +105,11 @@ Name:               & \bf Charlie Shepherd                        \\
 College:            & \bf Churchill College                     \\
 Project Title:      & \bf PDB: A Distributed Database Based on Paxos \\
 Examination:        & \bf Computer Science Tripos, July 2013        \\
-Word Count:         & \bf 11,717 \\
+Word Count:         & \bf 11,189 \\
 Project Originator: & Charlie Shepherd                    \\
 Supervisor:         & Stephen Cross                    \\
 \end{tabular}
 }
-
-% XXX: note: cut down DVCS, cut bullshit about not having enough time, SQL etc
-
 
 \section*{Original Aims of the Project}
 
@@ -236,7 +233,6 @@ round of 2PC.}. If all nodes agree then it sends a message telling each member t
 it sends a message to each member telling them to abort. This is very efficient, with a message
 cost of $3n$ for a network of $n$ nodes.
 
-% XXX review
 However, 2PC suffers from a lack of tolerance to failures. If the
 co-ordinator fails during the protocol then some nodes in the cohort will have received a message from
 the co-ordinator and voted and some may not. The nodes that have voted may be blocked, having
@@ -318,12 +314,11 @@ However, a potential drawback to this is that Paxos sacrifices availability. Thi
 a pathological case where no progress is made, i.e., there is no upper bound on the
 time it will take to achieve consensus. This is due to the FLP
 impossibility proof \cite{fischer85}, which states that it is impossible to guarantee liveness in
-an asynchronous network where at least one failure has occured. In practice, it is a situation that
+an asynchronous network where at least one failure has occurred. In practice, it is a situation that
 is relatively easy to avoid and is not a serious concern.
 
 \section{Databases}
 
-% XXX repeat im going to implement a database system
 \subsection*{ACID}
 
 Commonly all databases provide ACID properties. ACID stands for:
@@ -419,12 +414,13 @@ Implementation, Verification and Maintenance. I decided against using this and i
 Spiral Model. The Spiral Model uses the steps of the Waterfall model but repeats them several
 times, iteratively working towards the final result.
 
-The Spiral Model is more suitable for my project because, although I have set out my formal
-requirements, there is still a lot of uncertainty in the project. I have not designed a network
-protocol or a database previously, nor have I implemented Paxos before. This means that it is
-likely I will encounter unexpected difficulties in developing my project that may lead me to
-change or shift my requirements. The Spiral Model is more flexible than the Waterfall Model in
-this case.
+The Spiral Model was more suitable for my project because, although formal
+requirements for the project were set out, there was still a lot of uncertainty in the project. I
+had not designed a network
+protocol or a database previously, nor had I implemented Paxos before. This meant it was
+likely I would encounter unexpected difficulties in developing my project that would lead me to
+change or shift my requirements. In this case the Spiral Model is more flexible than the Waterfall
+Model.
 
 \subsection{Language Choice}
 
@@ -449,7 +445,7 @@ to the limitations of the network.
 
 Twisted is a Python framework used for event driven network programming. It contains support for
 many different protocols, making it easier to write efficient networking code.  It is single
-threaded, which means I will not have to worry about concurrency issues in my project. Twisted is
+threaded, which means I need not worry about concurrency issues in my project. Twisted is
 licensed under the MIT license so there are no license issues in using it for my project.
 
 The other module I decided to use is PyParsing, a Python module for programmatically creating a
@@ -466,16 +462,15 @@ work.
 
 \subsection{Testing}
 
-In order to have confidence that my project works correctly I will need to write
-tests. I will write unit tests for the main modules of my project, to check it handles both expected and
+In order to have confidence that my project works correctly I wrote
+tests. I wrote unit tests for the main modules of my project, to check it handles both expected and
 malformed input correctly and as expected. Tests are also useful for
 expressing the API usage of the different modules of the project and checking that the interfaces
-connect sensibly. I will perform regression testing; every time I fix a bug I will
-% XXX bug twice (from dad)
-add a test ensuring any regression (causing the bug again) will make the test fail.
+connect sensibly. I also performed regression testing; every time I fixed a bug I
+added a test ensuring that any regression causing the bug again would make the test fail.
 
 Tests will be run every time I make a commit, to confirm that the project
-is working correctly. Twisted has a unit testing framework that I will use as it easily
+is working correctly. Twisted has a unit testing framework that I used as it easily
 facilitates testing asynchronous programs, something that would be harder in other unit testing
 frameworks available in Python.
 
@@ -657,10 +652,8 @@ there is a single leader that talks to a majority of processes twice.
 
 However Paxos cannot tolerate `rogue' processes, that is, processes deliberately sending
 malicious or incorrect messages. There is a variant of Paxos called \emph{Byzantine Paxos} which
-can tolerate this, albeit at a failure tolerance of $F$ for $3F + 1$ nodes. I will not go into
-this variant further in this dissertation.
-% XXX: dad - this variant is not discussed futher in this disssertation
-% XXX: go into this further
+can tolerate this, albeit at a failure tolerance of $F$ for $3F + 1$ nodes.
+This variant is not discussed further in this dissertation.
 
 \subsection{Definitions}
 
@@ -923,7 +916,6 @@ FastPaxos, have better performance but are also more complex to implement.
 
 \cleardoublepage
 \chapter{Implementation}
-% XXX review nicks comments on the start of this chapter again
 
 \section{Event Driven Programming}
 
@@ -931,7 +923,6 @@ Event Driven Programming is a programming paradigm in which program flow is dete
 that occur. Program flow is co-ordinated by an event handling loop, which calls appropriate
 callbacks when the events they are registered for occur.
 
-% XXX do i want to say its trivial?
 Twisted provides the event loop and network interfaces, making it possible to listen on
 an interface and have a callback be passed events that occur.
 
@@ -1007,7 +998,6 @@ better than using a tuple for the reasons identified above - the host is now awa
 address and is able to include it in messages, and there are no problems in potentially ambiguous
 adapter situations, where different parts of the network think a node has different addresses.
 
-% XXX rewrite? as per eds comments
 A potential problem is that a node may lie about its identity, for example forging a
 \op{ATTEMPTLOCK} request. A more secure implementation would therefore have nodes generate a
 public/private keypair and sign messages with the private key, so that they could be verified with
@@ -1032,21 +1022,17 @@ problematic, since if the network develops inconsistencies these are much harder
 \subsubsection{Bootstrap}
 
 A node connects to the network by connecting to a \emph{bootstrap node}. In my current
-% XXX dht
-architecture this can be any node, however in a different model it may be a specific node, see the
-Evaluation chapter for more details involving scaling. When a node $N$ connects to the bootstrap
+architecture this can be any node, however in a different model it may be a specific node.
+When a node $N$ connects to the bootstrap
 node $B$, it sends an \msg{EHLO} message\footnote{EHLO is taken from SMTP: http://cr.yp.to/smtp/ehlo.html}.
 $B$ replies with a \msg{Notify} message containing all the
 hosts $B$ is aware of. $N$ then sends each of these in turn an \msg{EHLO} message, making each of them
 aware of its presence, and getting a \msg{Notify} message from each of them. This is repeated until
-% XXX rewrite
-there are no nodes it has not learned of. $N$ is then fully integrated into the network.\footnote{
+there are no nodes it has not learned the existence of. $N$ is then fully integrated into the network.\footnote{
 Note that this bootstrap method is $O(n^2)$ in the number of messages sent, where $n$ is the
 number of nodes in the network. There are other ways to
-do bootstrap that are more efficient in the number of messages sent (for instance a DHT or a
-supernode hierarchy). While this architecture is out of the scope of this project these options are
-discussed later on.}
-% XXX dht
+do bootstrap that are more efficient in the number of messages sent, these are discussed
+later on.}
 
 \subsubsection{Heartbeat}
 
@@ -1072,7 +1058,7 @@ an argument and operates on it, allowing several instances to operate simultaneo
 \label{sec:nacks}
 
 Paxos is designed to preserve its safety and liveness properties even when messages are dropped or
-lost. In fact, the most basic implementation of Paxos simples ignores messages if they do not
+lost. In fact, the most basic implementation of Paxos simply ignores messages if they do not
 require a response, as the protocol detects a timeout and acts accordingly (this often means
 retrying with a higher proposal number).
 
@@ -1202,7 +1188,9 @@ class.
 \end{figure}
 
 The Proposer role is the most complicated of the three. It is implemented as a state machine with
-3 states: `idle', `trying' and `polling' (see figure~\ref{fig:proposer-state-machine}). The
+3 states: `idle', `trying' and `polling' (see
+figure~\ref{fig:proposer-state-machine})\footnote{Pseudocode for the Proposer role is presented in
+Appendix A.}. The
 state machine starts in the `idle' state. It then transitions to the `trying' state and sends
 \msg{Prepare} messages to the Acceptors in the network. As the network is homogenous in my design
 this means all nodes are sent \msg{Prepare} messages.
@@ -1231,7 +1219,6 @@ As the Proposer receives \msg{Promise} messages, it keeps track of the \verb+pre
 than \verb+proposer_prev_prop_num+, then it updates \verb+proposer_prev_prop_num+
 and \verb+proposer_prev_prop_value+ to \verb+prev_prop_num+ and \verb+prev_prop_value+
 respectively.
-% XXX: refer to psuedo code here
 
 Once a Proposer in the `trying' state has received \msg{Promise} messages from a majority of
 Acceptors in the network, it moves to the `polling' state. The Proposer examines the responses
@@ -1247,8 +1234,8 @@ the operation log and its value needs to be ascertained.
 
 \subsubsection{Acceptor}
 
-The Acceptor class only stores three variables in each instance:
-\\
+The Acceptor class only stores three variables in each instance\footnote{Pseudocode for the
+Acceptor role is also presented in Appendix A.}:\\
 \\
 \begin{tabular}{ | c | p{8cm} | }
   \hline
@@ -1322,9 +1309,7 @@ network of scale efficiently. One of these is using `supernodes' --- nodes desig
 through bandwidth or chosen randomly to co-ordinate their child nodes.  Another technique is the
 use of Distributed Hashing Tables (DHTs) to manage nodes. This involves computing a measure or
 pseudo-measure of `distance' to other nodes, then having nodes only contact their
-`neighbours', rather than the entire network. Unfortunately I did not have time to investigate
-these options for my project.
-% XXX dht
+`neighbours', rather than the entire network.
 
 \section{Database Design}
 
@@ -1354,8 +1339,8 @@ before and starts a new round of Paxos for that instance, trying to assert that
 
 I tried a number of different techniques for retrying an insertion in the event that the OID was
 associated with another operation. Initially I put the retry logic in the database. However it
-became clear that it made more sense to delegate the responsibility for retrying to Paxos.
-% XXX why?
+became clear that it made more sense to delegate the responsibility for retrying to Paxos, as it
+allowed a simpler interface between the two modules.
 
 This meant that at submit time the Database Controller could make no guarantee about the OID the
 statement would have but did have the guarantee that once a statement was submitted to Paxos, it
@@ -1378,22 +1363,21 @@ may return out of date data. A slow read forces the database to actually examine
 of the network by inserting an operation to ensure it has obtained all transactions issued
 prior to the slow read.
 
-% XXX say what: ed
-I chose to use a \op{NOP} operation rather than a \op{READ} operation, although they
-would semantically be the same (as other nodes do nothing on a \op{READ}), as I felt a \op{NOP}
+I chose to use a \op{NOP} operation rather than a \op{READ} operation to do a slow read on other
+nodes, although they
+would semantically be the same (as other nodes do not need to perform an action on a \op{READ}), as I felt a \op{NOP}
 better represented the operation being sent (do nothing).
 
-% XXX subfigures
 \begin{figure}[htb]
 \centering
-\includegraphics[scale=0.5]{figs/op-log-slow-read-1.eps}
-\caption{\label{fig:op-log-slow-read-1}Performing a slow read}
-\end{figure}
-
-\begin{figure}[htb]
-\centering
-\includegraphics[scale=0.5]{figs/op-log-slow-read-2.eps}
-\caption{\label{fig:op-log-slow-read-2}After a slow read}
+\subfigure[Performing a slow read]{
+	\includegraphics[scale=0.5]{figs/op-log-slow-read-1.eps}
+	\label{fig:op-log-slow-read-1}
+}
+\subfigure[After a slow read]{
+	\includegraphics[scale=0.5]{figs/op-log-slow-read-2.eps}
+	\label{fig:op-log-slow-read-2}
+}
 \end{figure}
 
 Figure~\ref{fig:op-log-slow-read-1} shows the situation as seen by a node $N$ at time $t_1$. It
@@ -1423,7 +1407,7 @@ time and when a node holds it, only that node can perform operations on the data
 isolation for transactions.
 
 In order to start a transaction, a node inserts the \op{ATTEMPTLOCK} operation. If, when the
-operation is inserted, the number of preceeding \op{ATTEMPTLOCK}s is well-bracketed\footnote{There
+operation is inserted, the number of preceding \op{ATTEMPTLOCK}s is well-bracketed\footnote{There
 is an equal number of lock takes and releases.}, then the node was successful in taking the lock.
 While a node holds the lock, no other node can perform an operation. Operations continue to be inserted
 in the operation log but are not performed on the row store.
@@ -1485,7 +1469,6 @@ refers to the end of the line.
 \caption{\label{fig:where-ast}Example WHERE clause matching tree}
 \end{figure}
 
-% XXX pyparsing didnt do this for you?
 For this grammar, I then built a simple recursive descent parser to construct a boolean matching
 tree. For example, the SQL fragment \verb+WHERE (field1 == 'a' AND field2 == 1) OR field2 <= field3+
 would be parsed into the tree represented by figure~\ref{fig:where-ast}.
@@ -1543,14 +1526,12 @@ results from nodes run on a physical network, due to other factors such as netwo
 also makes results inconsistent and difficult to reproduce on several runs. As my results are
 dependent upon network characteristics, I wanted to control those characteristics.
 
-% XXX reword
-It became necessary to run all nodes in the same script in order to control complex scenarios. I
+It became necessary to run all nodes in the same script in order to emulate more complex networks. I
 discuss the limitations of this in the section below.
 
 \subsubsection*{Assumptions}
 
 For the simulation to be a valid measure of how the network responds, I made certain assumptions.
-% XXX does io bound need explaining?
 As a distributed application, I would expect my application to be mainly IO bound, rather than
 being CPU bound. IO bound means that the application spends most of the time waiting for IO, in
 this case network IO (sending and receiving messages), as opposed to CPU bound, which means the
@@ -1566,8 +1547,7 @@ one core without explicit parallelism, and Twisted's event loop ran for all the 
 network. A potential fix would be to spawn different threads for each node and then join the
 results when the simulation is done. In this way the simulation could utilise the full resources
 of the simulating machine, instead of being artificially constrained by the resource limits of the
-simulating machine. While this is possible in Twisted, it is not straightforward, and
-unfortunately time constraints did not allow further exploration of this evaluation method.
+simulating machine.
 
 \subsection{Gathering and Formatting Results}
 
@@ -1579,7 +1559,6 @@ operations could not immediately be run, the script had to wait for every node i
 to be aware of every other node in the network. This start up time is not reflected in the
 results. After the network bootstrapped, the required number of nodes were scheduled to write,
 and the relevant metric was recorded in a CSV file.
-% XXX rewrite
 
 Five measurements were taken for each point, the average and standard deviation were then calculated
 and plotted by gnuplot. This was all co-ordinated from a Makefile, so that all graphs could
@@ -1590,8 +1569,7 @@ thoroughly to be sure it was valid, and be sure that I was handling all the data
 
 I started off by measuring how the network responded to contention. This meant measuring how the
 latency and throughput changed in response to the number of nodes which were writing in the
-network. Obviously the higher the contention the longer it would take operations to complete, but
-by graphing the results  % XXX ...
+network.
 
 \subsection{Latency}
 
@@ -1628,9 +1606,7 @@ operations. This is also expected as executing a transaction involves waiting on
 operations to be executed before it is committed.
 
 A common trend in the graph is that the latency of committing an operation to the
-network increases linearly with the number of writers in the network with a strong
-correlation.
-% XXX: nick says delete
+network increases linearly with the number of writers in the network.
 
 I repeated the simulation with a network of 20 nodes, shown in figure~\ref{fig:lat-20}.  This
 shows again that increasing the number of concurrent writers in the system causes the latency
@@ -1668,8 +1644,7 @@ database operation throughput and database transaction throughput.
 
 I calculated the throughput by measuring how long it took to commit 5 operations to the network with
 a given number of writers. I then plotted $\frac{5}{x}$ for each point as the average throughput in
-\emph{operation seconds\superscript{-1}}.
-% XXX dont do this
+operations per second.
 
 Again this was initially done for a network of 10 nodes. The results of this are in
 figure~\ref{fig:thruput-10}, which shows that the throughput of the network decreases with
@@ -1708,7 +1683,7 @@ number of messages sent without offering an increase in latency.
 \begin{figure}[Hhtb]
 \centering
 \lwincludegraphics[scale=2]{figs/start.eps}
-\caption{\label{fig:start}Start}
+\caption{\label{fig:start}Startup Cost Measurements}
 \end{figure}
 
 As the size of the network increases, the cost of bootstrapping the network becomes prohibitively
@@ -1718,32 +1693,6 @@ $N^2$ curve as the number of nodes in the network increases, as expected, as eve
 every other node. In the centralised design, not only is the amount of bandwidth used at the start
 significantly decreased, but the increase as the number of nodes rises is linear, rather than
 $O(N^2)$.
-
-\subsection{Node Churn}
-
-\begin{figure}[Hhtb]
-\centering
-\subfigure[Latency vs Churn]{
-	\includegraphics[scale=0.75]{figs/churn_lat.eps}
-	\label{fig:churn-lat}
-}
-\subfigure[Throughput vs Churn]{
-	\includegraphics[scale=0.75]{figs/churn_thru.eps}
-	\label{fig:churn-thru}
-}
-\end{figure}
-
-% XXX wtf is churn
-Paxos is designed to remain fully functional as long as a majority of nodes remain in the network.
-I measured how the network responds to nodes leaving and joining the network.
-Figure~\ref{fig:churn-lat} shows how the latency of an operation is affected by nodes leaving and
-joining a network of 20 nodes. The churn has no effect until a majority of nodes start leaving the
-network, when the performance suddenly drops off.
-
-This can also be seen in figure~\ref{fig:churn-thru}, which shows how the throughput of the
-network is affected by churn, again in a network of 20 nodes. The result is similar -- the churn
-has no effect until a majority of nodes are affected, at which point the network is unable to make
-any progress.
 
 \section{Limitations}
 
@@ -1761,44 +1710,31 @@ Another limitation of the protocol is that it is quite verbose.
 Using a more efficient variant such as MultiPaxos would decrease the bandwidth requirements of the
 system, or a variant such as FastPaxos would decrease the latency.
 
-Although I saw an improvement to the startup cost of bootstrapping the network, my improvement
-centralises the bootstrapping. A more advanced solution would use a DHT or super-node
-hierarchy for managing the nodes.
-% XXX dht
+% \section{Changes with hindsight}
+% 
+% If I was to do the project again, there are several potential changes that I would make.
+% 
+% One design choice I made was to start with a key/value database prototype and later refactor it
+% into a row based database. I then added an SQL interface and layered transactions on top. This was
+% % XXX why change it if it was reasonable
+% % nick says wheres the change
+% a reasonable design choice, as I started with a small prototype and then built on it.  Using my
+% experience from this implementation, I could design the system as row-based from the start.
 
-Due to time constraints I did not have time to implement all the SQL syntax that my requirements
-indicated. However this is not a significant concern as it is relatively easy to add new syntax and
-operations to the database.
-
-\section{Changes with hindsight}
-% XXX move to conclusion?
-
-If I was to do the project again, there are several potential changes that I would make.
-
-One design choice I made was to start with a key/value database prototype and later refactor it
-into a row based database. I then added an SQL interface and layered transactions on top. This was
-% XXX why change it if it was reasonable
-% nick says wheres the change
-a reasonable design choice, as I started with a small prototype and then built on it.  Using my
-experience from this implementation, I could design the system as row-based from the start.
-
-As I progressed through the project, I began to struggle to keep unit tests up to date with the
-code. After refactoring the code, I would need to rewrite the tests, as
-the refactoring would invalidate a number of them. This was because I had decided to write the
-unit tests after the code.  A strategy called Test Driven Development involves writing tests for
-an interface, then writing the code that satisfies the interface. Using this strategy may be a
-good choice for future projects.
-% XXX: nick says change?
+% As I progressed through the project, I began to struggle to keep unit tests up to date with the
+% code. After refactoring the code, I would need to rewrite the tests, as
+% the refactoring would invalidate a number of them. This was because I had decided to write the
+% unit tests after the code.  A strategy called Test Driven Development involves writing tests for
+% an interface, then writing the code that satisfies the interface. Using this strategy may be a
+% good choice for future projects.
+% % XXX: nick says change?
 
 \cleardoublepage
 \chapter{Conclusion}
 
 I implemented Paxos and built an ACID distributed database on top of it, with support for transactions.
-I made some improvements to my design, which showed how to start optimising the project for
-different scenarios. The project is an effective prototype, giving valuable insight into the
-performance ramifications of different design decisions of a distributed database. Although my
-project was limited by the amount of time I had, I have gained valuable insights into my decisions
-and how I would improve the project if I were to implement it again.
+I made some improvements to my design and measured quantatively how these affected the performance
+of the database under different loads.
 
 \section{Comparison with Requirements}
 
@@ -1831,7 +1767,6 @@ the project to be improved and extended.
 
 \paragraph{Transactions}
 
-% XXX reword? punctuation
 There are several different locking schemes that could be used, Optimistic Concurrency Control
 (OCC) being one of particular interest, as it is much more effective in a network with low
 contention.
@@ -1855,9 +1790,9 @@ bandwidth.
 \paragraph{Security}
 
 One area of Computer Science that I constantly encountered during this project was security.
-Although I decided it was beyond the scope of my project, given more time it would have been
-valuable to investigate the security implications of many of my design decisions and build more
-security into my design, as well as considering implementing Byzantine Paxos, which can tolerate
+Although I decided it was beyond the scope of my project, it would be been
+valuable to investigate the security implications of my design decisions
+and consider implementing Byzantine Paxos, which can tolerate
 rogue and faulty nodes in the network.
 
 \cleardoublepage

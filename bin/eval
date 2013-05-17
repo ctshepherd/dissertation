@@ -288,8 +288,11 @@ def main():
     m = kls(backend, options.nodes, options.writers)
 
     reactor.callLater(7, m.start_run, options.ops, i)
-    failout = 100
-    reactor.callLater(failout, reactor.stop)
+    failout = 500
+    def f():
+        print "stopping!..."
+        reactor.stop()
+    reactor.callLater(failout, f)
     reactor.run()
 
     m.output(options.file)

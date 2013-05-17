@@ -12,7 +12,7 @@ PROPOSER_TIMEOUT = 3
 #     0 - no, 1 - yes, 2 - yes with full info
 NACKS_ENABLED = 2
 
-STARTUP = "new"
+STARTUP = "old"
 
 # Database schema
 DB_SCHEMA = ("address", "name", "age")
